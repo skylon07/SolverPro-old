@@ -62,14 +62,14 @@ from errors import TracebackError
 #     leftaliastemp COLON_EQUALS rightaliastemp
 #         FIRST: [IDENTIFIER|IDENTIFIER PERIOD|BRACKET_OPEN]
 #                IDENTIFIER [PERIOD|_] PAREN_OPEN
-# leftalias -> identifier | BRACKET_OPEN identifiers BRACKET_CLOSE
+# leftalias -> fullidentifier | BRACKET_OPEN identifiers BRACKET_CLOSE
 #         FIRST: IDENTIFIER
 #                BRACKET_OPEN
 # rightalias -> inherits objectdeclaration | objectdeclaration | expression
 #         FIRST: PAREN_OPEN
 #                BRACE_OPEN
-# leftaliastemp -> identifier PAREN_OPEN PAREN_CLOSE |
-#     identifier PAREN_OPEN identifiers PAREN_CLOSE
+# leftaliastemp -> fullidentifier PAREN_OPEN PAREN_CLOSE |
+#     fullidentifier PAREN_OPEN identifiers PAREN_CLOSE
 #         FIRST: IDENTIFIER [PERIOD|_] PAREN_OPEN PAREN_CLOSE
 #                IDENTIFIER [PERIOD|_] PAREN_OPEN IDENTIFIER
 # rightaliastemp -> relation | expression | command | objectdeclaration
