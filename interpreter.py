@@ -15,6 +15,11 @@ class Interpreter:
             "numbers": [],
             "values": [],
             "operations": [],
+            "expressions": [],
+
+            "aliasNames": [],
+            "templateArgs": [],
+            "aliasRightHands": [],
         }
         self._parseResult = None
 
@@ -85,29 +90,35 @@ class Interpreter:
             if branch == "id":
                 tokenStrs = map(lambda token: str(token), tokens)
                 fullId = ''.join(tokenStrs)
-                pushStack("identifiers", fullId)
+            pushStack("identifiers", fullId)
         self._parser.onFullIdentifier(onFullIdentifier)
+
+        def onIdentifiers(tokens, branch):
+            if branch == "fu":
+                identifier = popStack("identifiers")
+                identifiers = [identifier]
+            elif branch == "fu CO ids":
+                identifiers = popStack("identifiers")
+                nextIdentifier = popStack("identifiers")
+                identifiers.append(nextIdentifier)
+            pushStack("identifiers", identifiers)
+        self._parser.onIdentifiers(onIdentifiers)
 
         def onNumber(tokens, branch):
             if branch == "NU" or branch == "EN":
                 numberStr = str(tokens[0])
-                pushStack("numbers", numberStr)
+            pushStack("numbers", numberStr)
         self._parser.onNumber(onNumber)
 
         def onValue(tokens, branch):
             if branch == "fu":
                 idStr = popStack("identifiers")
                 value = IdentifierValue(idStr)
-                pushStack("values", value)
             if branch == "nu":
                 numberStr = popStack("numbers")
                 value = NumericValue(numberStr)
-                pushStack("values", value)
+            pushStack("values", value)
         self._parser.onValue(onValue)
-
-        def onExpression(tokens, branch):
-            self._throwBranchNotImplemented("expressions")
-        self._parser.onExpression(onExpression)
 
         def onOperationANY(tokens, branch):
             binaryOpBranches = [
@@ -120,11 +131,14 @@ class Interpreter:
                 rightExpr = popStack("expressions")
                 leftExpr = popStack("expressions")
                 newExpr = Expression(leftExpr, operatorStr, rightExpr)
-                pushStack("expressions", newExpr)
             elif branch == "DA opx":
                 expr = popStack("expressions")
                 newExpr = NegativeExpression(expr)
-                pushStack("expressions", newExpr)
+            else:
+                # nothing to do for carry-over branches
+                return
+            pushStack("expressions", newExpr)
+                
         self._parser.onOperationLow(onOperationANY)
         self._parser.onOperationMid(onOperationANY)
         self._parser.onOperationHigh(onOperationANY)
@@ -137,14 +151,53 @@ class Interpreter:
         self._parser.onOperatorMid(onOperatorANY)
         self._parser.onOperatorHigh(onOperatorANY)
 
+        def onEvaluation(tokens, branch):
+            if branch == "va":
+                expr = popStack("values")
+            elif branch == "PAO ex PAC":
+                # no need to process;
+                # the expression is already in the right place
+                return
+            pushStack("expressions", expr)
+        self._parser.onEvaluation(onEvaluation)
+
+        def onLeftAliasANY(tokens, branch):
+            if branch == "fu":
+                identifier = popStack("identifiers")
+                identifiers = (identifier,)
+                args = None
+            elif branch == "BRO ids BRC":
+                identifiers = popStack("identifiers")
+                args = None
+            else:
+                self._throwBranchNotImplemented("alias names".format(branch))
+            pushStack("aliasNames", identifiers)
+            pushStack("templateArgs", args)
+        self._parser.onLeftAlias(onLeftAliasANY)
+        self._parser.onLeftAliasTemp(onLeftAliasANY)
+
+        def onRightAlias(tokens, branch):
+            if branch == "ex":
+                expr = popStack("expressions")
+                rightHand = expr
+            else:
+                self._throwBranchNotImplemented("alias expressions".format(branch))
+            pushStack("aliasRightHands", rightHand)
+        self._parser.onRightAlias(onRightAlias)
+
+        def onRightAliasTemp(tokens, branch):
+            if False:
+                pass
+            else:
+                self._throwBranchNotImplemented("alias template expressions".format(branch))
+            TODO_somethingNeedsToGoHere = None
+            pushStack("aliasRightHands", TODO_somethingNeedsToGoHere)
+        self._parser.onRightAliasTemp(onRightAliasTemp)
+
         # TODO: finish these features
         def onUnit(tokens, branch):
             self._throwBranchNotImplemented("units")
         self._parser.onUnit(onUnit)
-
-        def onAlias(tokens, branch):
-            self._throwBranchNotImplemented("aliases")
-        self._parser.onAlias(onAlias)
 
         def onObjectDeclaration(tokens, branch):
             self._throwBranchNotImplemented("objects")
