@@ -1,0 +1,11 @@
+Please note that when the program errors, it does not process ANY of the last input.
+This means if you see any error, the last line might as well never have been entered.
+
+MissingParameter
+    "object:" command requires an object name
+        This occurs when an object name is not specified when creating a new object
+        |> object:
+    
+    "unit:" command requires a unit name
+        This occurs when a unit name is not specified when defining a new unit
+        |> unit:

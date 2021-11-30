@@ -1,0 +1,27 @@
+Why does SolverPro have/do <something>?
+What makes SolverPro useful?
+
+
+Example 1: Why does SolverPro have units?
+
+Problem:
+A block has 12N of force applied to it and weighs 4kg.
+How fast is the block accelerating?
+
+We know the "force relationship" applies to the block...
+    |> unit: N = kg * m / s^2
+    |> object: block { force<N> = mass<kg> * acc<m/s^2> }
+
+"A block has 12N of force ... and weighs 4kg"
+    |> block.force = 12
+    |> block.mass = 4
+
+"How fast is the block accelerating?"
+    |> block.acc
+        3 m/s^2
+It printed the correct units!
+
+But more than that, it can also check for math errors!
+    |> object: block2 { acc = pos<m> / time<s> }
+    |> block2.acc = block1.acc
+        TODO(use correct error name/msg) Error! Units mismatched: m/s <--> m/s^2

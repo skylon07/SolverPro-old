@@ -1,0 +1,77 @@
+        Note 1: All symbols are needed for systems of equations
+    |> a = 2 * b + c
+    |> 4 * b = a + c
+    |> a - c = b + 2
+Without solving for each a, b, and c, the answers
+    a = 6, b = 2, and c = 2 cannot be obtained
+
+
+        Note 2: Different "classes" of relations
+    |> f = m * a
+    |> f = 2 * m
+    |> a = v / t
+When solving all equations with all variables,
+    f = 0 and m = 0 (they seem to be ignored)
+
+
+        Note 3: solveset() seems to be more rigid than solve(),
+            however it can't solve systems of equations
+(Second paragraph)
+https://docs.sympy.org/latest/tutorial/solvers.html#solving-equations-algebraically
+
+
+        Note 4: Finding solutions to an equation requires solves for
+            each variable (when using solveset())
+    |> b + c = 2 * b
+    |> c = c + b - 2
+When solving by hand, it is apparent in the first relation that c = b.
+We can also see that b = 2 from the second equation. However, trying
+    to solve for c in the second equation gives us the empty set.
+This means that for every relation, we must attempt to solve for
+    every variable present in the relation.
+
+
+        Note 5: python syntax needs to be substituted
+'**' is not a valid operator; strings returned need this to be replaced.
+Builtins might also need to be implemented; sympy returns things like "sqrt(b)"
+
+
+
+
+
+GOOD TEST PROBLEMS
+    (celestial bodies and answer-as-radius-fraction problem)
+
+    (falling block is pulling a pully that's pulling a block sliding on frictionful table)
+
+    A football player with mass 100kg runs 2.6 m/s on
+    a disk with angular inertia I = 3E6 and a radius of 8 meters,
+    both initially at rest. What is the period of the disk?
+    |> disk := { I = 3E6, r = 8 }
+    |> guy := { m = 100, v = 2.6, I = m * disk.r^2 }
+    |> guy.v = guy.v_ang * disk.r
+    |> guy.ang_momentum = guy.I * guy.v_ang
+    |> disk.ang_momentum = -guy.ang_momentum
+    |> disk.ang_momentum = disk.ang_velocity * disk.I
+    |> disk.ang_velocity = disk.rotated / disk.period
+    |> disk.period
+        undefined (disk.rotated / 2.49599789)
+    |> disk.rotated = 2 * 3.14159
+    |> disk.period
+        2.51730180576
+
+    A block is pushed with a force of 12N.
+    If it weighs 6kg, how fast is it accelerating?
+    |> block = { F = m * a, F = 12, m = 6 }
+    |> block.a
+        2
+    If instead the block was pushed twice as much,
+    how fast would it accelerate?
+    |> block.force = 2 * block.force
+        Error! Contradiction
+    |> block.force := 2 * block.force
+    |> block.force
+        24
+    |> block.a
+        4
+

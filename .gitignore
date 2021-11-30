@@ -1,0 +1,9 @@
+# hidden in skylon07 .vscode settings.json
+**/.svn
+**/.hg
+**/CVS
+**/.DS_Store
+**/*.pyc
+**/__pycache__
+# speaking of .vscode...
+.vscode
