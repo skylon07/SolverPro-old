@@ -5,20 +5,6 @@ from parser import Parser
 from engine import *
 
 
-# decorator for all interpreter functions that call parser.inspect()
-def parserInvoker(fn):
-    def newFnForLine(self, string):
-        lastMode = self._parseMode
-        try:
-            if '\n' in string:
-                raise ValueError("(Internal error) Interpreter expected a single line to evaluate; given multiple lines (in a single string)")
-            fn(self, string)
-            # self._assertParseStackEmpty()
-        finally:
-            self._parseMode = lastMode
-    return newFnForLine
-
-
 class Interpreter:
     def __init__(self, outputFn):
         self._outputFn = outputFn
@@ -37,12 +23,10 @@ class Interpreter:
         self._engine = Engine()
         self._bindToParser()
 
-    @parserInvoker
     # treats the string as user input
     def executeLine(self, string):
         try:
-            tokens = self._lexer.process(string)
-            self._parser.inspect(tokens, string)
+            result = self.evaluateLine(string)
         except (Parser.ParseError, Parser.EOLError) as e:
             self._outputFn(e)
         except NotImplementedError as e:
@@ -50,11 +34,19 @@ class Interpreter:
         except Exception as e:
             self._outputFn("{}(Interpreter -- Unhandled error) {}: {}".format(INDENT, type(e).__name__, e))
 
-    @parserInvoker
     # helper that can turn strings into engine-useable data structures
     def evaluateLine(self, string):
+        if '\n' in string:
+            raise ValueError("(Internal error) Interpreter expected a single line to evaluate; given multiple lines (in a single string)")
+
         tokens = self._lexer.process(string)
         self._parser.inspect(tokens, string)
+        result = self._parseResult
+        self._parseResult = None
+        # stack should be empty (otherwise, parser callbacks aren't
+        # communicating/working properly)
+        self._assertParseStackEmpty()
+        return result
 
     def _bindToParser(self):
         def pushStack(key, *args):
