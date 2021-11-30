@@ -49,22 +49,36 @@ class Interpreter:
         return result
 
     def _bindToParser(self):
-        def pushStack(key, *args):
-            return self._parseStack[key].append(*args)
-        def popStack(key, *args):
-            return self._parseStack[key].pop(*args)
+        def pushStack(key, *pushArgs):
+            return self._parseStack[key].append(*pushArgs)
+        def popStack(key, *popArgs):
+            return self._parseStack[key].pop(*popArgs)
         
         def onStart(tokens, branch):
             if branch == "re EOL":
-                pass
+                self._parseResult = {
+                    "type": "relation",
+                }
             elif branch == "al EOL":
-                pass
+                self._parseResult = {
+                    "type": "alias",
+                    "aliasNames": popStack("aliasNames"),
+                    "templateArgs": popStack("templateArgs"),
+                    "rightHand": popStack("aliasRightHands"),
+                }
             elif branch == "ex EOL":
-                pass
+                self._parseResult = {
+                    "type": "expression",
+                    "expression": popStack("expressions"),
+                }
             elif branch == "co EOL":
-                pass
+                self._parseResult = {
+                    "type": "command",
+                }
             elif branch == "EOL":
-                pass
+                self._parseResult = {
+                    "type": "Empty",
+                }
         self._parser.onStart(onStart)
 
         def onFullIdentifier(tokens, branch):
