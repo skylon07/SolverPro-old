@@ -5,15 +5,6 @@ from parser import Parser
 from engine import *
 
 
-# parse events the interpreter subscribes to may perform different tasks
-# depending on the "parse mode" the interpreter is in
-PARSE_MODES = {
-    "EXECUTE": "EXECUTE", # treat parser tokens as user input to execute
-    "EVALUATE": "EVALUATE", # only use the parser to assist in processing tokens
-    "NONE": "NONE", # ignore parser processing
-}
-
-
 # decorator for all interpreter functions that call parser.inspect()
 def parserInvoker(fn):
     def newFnForLine(self, string):
@@ -33,7 +24,6 @@ class Interpreter:
         self._outputFn = outputFn
         self._solutions = list()
 
-        self._parseMode = PARSE_MODES["NONE"]
         self._parseStack = {
             "identifiers": [],
             "numbers": [],
@@ -47,19 +37,9 @@ class Interpreter:
         self._engine = Engine()
         self._bindToParser()
 
-    @property
-    def _parseMode(self):
-        return self.__parseMode
-    @_parseMode.setter
-    def _parseMode(self, newMode):
-        if newMode not in PARSE_MODES:
-            raise ValueError("(Internal error) Tried to set interpreter to invalid parse mode")
-        self.__parseMode = newMode
-
     @parserInvoker
     # treats the string as user input
     def executeLine(self, string):
-        self._parseMode = PARSE_MODES["EXECUTE"]
         try:
             tokens = self._lexer.process(string)
             self._parser.inspect(tokens, string)
@@ -73,50 +53,28 @@ class Interpreter:
     @parserInvoker
     # helper that can turn strings into engine-useable data structures
     def evaluateLine(self, string):
-        self._parseMode = PARSE_MODES["EVALUATE"]
         tokens = self._lexer.process(string)
         self._parser.inspect(tokens, string)
 
     def _bindToParser(self):
-        def ensureParseMode(fn):
-            def newOnFn(*args, **kwargs):
-                if self._parseMode != PARSE_MODES["NONE"]:
-                    return fn(*args, **kwargs)
-                raise ValueError("(Internal error) Interpreter cannot use parser without a parse mode set")
-            return newOnFn
-        
         def pushStack(key, *args):
             return self._parseStack[key].append(*args)
         def popStack(key, *args):
             return self._parseStack[key].pop(*args)
         
-        @ensureParseMode
         def onStart(tokens, branch):
-            if self._parseMode == PARSE_MODES["EXECUTE"]:
-                if branch == "re EOL":
-                    pass
-                elif branch == "al EOL":
-                    pass
-                elif branch == "ex EOL":
-                    pass
-                elif branch == "co EOL":
-                    pass
-                elif branch == "EOL":
-                    pass
-            elif self._parseMode == PARSE_MODES["EVALUATE"]:
-                if branch == "re EOL":
-                    pass
-                elif branch == "al EOL":
-                    pass
-                elif branch == "ex EOL":
-                    pass
-                elif branch == "co EOL":
-                    pass
-                elif branch == "EOL":
-                    pass
+            if branch == "re EOL":
+                pass
+            elif branch == "al EOL":
+                pass
+            elif branch == "ex EOL":
+                pass
+            elif branch == "co EOL":
+                pass
+            elif branch == "EOL":
+                pass
         self._parser.onStart(onStart)
 
-        @ensureParseMode
         def onFullIdentifier(tokens, branch):
             if branch == "id":
                 tokenStrs = map(lambda token: str(token), tokens)
@@ -124,14 +82,12 @@ class Interpreter:
                 pushStack("identifiers", fullId)
         self._parser.onFullIdentifier(onFullIdentifier)
 
-        @ensureParseMode
         def onNumber(tokens, branch):
             if branch == "NU" or branch == "EN":
                 numberStr = str(tokens[0])
                 pushStack("numbers", numberStr)
         self._parser.onNumber(onNumber)
 
-        @ensureParseMode
         def onValue(tokens, branch):
             if branch == "fu":
                 idStr = popStack("identifiers")
@@ -143,12 +99,10 @@ class Interpreter:
                 pushStack("values", value)
         self._parser.onValue(onValue)
 
-        @ensureParseMode
         def onExpression(tokens, branch):
             self._throwBranchNotImplemented("expressions")
         self._parser.onExpression(onExpression)
 
-        @ensureParseMode
         def onOperationANY(tokens, branch):
             binaryOpBranches = [
                 "opm opl opl",
@@ -170,7 +124,6 @@ class Interpreter:
         self._parser.onOperationHigh(onOperationANY)
         self._parser.onOperationMax(onOperationANY)
 
-        @ensureParseMode
         def onOperatorANY(tokens, branch):
             operatorStr = tokens[0]
             pushStack("operations", operatorStr)
@@ -179,33 +132,27 @@ class Interpreter:
         self._parser.onOperatorHigh(onOperatorANY)
 
         # TODO: finish these features
-        @ensureParseMode
         def onUnit(tokens, branch):
             self._throwBranchNotImplemented("units")
         self._parser.onUnit(onUnit)
 
-        @ensureParseMode
         def onAlias(tokens, branch):
             self._throwBranchNotImplemented("aliases")
         self._parser.onAlias(onAlias)
 
-        @ensureParseMode
         def onObjectDeclaration(tokens, branch):
             self._throwBranchNotImplemented("objects")
         self._parser.onObjectDeclaration(onObjectDeclaration)
 
-        @ensureParseMode
         def onIdentifier(tokens, branch):
             if branch == "ID PE id":
                 self._throwBranchNotImplemented("identifiers")
         self._parser.onIdentifier(onIdentifier)
 
-        @ensureParseMode
         def onRelation(tokens, branch):
             self._throwBranchNotImplemented("relations")
         self._parser.onRelation(onRelation)
 
-        @ensureParseMode
         def onCommand(tokens, branch):
             self._throwBranchNotImplemented("commands")
         self._parser.onCommand(onCommand)
