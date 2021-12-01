@@ -17,6 +17,24 @@ class Symbolable:
 
 # mixin class that provides an evaluation interface
 class Evaluable:
+    def __add__(self, other):
+        return Expression(self, '+', other)
+
+    def __sub__(self, other):
+        return Expression(self, '-', other)
+
+    def __mul__(self, other):
+        return Expression(self, '*', other)
+
+    def __truediv__(self, other):
+        return Expression(self, '/', other)
+
+    def __pow__(self, other):
+        return Expression(self, '^', other)
+
+    def __neg__(self):
+        return NegativeExpression(self)
+
     @abstractmethod
     # substDict[symbol] -> numeric value
     def evaluate(self, substDict):
@@ -72,41 +90,106 @@ class Solution():
 # data structure for two equal expressions
 @immutable
 class Relation(Symbolable):
-    def __init__(self, exp1, exp2):
-        pass
+    def __init__(self, expr1, expr2):
+        self._leftExpr = expr1
+        self._rightExpr = expr2
+
+    @property
+    def left(self):
+        return self._leftExpr
+
+    @property
+    def right(self):
+        return self._rightExpr
     
     # returns symbol that is assumed equal to zero
     @immutable.memoize
     def asSymbol(self):
-        pass
+        return self._leftExpr - self._rightExpr
 
 
+OPERATORS = {
+    "+": "+",
+    "PLUS": "+",
+    "-": "-",
+    "MINUS": "-",
+    "*": "*",
+    "MULTIPLY": "*",
+    "/": "/",
+    "DIVIDE": "/",
+    "^": "^",
+    "EXPONENT": "^",
+}
 # data structure for performing operations
 @immutable
 class Expression(Symbolable, Evaluable):
     def __init__(self, evalable1, oper, evalable2):
-        pass
+        if not isinstance(evalable1, Evaluable):
+            raise TypeError("first argument for Expression must be an evaluable")
+        if oper not in OPERATORS:
+            raise TypeError("second argument for Expression must be an operator")
+        if not isinstance(evalable2, Evaluable):
+            raise TypeError("third argument for Expression must be an evaluable")
+        self._eval1 = evalable1
+        self._eval2 = evalable2
+        self._oper = oper
 
     @immutable.memoize
     def asSymbol(self):
-        pass
+        sym1 = self._eval1.asSymbol()
+        sym2 = self._eval2.asSymbol()
+        return self._operate(sym1, sym2)
 
     @immutable.memoize
     def evaluate(self, substDict):
-        pass
+        val1 = self._eval1.evaluate(substDict)
+        val2 = self._eval2.evaluate(substDict)
+        return self._operate(val1, val2)
+
+    def _operate(self, val1, val2):
+        if self._oper == '+':
+            result = val1 + val2
+        elif self._oper == '-':
+            result = val1 - val2
+        elif self._oper == '*':
+            result = val1 * val2
+        elif self._oper == '/':
+            result = val1 / val2
+        elif self._oper == '^':
+            result = val1 ** val2
+        else:
+            # this should never happen, since oper is validated on construction
+            raise ValueError("Expression tried to evaluate with an invalid operator")
+        # resolves floating-point errors
+        return round(result, 12)
+        
 
 @immutable
 class NegativeExpression(Symbolable, Evaluable):
     def __init__(self, evalable):
-        pass
+        if not isinstance(evalable, Evaluable):
+            raise TypeError("first argument for NegativeExpression must be an evaluable")
+        self._eval = evalable
+        self._evalSym = None
+        self._evalEval = None
 
     @immutable.memoize
     def asSymbol(self):
-        pass
+        if self._evalSym is not None:
+            return self._evalSym
+
+        sym = self._eval.asSymbol()
+        self._evalSym = -sym
+        return self._evalSym
 
     @immutable.memoize
     def evaluate(self, substDict):
-        pass
+        if self._evalEval is not None:
+            return self._evalEval
+
+        val = self._eval.evaluate(substDict)
+        self._evalEval = -val
+        return self._evalEval
 
 
 # data structure for defining (e)value(able)s (identifiers or numbers)
