@@ -161,10 +161,15 @@ eqs = [
 
     # "a ** 2 = b"
     
+    # NO WORKIE!!!
     # "a + b = c",
     # "a = b + c",
 
-    "a^2 + b^2 = c^2"
+    # "a^2 + b^2 = c^2"
+
+    # NO WORKIE!!!
+    "a = b / 5",
+    "b = a",
 ]
 import itertools
 allSyms = [b, a, c]
