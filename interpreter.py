@@ -4,7 +4,14 @@ from lexer import Lexer
 from parser import Parser
 from engine import *
 
-
+# decorator to handle errors for interpreter functions
+def handleErrors(method):
+    def withHandleErrors(self, *args, **kwargs):
+        try:
+            method(self, *args, **kwargs)
+        except Exception as e:
+            self._handleError(e)
+    return withHandleErrors
 class Interpreter:
     def __init__(self, outputFn):
         self._outputFn = outputFn
@@ -29,17 +36,12 @@ class Interpreter:
         self._bindToParser()
 
     # treats the string as user input
+    @handleErrors
     def executeLine(self, string):
-        try:
-            result = self.evaluateLine(string)
-        except (Parser.ParseError, Parser.EOLError) as e:
-            self._outputFn(e)
-        except NotImplementedError as e:
-            self._print(type(e).__name__ + ':', e)
-        except Exception as e:
-            self._outputFn("{}(Interpreter -- Unhandled error) {}: {}".format(INDENT, type(e).__name__, e))
+        result = self.evaluateLine(string)
 
     # helper that can turn strings into engine-useable data structures
+    @handleErrors
     def evaluateLine(self, string):
         if '\n' in string:
             raise ValueError("(Internal error) Interpreter expected a single line to evaluate; given multiple lines (in a single string)")
@@ -217,7 +219,7 @@ class Interpreter:
         self._parser.onCommand(onCommand)
 
     def _print(self, *args):
-        self._outputFn(INDENT, *args)
+        self._outputFn(INDENT, *args, sep='')
 
     def _assertParseStackEmpty(self):
         badStackNames = []
@@ -230,3 +232,19 @@ class Interpreter:
 
     def _throwBranchNotImplemented(self, featureNamePlural):
         raise NotImplementedError("SolverPro cannot process {} (yet)".format(featureNamePlural))
+
+    def _handleError(self, e):
+        parserErrors = (
+            Parser.ParseError,
+            Parser.EOLError,
+        )
+        if type(e) in parserErrors:
+            self._outputFn(e)
+            return True
+
+        if type(e) is NotImplementedError:
+            self._print(type(e).__name__ + ':', e)
+            return True
+        
+        self._print("(Internal error) {}: {}".format(type(e).__name__, e))
+        return False
