@@ -209,11 +209,13 @@ class NumericValue(Value):
     def __init__(self, number):
         validTypes = (float, int, str)
         if type(number) not in validTypes:
-            raise TypeError("(Internal error) NumericValue constructed with invalid value")
+            raise TypeError("NumericValue constructed with invalid value")
+            
         self._symbol = float(number)
 
 class IdentifierValue(Value):
     def __init__(self, identifier):
         if type(identifier) is not str:
-            raise TypeError("(Internal error) IdentifierValue constructed with invalid value")
+            raise TypeError("IdentifierValue constructed with invalid value")
+
         self._symbol = sympy.Symbol(identifier)

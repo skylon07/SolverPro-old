@@ -44,7 +44,7 @@ class Interpreter:
     @handleErrors
     def evaluateLine(self, string):
         if '\n' in string:
-            raise ValueError("(Internal error) Interpreter expected a single line to evaluate; given multiple lines (in a single string)")
+            raise ValueError("Interpreter expected a single line to evaluate; given multiple lines (in a single string)")
 
         tokens = self._lexer.process(string)
         self._parser.inspect(tokens, string)
@@ -228,7 +228,7 @@ class Interpreter:
             if len(stack) > 0:
                 badStackNames.append(stackName)
         if len(badStackNames) > 0:
-            raise RuntimeError("(Internal error) Interpreter did not use all items in the parse stack")
+            raise RuntimeError("Interpreter did not use all items in the parse stack")
 
     def _throwBranchNotImplemented(self, featureNamePlural):
         raise NotImplementedError("SolverPro cannot process {} (yet)".format(featureNamePlural))
