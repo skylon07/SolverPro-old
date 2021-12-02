@@ -19,7 +19,11 @@ from errors import TracebackError
 #         FIRST: IDENTIFIER | NUMBER | E_NUMBER
 #                PAREN_OPEN
 #                BRACKET_OPEN
-# value -> fullidentifier | fullidentifier unit | number | number unit
+# templatearguments -> expression |
+#     expression COMMA templatearguments
+# value -> fullidentifier | fullidentifier unit | number | number unit |
+#     fullidentifier PAREN_OPEN templatearguments PAREN_CLOSE |
+#     fullidentifier PAREN_OPEN PAREN_CLOSE
 #         FIRST: IDENTIFIER [PERIOD|_]
 #                IDENTIFIER [PERIOD|_] CARROT_LEFT
 #                [NUMBER|E_NUMBER]
@@ -153,6 +157,9 @@ class Parser:
 
     def onEvaluation(self, fn):
         self._addOnFunction("onEvaluation", fn)
+        
+    def onTemplateArguments(self, fn):
+        self._addOnFunction("onTemplateArguments", fn)
 
     def onValue(self, fn):
         self._addOnFunction("onValue", fn)
@@ -237,6 +244,7 @@ def production(productionFn):
         "relation": "onRelation",
         "expression": "onExpression",
         "evaluation": "onEvaluation",
+        "templatearguments": "onTemplateArguments",
         "value": "onValue",
         "fullidentifier": "onFullIdentifier",
         "identifier": "onIdentifier",
@@ -390,8 +398,23 @@ class ParserMatcher:
         return "va"
 
     @production
+    def templatearguments(self):
+        # all branches
+        self.expression()
+
+        # branch ex CO tes
+        moreTokens = self.moreTokens() # (no more tokens is a valid branch!)
+        if moreTokens and self.currToken.type == Lexer.types.COMMA:
+            self.match(Lexer.types.COMMA)
+            self.templatearguments()
+            return "ex CO tes"
+
+        # (end of default branch ex)
+        return "ex"
+
+    @production
     def value(self):
-        # branch nu/nu un
+        # branches nu/nu un
         numberFirsts = [
             Lexer.types.NUMBER,
             Lexer.types.E_NUMBER,
@@ -412,7 +435,7 @@ class ParserMatcher:
             # (end of branch nu)
             return "nu"
         
-        # branch fu/fu un
+        # branches fu/fu un/fu PAO PAC/fu PAO tes PAC
         self.fullidentifier()
 
         # branch fu un
@@ -423,6 +446,20 @@ class ParserMatcher:
         if moreTokens and self.currToken.type in unitFirsts:
             self.unit()
             return "fu un"
+
+        # branch fu PAO PAC/fu PAO tes PAC
+        # (would make more sense for these branches to be in
+        # evaluable, but it is easier to implement here)
+        elif moreTokens and self.currToken.type == Lexer.types.PAREN_OPEN:
+            self.match(Lexer.types.PAREN_OPEN)
+            # branch fu PAO PAC
+            if self.currToken.type == Lexer.types.PAREN_CLOSE:
+                self.match(Lexer.types.PAREN_CLOSE)
+                return "fu PAO PAC"
+            # branch fu PAO tes PAC
+            self.templatearguments()
+            self.match(Lexer.types.PAREN_CLOSE)
+            return "fu PAO tes PAC"
 
         # (end of default branch fu)
         return "fu"

@@ -640,6 +640,7 @@ class TestSuites:
             PARSER_ON_DICT["onExpression"] = []
 
             PARSER_ON_DICT["onEvaluation"] = []
+            PARSER_ON_DICT["onTemplateArguments"] = []
             PARSER_ON_DICT["onValue"] = []
             PARSER_ON_DICT["onFullIdentifier"] = []
             PARSER_ON_DICT["onIdentifier"] = []
@@ -948,8 +949,8 @@ class TestSuites:
         Tester.stopIfFailed()
 
         # test top/recursive productions
-        # (relation, expression, evaluation, value (with units), unit <relies on value>,
-        # operation-s, rightalias <relies on alias>, rightaliastemp <relies on alias>,
+        # (relation, expression, evaluation, templatearguments, value (with units),
+        # unit <relies on value>, operation-s, rightalias <relies on alias>, rightaliastemp <relies on alias>,
         # objectdeclaration <relies on rightalias>, objectparameters <relies on objectdeclaration>)
         lineStr = "a + b = c + d"
         tokens = lexer.process(lineStr)
@@ -1039,6 +1040,21 @@ class TestSuites:
         eval4 = lexer.process("(b + c)", withEOL=False)
         testInspectPerforms(tokens, lineStr, "onEvaluation", [(eval1, "va"), (eval2, "va"), (eval3, "va"), (eval4, "PAO ex PAC")], "(low-key order-ops test)")
 
+        lineStr = "a(b)"
+        tokens = lexer.process(lineStr)
+        expTokens = lexer.process("b", withEOL=False)
+        testInspectPerforms(tokens, lineStr, "onTemplateArguments", [(expTokens, "ex")], "can process a single argument")
+        lineStr = "a(b, c)"
+        tokens = lexer.process(lineStr)
+        expTokens1 = lexer.process("c", withEOL=False)
+        expTokens2 = lexer.process("b, c", withEOL=False)
+        testInspectPerforms(tokens, lineStr, "onTemplateArguments", [(expTokens1, "ex"), (expTokens2, "ex CO tes")], "can process multiple singular arguments")
+        lineStr = "a(b + c, d * e - f)"
+        tokens = lexer.process(lineStr)
+        expTokens1 = lexer.process("d * e - f", withEOL=False)
+        expTokens2 = lexer.process("b + c, d * e - f", withEOL=False)
+        testInspectPerforms(tokens, lineStr, "onTemplateArguments", [(expTokens1, "ex"), (expTokens2, "ex CO tes")], "can process multiple complex arguments")
+
         lineStr = "var<unit>"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("var<unit>", withEOL=False)
@@ -1054,6 +1070,17 @@ class TestSuites:
         expTokens = lexer.process(".8e-6<unit>", withEOL=False)
         unitTokens = lexer.process("unit", withEOL=False)
         testInspectPerforms(tokens, lineStr, "onValue", [(unitTokens, "fu"), (expTokens, "nu un")], "E-number with units")
+        lineStr = "a(b + c, d)"
+        tokens = lexer.process(lineStr)
+        eval1 = lexer.process("b", withEOL=False)
+        eval2 = lexer.process("c", withEOL=False)
+        eval3 = lexer.process("d", withEOL=False)
+        eval4 = lexer.process("a(b + c, d)", withEOL=False)
+        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fu"), (eval2, "fu"), (eval3, "fu"), (eval4, "fu PAO tes PAC")], "can evaluate template arguments")
+        lineStr = "a()"
+        tokens = lexer.process(lineStr)
+        expTokens = lexer.process("a()", withEOL=False)
+        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "fu PAO PAC")], "can evaluate templates (with no arguments)")
 
         lineStr = "var<unit>"
         tokens = lexer.process(lineStr)
