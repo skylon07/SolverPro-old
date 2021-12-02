@@ -108,14 +108,14 @@ class Parser:
                 iter(expectedTypes)
             except TypeError as e:
                 if "not iterable" in str(e):
-                    raise TypeError("(Internal Error) Attempted to create ParseError with invalid list of expected types")
+                    raise TypeError("Attempted to create ParseError with invalid list of expected types")
                 raise e
             if type(expectedTypes) is str or (len(expectedTypes) > 0 and type(expectedTypes[0]) is not str):
-                    raise TypeError("(Internal Error) Attempted to create ParseError with invalid list of expected types")
+                    raise TypeError("Attempted to create ParseError with invalid list of expected types")
             self.expectedTypes = tuple(expectedTypes)
             
             if type(unexpectedToken) is not Lexer.Token:
-                raise TypeError("(Internal Error) ParseError was given an invalid token")
+                raise TypeError("ParseError was given an invalid token")
             self.unexpectedToken = unexpectedToken
 
             expectedTypesStr = " or ".join(self.expectedTypes)
@@ -128,7 +128,7 @@ class Parser:
     class EOLError(TracebackError):
         def __init__(self, eolToken, lineStr):
             if type(eolToken) is not Lexer.Token or eolToken.type != Lexer.types.EOL:
-                raise TypeError("(Internal Error) EOLError was given a bad EOL-token argument")
+                raise TypeError("EOLError was given a bad EOL-token argument")
             self.unexpectedToken = eolToken
 
             fullMessage = "Unexpected end of line"
@@ -264,7 +264,7 @@ def production(productionFn):
         start = self.numParsed
         branch = productionFn(self)
         if type(branch) is not str:
-            raise TypeError("(Internal error) Parser production did not return branch type")
+            raise TypeError("Parser production did not return branch type")
         end = self.numParsed
 
         prodName = productionFn.__name__
@@ -283,7 +283,7 @@ class ParserMatcher:
     # index incrementer and syntax validator
     def match(self, tokenType):
         if tokenType not in Lexer.types:
-            raise ValueError("(Internal error) Parser tried to match tokens against an invalid type")
+            raise ValueError("Parser tried to match tokens against an invalid type")
 
         if self.currToken.type != tokenType:
             if self.currToken.type == Lexer.types.EOL:
@@ -301,7 +301,7 @@ class ParserMatcher:
         if self.moreTokens():
             currToken = self.tokens[self.numParsed]
             if type(currToken) is not Lexer.Token:
-                raise TypeError("(Internal error) Parser tried to parse non-token in tokens list")
+                raise TypeError("Parser tried to parse non-token in tokens list")
             return currToken
         # a token was expected, yet there aren't any more!
         self._throwEOLError()
@@ -849,7 +849,7 @@ class ParserMatcher:
                     fn(tuple(tokens), branch)
                 except TypeError as e:
                     if "positional argument" in str(e):
-                        raise TypeError("(Internal error) Parser tried to execute callback defined with the wrong number of arguments; {}".format(e))
+                        raise TypeError("Parser tried to execute callback defined with the wrong number of arguments; {}".format(e))
                     raise e
 
     # helper functions to throw errors with expected types

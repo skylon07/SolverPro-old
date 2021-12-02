@@ -178,7 +178,7 @@ class LexerMachine(ABC):
             self.stateErr()
         
         if type(self.numMatched) is not int:
-            raise TypeError("(Internal error) Token machine returned non-int for numMatched")
+            raise TypeError("Token machine returned non-int for numMatched")
         numMatched = self.numMatched
         self.resetState()
 
