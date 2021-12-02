@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod, abstractproperty
 import string
-from typing import Type
+
+from engine import immutable
 
 class Lexer():
     class types(dict):
@@ -48,6 +49,7 @@ class Lexer():
 
     types = types()
 
+    @immutable
     class Token:
         def __init__(self, repStr, tokenType, placementIdx):
             self._repStr = repStr
@@ -62,12 +64,12 @@ class Lexer():
             return 'Token<{}>("{}")'.format(self._type, self._repStr)
         
         def __eq__(self, other):
-            if type(other) is not Lexer.Token:
+            if not isinstance(other, Lexer.Token):
                 return False
             return self._repStr == other._repStr and self._type == other._type
 
         def __ne__(self, other):
-            if type(other) is not Lexer.Token:
+            if not isinstance(other, Lexer.Token):
                 return True
             return self._repStr != other._repStr or self._type != other._type
 
