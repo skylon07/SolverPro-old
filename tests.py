@@ -1270,9 +1270,10 @@ class TestSuites:
     @classmethod
     def Interpreter(cls):
         state = dict()
-        def fakePrint(*args):
+        def fakePrint(*args, **kwargs):
             argsStrs = map(lambda arg: str(arg), args)
-            state["lastPrint"] = " ".join(argsStrs)
+            sep = kwargs.get('sep') or ' '
+            state["lastPrint"] = sep.join(argsStrs)
         def resetState():
             state["interpreter"] = Interpreter(fakePrint)
             state["lastPrint"] = None
