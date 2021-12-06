@@ -3,15 +3,6 @@ from constants import INDENT
 from lexer import Lexer
 from parser import Parser
 from engine import *
-
-# decorator to handle errors for interpreter functions
-def handleErrors(method):
-    def withHandleErrors(self, *args, **kwargs):
-        try:
-            method(self, *args, **kwargs)
-        except Exception as e:
-            self._handleError(e)
-    return withHandleErrors
 class Interpreter:
     def __init__(self, outputFn):
         self._outputFn = outputFn
@@ -36,12 +27,39 @@ class Interpreter:
         self._bindToParser()
 
     # treats the string as user input
-    @handleErrors
     def executeLine(self, string):
-        result = self.evaluateLine(string)
+        try:
+            result = self.evaluateLine(string)
+            if result["type"] == "relation":
+                self._throwBranchNotImplemented("relation executions")
+            
+            elif result["type"] == "alias":
+                isTemplate = result["templateArgs"] is not None
+                if isTemplate:
+                    self._throwBranchNotImplemented("template alias executions")
+                else:
+                    identifiers = result["aliasNames"]
+                    rawValue = result["rightHand"]
+                    value = self._engine.substitute(rawValue)
+                    self._engine.setAliases(identifiers, value)
+            
+            elif result["type"] == "expression":
+                expr = result["expression"]
+                result = self._engine.substitute(expr)
+                self._print(str(result))
+            
+            elif result["type"] == "command":
+                self._throwBranchNotImplemented("command executions")
+            
+            elif result["type"] == "empty":
+                pass # nuthin to do
+            
+            else:
+                raise TypeError("Interpreter encountered an unexpected result type")
+        except Exception as e:
+            self._handleError(e)
 
     # helper that can turn strings into engine-useable data structures
-    @handleErrors
     def evaluateLine(self, string):
         if '\n' in string:
             raise ValueError("Interpreter expected a single line to evaluate; given multiple lines (in a single string)")
@@ -84,15 +102,17 @@ class Interpreter:
                 }
             elif branch == "EOL":
                 self._parseResult = {
-                    "type": "Empty",
+                    "type": "empty",
                 }
         self._parser.onStart(onStart)
 
         def onFullIdentifier(tokens, branch):
+            # TODO: check that the value is defined
             if branch == "id":
                 tokenStrs = map(lambda token: str(token), tokens)
                 fullId = ''.join(tokenStrs)
-            pushStack("identifiers", fullId)
+                value = IdentifierValue(fullId)
+            pushStack("identifiers", value)
         self._parser.onFullIdentifier(onFullIdentifier)
 
         def onIdentifiers(tokens, branch):
@@ -109,16 +129,15 @@ class Interpreter:
         def onNumber(tokens, branch):
             if branch == "NU" or branch == "EN":
                 numberStr = str(tokens[0])
-            pushStack("numbers", numberStr)
+                value = NumericValue(numberStr)
+            pushStack("numbers", value)
         self._parser.onNumber(onNumber)
 
         def onValue(tokens, branch):
             if branch == "fu":
-                idStr = popStack("identifiers")
-                value = IdentifierValue(idStr)
+                value = popStack("identifiers")
             if branch == "nu":
-                numberStr = popStack("numbers")
-                value = NumericValue(numberStr)
+                value = popStack("numbers")
             pushStack("values", value)
         self._parser.onValue(onValue)
 
