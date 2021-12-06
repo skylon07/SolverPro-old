@@ -1299,7 +1299,8 @@ class TestSuites:
         state = dict()
         def fakePrint(*args, **kwargs):
             argsStrs = map(lambda arg: str(arg), args)
-            sep = kwargs.get('sep') or ' '
+            sep = kwargs.get('sep')
+            sep = sep if sep is not None else ' '
             state["lastPrint"] = sep.join(argsStrs)
         def resetState():
             state["interpreter"] = Interpreter(fakePrint)
