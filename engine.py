@@ -29,6 +29,9 @@ class Engine:
     def getAlias(self, identifier):
         return self._identifiers.get(identifier)
 
+    def isDefined(self, identifier):
+        return identifier in self._identifiers
+
     # substitutes all known values into a given object
     def substitute(self, subsable):
         if not isinstance(subsable, Substitutable):

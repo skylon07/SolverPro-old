@@ -67,18 +67,20 @@ class Interpreter:
                 self._throwBranchNotImplemented("relation executions")
             
             elif result["type"] == "alias":
-                isTemplate = result["templateArgs"] is not None
+                isTemplate = result["templateArgs"].obj is not None
                 if isTemplate:
                     self._throwBranchNotImplemented("template alias executions")
                 else:
-                    identifiers = result["aliasNames"]
-                    rawValue = result["rightHand"]
-                    value = self._engine.substitute(rawValue)
-                    self._engine.setAliases(identifiers, value)
+                    idsPiece = result["aliasNames"]
+                    rightHandPiece = result["rightHand"]
+                    self._ensureDefined(rightHandPiece)
+                    rightWithSubs = self._engine.substitute(rightHandPiece.obj)
+                    self._engine.setAliases(idsPiece.obj, rightWithSubs)
             
             elif result["type"] == "expression":
-                expr = result["expression"]
-                subExpr = self._engine.substitute(expr)
+                exprPiece = result["expression"]
+                self._ensureDefined(exprPiece)
+                subExpr = self._engine.substitute(exprPiece.obj)
                 self._print(str(subExpr))
             
             elif result["type"] == "command":
@@ -105,6 +107,18 @@ class Interpreter:
         # communicating/working properly)
         self._assertParseStackEmpty()
         return result
+
+    def _ensureDefined(self, stackPiece):
+        badTraces = []
+        for trace in stackPiece.traces:
+            traceType = trace["type"]
+            if traceType == TRACE_TYPES["IDENTIFIER"]:
+                identifier = trace["obj"]
+                if not self._engine.isDefined(identifier):
+                    badTraces.append(trace)
+        if len(badTraces) > 0:
+            raise UndefinedError(badTraces)
+
 
     def _bindToParser(self):
         def pushStack(key, stackPiece):
