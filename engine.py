@@ -1,11 +1,62 @@
 from abc import ABC, abstractmethod, abstractproperty
-from typing import Type
+from math import log10
 
 import sympy
 
 
 class Engine:
-    pass
+    def __init__(self):
+        self._aliases = dict()
+
+    def setAlias(self, identifier, value):
+        if not isinstance(identifier, VariableValue):
+            raise TypeError("Engine.setAlias(identifier, value) -- identifier was not an VariableValue()")
+        if not isinstance(value, Value):
+            raise TypeError("Engine.setAlias(identifier, value) -- value was not a Value()")
+
+        self._aliases[identifier] = value
+
+    def setAliases(self, identifiers, value):
+        if not isinstance(value, Value):
+            raise TypeError("Engine.setAliases(identifiers, value) -- value was not a Value()")
+        for identifier in identifiers:
+            if not isinstance(identifier, VariableValue):
+                raise TypeError("Engine.setAliases(identifiers, value) -- identifiers was not a list of VariableValue()s")
+        
+        for identifier in identifiers:
+            self.setAlias(identifier, value)
+
+    def getAlias(self, identifier):
+        return self._aliases.get(identifier)
+
+    # substitutes all known values into a given object
+    def substitute(self, subsable):
+        if not isinstance(subsable, Substitutable):
+            raise TypeError("Engine.evaluate(subsable) -- subsable must be a Substitutable()")
+        
+        substDict = self._aliases
+        return subsable.substitute(substDict)
+
+    def roundFloat(self, numericValue):
+        if not isinstance(numericValue, NumericValue):
+            raise TypeError("Engine.roundFloat() received a non-NumericValue()")
+        
+        rawFloat = numericValue.asSymbol(self._identifiers)
+        # special case for 0 (log10 gives domain error)
+        if rawFloat == 0:
+            return numericValue
+        # number of digits to most signifigant figure
+        numDigits = int(log10(abs(rawFloat)))
+        if numDigits >= 0:
+            # because log10(1) gives 0; we want 1
+            numDigits += 1
+        # we care about 12 signifigant digits
+        # (round() using positive arg will round after decimal;
+        # with negative arg will round before decimal; this is 
+        # the opposite of numDigits, therefore we use -numDigits)
+        roundTo = 12 - numDigits
+        roundFloat = round(rawFloat, roundTo)
+        return NumericValue(roundFloat)
 
 
 # abstract class that gives a blueprint for repr strings for objects
@@ -435,3 +486,8 @@ class TemplateCall(Expressable):
         namesAndValues = zip(template.argNames, self._params)
         substDict = {name: value for name, value in namesAndValues}
         return template.substitute(substDict)
+
+
+if __name__ == "__main__":
+    engine = Engine()
+    print(repr(engine.substitute(VariableValue("a"))))
