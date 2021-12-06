@@ -74,18 +74,15 @@ class immutable:
     
 
 # represents the list of all solutions for variables in a single relation
-@immutable
 class Solution():
     def __init__(self, relation):
         pass
     
-    @immutable
     def solveVar(symbol):
         pass
 
 
 # data structure for two equal expressions
-@immutable
 class Relation(Symbolable):
     def __init__(self, subsable1, subsable2):
         if not isinstance(subsable1, Substitutable):
@@ -105,7 +102,6 @@ class Relation(Symbolable):
         return self._rightExpr
     
     # returns symbol that is assumed equal to zero
-    @immutable
     def asSymbol(self):
         return self._leftExpr - self._rightExpr
 
@@ -123,7 +119,6 @@ OPERATORS = {
     "EXPONENT": "^",
 }
 # data structure for performing operations
-@immutable
 class Expression(Symbolable, Substitutable):
     def __init__(self, subsable1, oper, subsable2):
         if not isinstance(subsable1, Substitutable):
@@ -137,13 +132,11 @@ class Expression(Symbolable, Substitutable):
         self._subsable2 = subsable2
         self._oper = oper
 
-    @immutable
     def asSymbol(self):
         sym1 = self._subsable1.asSymbol()
         sym2 = self._subsable2.asSymbol()
         return self._operate(sym1, sym2)
 
-    @immutable
     def substitute(self, substDict):
         val1 = self._subsable1.substitute(substDict)
         val2 = self._subsable2.substitute(substDict)
@@ -167,7 +160,6 @@ class Expression(Symbolable, Substitutable):
         return round(result, 12)
         
 
-@immutable
 class NegativeExpression(Symbolable, Substitutable):
     def __init__(self, subsable):
         if not isinstance(subsable, Substitutable):
@@ -175,12 +167,10 @@ class NegativeExpression(Symbolable, Substitutable):
         
         self._subsable = subsable
 
-    @immutable
     def asSymbol(self):
         sym = self._subsable.asSymbol()
         return -sym
 
-    @immutable
     def substitute(self, substDict):
         val = self._subsable.substitute(substDict)
         return -val
@@ -192,15 +182,12 @@ class Value(Symbolable, Substitutable):
     def __init__(self):
         self._symbol = None # set to sympy-processable value
 
-    @immutable
     def asSymbol(self):
         return self._symbol
 
-    @immutable
     def substitute(self, substDict):
         return substDict[self._symbol]
 
-@immutable
 class NumericValue(Value):
     def __init__(self, number):
         validTypes = (float, int, str)
@@ -209,7 +196,6 @@ class NumericValue(Value):
             
         self._symbol = float(number)
 
-@immutable
 class IdentifierValue(Value):
     def __init__(self, identifier):
         if type(identifier) is not str:
