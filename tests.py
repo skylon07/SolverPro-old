@@ -1,5 +1,7 @@
 from main import *
 
+ISP = ' ' * len(USER_INPUT)
+
 class TestSuites:
     @classmethod
     def Lexer(cls):
@@ -1363,9 +1365,16 @@ class TestSuites:
             "8e+16",
             "can print previously assigned variables (E-numbers)",
         )
+        Tester.stopIfFailed()
+        
         testLineOnInterpreter(
             "someUndefinedVal",
-            ("rror", "ndefined"),
+            (ISP + "        ^", "rror", "ndefined"),
+            "errors when trying to access undefined values",
+        )
+        testLineOnInterpreter(
+            "a := 4 + b",
+            (ISP + "         ^", "rror", "ndefined"),
             "errors when trying to access undefined values",
         )
         resetState()
@@ -1376,6 +1385,11 @@ class TestSuites:
             "1 + 2 * 3",
             "7",
             "can evaluate expressions (no variables)",
+        )
+        testLineOnInterpreter(
+            "(.1 + .2) * -10",
+            "-3",
+            "can evaluate expressions with floats (and return ints)",
         )
         testLineOnInterpreter(
             "val := 6 + 3",
@@ -1662,7 +1676,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "obj.force",
-            ("rror", "ndefined"),
+            (ISP + "    ^", "rror", "ndefined"),
             "errors when trying to access undefined object properties",
         )
         testLineOnInterpreter(
@@ -1903,7 +1917,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "obj1(5)",
-            ("rror", "valuate", "lias"),
+            (ISP + "  ^", "rror", "valuate", "lias"),
             "errors when trying to evaluate a non-template alias as a template alias",
         )
         testLineOnInterpreter(
@@ -1913,12 +1927,12 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "add(4, 5, 6)",
-            ("rror", "rguments"),
+            (ISP + " ^", "rror", "rguments"),
             "errors when template alias is given too many arguments",
         )
         testLineOnInterpreter(
             "add(4)",
-            ("rror", "rguments"),
+            (ISP + " ^", "rror", "rguments"),
             "errors when template alias is not given enough arguments",
         )
         resetState()
@@ -2103,7 +2117,7 @@ class TestSuites:
         Tester.stopIfFailed()
         testLineOnInterpreter(
             "!forget",
-            ("rror", "equired"),
+            (ISP + "   ^", "rror", "equired"),
             "errors when trying to forget with no arguments",
         )
         testLineOnInterpreter(
@@ -2149,7 +2163,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "b",
-            ("rror", "ndefined"),
+            (ISP + "^", "rror", "ndefined"),
             "resetting removes all variables"
         )
         testLineOnInterpreter(
@@ -2167,8 +2181,51 @@ class TestSuites:
             "Reset complete\n\n",
             "bypasses confirmation when given 'confirm'"
         )
+        resetState()
         Tester.stopIfFailed()
         # TODO: test eval and save
+
+        # other tests
+        testLineOnInterpreter(
+            "a() := 4",
+            None,
+            "can create (kind of useless) template aliases",
+        )
+        testLineOnInterpreter(
+            "b() := 5",
+            None,
+            "can create multiple (kind of useless) template aliases",
+        )
+        testLineOnInterpreter(
+            "a() * b() + a()",
+            "24",
+            "can evaluate template aliases in expressions",
+        )
+        testLineOnInterpreter(
+            "createObj(p1, p2) := {p1 := 1, p2 := 2, sum = p1 + p2}",
+            None,
+            "can create template aliases for objects",
+        )
+        testLineOnInterpreter(
+            "obj := createObj(a, b)",
+            None,
+            "can create objects from template aliases",
+        )
+        testLineOnInterpreter(
+            "obj.a",
+            "1",
+            "can evaluate object properties from template aliases",
+        )
+        testLineOnInterpreter(
+            "obj.sum",
+            "3",
+            "can evaluate object relations from template aliases",
+        )
+        testLineOnInterpreter(
+            "obj",
+            "{a=1, b=2}(sum=3)",
+            "can print objects derived from template aliases",
+        )
 
 
 
