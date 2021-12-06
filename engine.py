@@ -4,6 +4,64 @@ from math import log10
 import sympy
 
 
+# decorator that utilizes memory optimizations
+# (should obviously me used only for classes/functions
+# whose results can be treated as "immutable")
+class immutable:
+    _immutables = dict()
+    _immutableClasses = list()
+
+    # ran when python "calls the decorator"
+    def __new__(cls, anyCallable):
+        isClass = type(anyCallable) is type
+        if isClass:
+            class ImmutableMixin(anyCallable):
+                # we want "calls" to the class to run the memo function
+                def __new__(mixinCls, *args, **kwargs):
+                    return cls._getMemo(mixinCls, args, kwargs, create=mixinCls.__createNew)
+
+                def __init__(self, *args, **kwargs):
+                    # DONT call parent init after __new__; we want to have control of that
+                    return
+
+                # the creation function is separate to avoid recursion errors
+                # (and also gives a constant reference for memoizing)
+                @classmethod
+                def __createNew(mixinCls, *args, **kwargs):
+                    newObj = super(ImmutableMixin, mixinCls).__new__(mixinCls)
+                    super(mixinCls, newObj).__init__(*args, **kwargs)
+                    return newObj
+            cls._immutableClasses.append(ImmutableMixin)
+            return ImmutableMixin
+        else:
+            def memoWrapper(*args, **kwargs):
+                return cls._getMemo(anyCallable, args, kwargs)
+            return memoWrapper
+
+    @classmethod
+    def _getMemo(cls, someCallable, argsTuple, kwargsDict, create=None):
+        if len(kwargsDict) > 0:
+            # currently no way to distinguish if an argument becomes a keyword argument
+            # def fn(arg, kwargs="val")...
+            # fn(1, 2) <-- args=(1,2) kwargs={}
+            raise ValueError("Immutables cannot be created/called with keyword arguments")
+        
+        # separate creation function is needed for class wrapping
+        if create is None:
+            create = someCallable
+        memoKey = cls._makeCallId(someCallable, argsTuple, kwargsDict)
+        if memoKey not in cls._immutables:
+            cls._immutables[memoKey] = create(*argsTuple, **kwargsDict)
+        return cls._immutables[memoKey]
+
+    @classmethod
+    def _makeCallId(cls, someCallable, argsTuple, kwargsDict):
+        callHash = hash(someCallable)
+        argsHash = repr(argsTuple)
+        # kwargsHash ignored; kwargs not currently allowed
+        return hash((callHash, argsHash))
+
+
 class Engine:
     def __init__(self):
         self._identifiers = dict()
@@ -91,111 +149,6 @@ class Substitutable(ABC):
         return # Substitutable()
 
 
-# decorator that utilizes memory optimizations
-# (should obviously me used only for classes/functions
-# whose results can be treated as "immutable")
-class immutable:
-    _immutables = dict()
-    _immutableClasses = list()
-
-    # ran when python "calls the decorator"
-    def __new__(cls, anyCallable):
-        isClass = type(anyCallable) is type
-        if isClass:
-            class ImmutableMixin(anyCallable):
-                # we want "calls" to the class to run the memo function
-                def __new__(mixinCls, *args, **kwargs):
-                    return cls._getMemo(mixinCls, args, kwargs, create=mixinCls.__createNew)
-
-                def __init__(self, *args, **kwargs):
-                    # DONT call parent init after __new__; we want to have control of that
-                    return
-
-                # the creation function is separate to avoid recursion errors
-                # (and also gives a constant reference for memoizing)
-                @classmethod
-                def __createNew(mixinCls, *args, **kwargs):
-                    newObj = super(ImmutableMixin, mixinCls).__new__(mixinCls)
-                    super(mixinCls, newObj).__init__(*args, **kwargs)
-                    return newObj
-            cls._immutableClasses.append(ImmutableMixin)
-            return ImmutableMixin
-        else:
-            def memoWrapper(*args, **kwargs):
-                return cls._getMemo(anyCallable, args, kwargs)
-            return memoWrapper
-
-    @classmethod
-    def _getMemo(cls, someCallable, argsTuple, kwargsDict, create=None):
-        if len(kwargsDict) > 0:
-            # currently no way to distinguish if an argument becomes a keyword argument
-            # def fn(arg, kwargs="val")...
-            # fn(1, 2) <-- args=(1,2) kwargs={}
-            raise ValueError("Immutables cannot be created/called with keyword arguments")
-        
-        # separate creation function is needed for class wrapping
-        if create is None:
-            create = someCallable
-        memoKey = cls._makeCallId(someCallable, argsTuple, kwargsDict)
-        if memoKey not in cls._immutables:
-            cls._immutables[memoKey] = create(*argsTuple, **kwargsDict)
-        return cls._immutables[memoKey]
-
-    @classmethod
-    def _makeCallId(cls, someCallable, argsTuple, kwargsDict):
-        callHash = hash(someCallable)
-        argsHash = repr(argsTuple)
-        # kwargsHash ignored; kwargs not currently allowed
-        return hash((callHash, argsHash))
-
-
-# represents the list of all solutions for variables in a single relation
-class Solution():
-    def __init__(self, relation):
-        pass
-
-    def __repr__(self):
-        pass
-
-    def solveVar(symbol):
-        pass
-
-
-# data structure for two equal expressions
-class Relation(Symbolable, Substitutable, Displayable):
-    def __init__(self, expr1, expr2):
-        if not isinstance(expr1, Expressable):
-            raise TypeError("first argument for Relation must be an expression")
-        if not isinstance(expr2, Expressable):
-            raise TypeError("second argument for Relation must be an expression")
-        
-        self._leftExpr = expr1
-        self._rightExpr = expr2
-
-    @property
-    def _reprName(self):
-        return "Relation"
-
-    def __str__(self):
-        return "{} = {}".format(self._leftExpr, self._rightExpr)
-
-    @property
-    def left(self):
-        return self._leftExpr
-
-    @property
-    def right(self):
-        return self._rightExpr
-    
-    # returns symbol that is assumed equal to zero
-    def asSymbol(self, templatesDict):
-        return self._leftExpr - self._rightExpr
-
-    def substitute(self, substDict):
-        leftSub = self._leftExpr.substitute(substDict)
-        rightSub = self.rightExpr.substitute(substDict)
-        return Relation(leftSub, rightSub)
-
 # abstract class that gives operators to expression-like objects
 class Expressable(Symbolable, Substitutable, Displayable):
     # operations for expressions
@@ -216,90 +169,6 @@ class Expressable(Symbolable, Substitutable, Displayable):
 
     def __neg__(self):
         return NegativeExpression(self)
-
-
-OPERATORS = {
-    "+": "+",
-    "PLUS": "+",
-    "-": "-",
-    "MINUS": "-",
-    "*": "*",
-    "MULTIPLY": "*",
-    "/": "/",
-    "DIVIDE": "/",
-    "^": "^",
-    "EXPONENT": "^",
-}
-# data structure for performing operations
-class Expression(Expressable):
-    def __init__(self, expr1, oper, expr2):
-        if not isinstance(expr1, Expressable):
-            raise TypeError("first argument for Expression must be an expression")
-        if type(oper) is not str or oper not in OPERATORS:
-            raise TypeError("second argument for Expression must be an operator")
-        if not isinstance(expr2, Expressable):
-            raise TypeError("third argument for Expression must be an expression")
-        
-        self._leftExpr = expr1
-        self._rightExpr = expr2
-        self._oper = oper
-
-    @property
-    def _reprName(self):
-        return "Expression"
-
-    def __str__(self):
-        return "{} {} {}".format(self._leftExpr, self._oper, self._rightExpr)
-    
-    def asSymbol(self, templatesDict):
-        sym1 = self._leftExpr.asSymbol(templatesDict)
-        sym2 = self._rightExpr.asSymbol(templatesDict)
-        return self._operate(sym1, sym2)
-
-    def substitute(self, substDict):
-        val1 = self._leftExpr.substitute(substDict)
-        val2 = self._rightExpr.substitute(substDict)
-        return self._operate(val1, val2)
-
-    def _operate(self, val1, val2):
-        if self._oper == '+':
-            result = val1 + val2
-        elif self._oper == '-':
-            result = val1 - val2
-        elif self._oper == '*':
-            result = val1 * val2
-        elif self._oper == '/':
-            result = val1 / val2
-        elif self._oper == '^':
-            result = val1 ** val2
-        else:
-            # this should never happen, since oper is validated on construction
-            raise ValueError("Expression tried to substitute with an invalid operator")
-        # resolves floating-point errors
-        if isinstance(result, Numeric):
-            return Engine.roundFloat(result)
-        return result
-        
-
-class NegativeExpression(Expressable):
-    def __init__(self, expr):
-        if not isinstance(expr, Expressable):
-            raise TypeError("first argument for NegativeExpression must be a substitutable")
-        
-        self._expr = expr
-
-    def __str__(self):
-        if isinstance(self._expr, (Numeric, Identifier, TemplateCall)):
-            return "-{}".format(self._expr)
-        return "-({})".format(self._expr)
-
-    def asSymbol(self, templatesDict):
-        sym = self._expr.asSymbol(templatesDict)
-        return -sym
-
-    def substitute(self, substDict):
-        result = self._expr.substitute(substDict)
-        return -result
 
 
 class Numeric(Expressable):
@@ -414,6 +283,92 @@ class Identifier(Expressable):
         raise ValueError("Identifier() tried to construct with invalid idStr argument")
 
 
+OPERATORS = {
+    "+": "+",
+    "PLUS": "+",
+    "-": "-",
+    "MINUS": "-",
+    "*": "*",
+    "MULTIPLY": "*",
+    "/": "/",
+    "DIVIDE": "/",
+    "^": "^",
+    "EXPONENT": "^",
+}
+# data structure for performing operations
+class Expression(Expressable):
+    def __init__(self, expr1, oper, expr2):
+        if not isinstance(expr1, Expressable):
+            raise TypeError("first argument for Expression must be an expression")
+        if type(oper) is not str or oper not in OPERATORS:
+            raise TypeError("second argument for Expression must be an operator")
+        if not isinstance(expr2, Expressable):
+            raise TypeError("third argument for Expression must be an expression")
+        
+        self._leftExpr = expr1
+        self._rightExpr = expr2
+        self._oper = oper
+
+    @property
+    def _reprName(self):
+        return "Expression"
+
+    def __str__(self):
+        return "{} {} {}".format(self._leftExpr, self._oper, self._rightExpr)
+    
+    def asSymbol(self, templatesDict):
+        sym1 = self._leftExpr.asSymbol(templatesDict)
+        sym2 = self._rightExpr.asSymbol(templatesDict)
+        return self._operate(sym1, sym2)
+
+    def substitute(self, substDict):
+        val1 = self._leftExpr.substitute(substDict)
+        val2 = self._rightExpr.substitute(substDict)
+        return self._operate(val1, val2)
+
+    def _operate(self, val1, val2):
+        if self._oper == '+':
+            result = val1 + val2
+        elif self._oper == '-':
+            result = val1 - val2
+        elif self._oper == '*':
+            result = val1 * val2
+        elif self._oper == '/':
+            result = val1 / val2
+        elif self._oper == '^':
+            result = val1 ** val2
+        else:
+            # this should never happen, since oper is validated on construction
+            raise ValueError("Expression tried to substitute with an invalid operator")
+        # resolves floating-point errors
+        if isinstance(result, Numeric):
+            return Engine.roundFloat(result)
+        return result
+        
+
+# since expressions can only handle two values around an operator,
+# this special expression deals with negation
+class NegativeExpression(Expressable):
+    def __init__(self, expr):
+        if not isinstance(expr, Expressable):
+            raise TypeError("first argument for NegativeExpression must be a substitutable")
+        
+        self._expr = expr
+
+    def __str__(self):
+        if isinstance(self._expr, (Numeric, Identifier, TemplateCall)):
+            return "-{}".format(self._expr)
+        return "-({})".format(self._expr)
+
+    def asSymbol(self, templatesDict):
+        sym = self._expr.asSymbol(templatesDict)
+        return -sym
+
+    def substitute(self, substDict):
+        result = self._expr.substitute(substDict)
+        return -result
+
+
 class Template(Substitutable, Displayable):
     def __init__(self, paramNames, rightHand):
         for paramName in paramNames:
@@ -474,6 +429,54 @@ class TemplateCall(Expressable):
         namesAndValues = zip(template.argNames, self._params)
         substDict = {name: value for name, value in namesAndValues}
         return template.substitute(substDict)
+
+
+# data structure for two equal expressions
+class Relation(Symbolable, Substitutable, Displayable):
+    def __init__(self, expr1, expr2):
+        if not isinstance(expr1, Expressable):
+            raise TypeError("first argument for Relation must be an expression")
+        if not isinstance(expr2, Expressable):
+            raise TypeError("second argument for Relation must be an expression")
+        
+        self._leftExpr = expr1
+        self._rightExpr = expr2
+
+    @property
+    def _reprName(self):
+        return "Relation"
+
+    def __str__(self):
+        return "{} = {}".format(self._leftExpr, self._rightExpr)
+
+    @property
+    def left(self):
+        return self._leftExpr
+
+    @property
+    def right(self):
+        return self._rightExpr
+    
+    # returns symbol that is assumed equal to zero
+    def asSymbol(self, templatesDict):
+        return self._leftExpr - self._rightExpr
+
+    def substitute(self, substDict):
+        leftSub = self._leftExpr.substitute(substDict)
+        rightSub = self.rightExpr.substitute(substDict)
+        return Relation(leftSub, rightSub)
+
+
+# represents the list of all solutions for variables in a single relation
+class Solution():
+    def __init__(self, relation):
+        pass
+
+    def __repr__(self):
+        pass
+
+    def solveVar(symbol):
+        pass
 
 
 if __name__ == "__main__":

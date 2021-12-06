@@ -155,6 +155,14 @@ class Interpreter:
                 }
         self._parser.onStart(onStart)
 
+        def onNumber(tokens, branch):
+            if branch == "NU" or branch == "EN":
+                numberStr = str(tokens[0])
+                value = Numeric(numberStr)
+            piece = StackPieceTracer(value, tokens)
+            pushStack("numbers", piece)
+        self._parser.onNumber(onNumber)
+
         def onFullIdentifier(tokens, branch):
             # TODO: check that the value is defined
             if branch == "id":
@@ -182,14 +190,6 @@ class Interpreter:
             pushStack("identifiers", piece)
         self._parser.onIdentifiers(onIdentifiers)
 
-        def onNumber(tokens, branch):
-            if branch == "NU" or branch == "EN":
-                numberStr = str(tokens[0])
-                value = Numeric(numberStr)
-            piece = StackPieceTracer(value, tokens)
-            pushStack("numbers", piece)
-        self._parser.onNumber(onNumber)
-
         def onValue(tokens, branch):
             if branch == "fu":
                 piece = popStack("identifiers")
@@ -197,6 +197,16 @@ class Interpreter:
                 piece = popStack("numbers")
             pushStack("values", piece)
         self._parser.onValue(onValue)
+
+        def onOperatorANY(tokens, branch):
+            operatorStr = str(tokens[0])
+            piece = StackPieceTracer(operatorStr, tokens)
+            # can't use piece.trace() here without reviewing onOperation;
+            # that callback ignores this piece's traces
+            pushStack("operations", piece)
+        self._parser.onOperatorLow(onOperatorANY)
+        self._parser.onOperatorMid(onOperatorANY)
+        self._parser.onOperatorHigh(onOperatorANY)
 
         def onOperationANY(tokens, branch):
             binaryOpBranches = [
@@ -224,16 +234,6 @@ class Interpreter:
         self._parser.onOperationMid(onOperationANY)
         self._parser.onOperationHigh(onOperationANY)
         self._parser.onOperationMax(onOperationANY)
-
-        def onOperatorANY(tokens, branch):
-            operatorStr = str(tokens[0])
-            piece = StackPieceTracer(operatorStr, tokens)
-            # can't use piece.trace() here without reviewing onOperation;
-            # that callback ignores this piece's traces
-            pushStack("operations", piece)
-        self._parser.onOperatorLow(onOperatorANY)
-        self._parser.onOperatorMid(onOperatorANY)
-        self._parser.onOperatorHigh(onOperatorANY)
 
         def onEvaluation(tokens, branch):
             if branch == "va":
