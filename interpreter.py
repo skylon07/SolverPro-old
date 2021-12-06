@@ -107,10 +107,12 @@ class Interpreter:
         return result
 
     def _bindToParser(self):
-        def pushStack(key, *pushArgs):
-            return self._parseStack[key].append(*pushArgs)
-        def popStack(key, *popArgs):
-            return self._parseStack[key].pop(*popArgs)
+        def pushStack(key, stackPiece):
+            if not isinstance(stackPiece, StackPieceTracer):
+                raise TypeError("Interpreter pushed non-tracer type to stack")
+            return self._parseStack[key].append(stackPiece)
+        def popStack(key):
+            return self._parseStack[key].pop()
         
         def onStart(tokens, branch):
             if branch == "re EOL":
@@ -145,33 +147,41 @@ class Interpreter:
                 tokenStrs = map(lambda token: str(token), tokens)
                 fullId = ''.join(tokenStrs)
                 value = Identifier(fullId)
-            pushStack("identifiers", value)
+            piece = StackPieceTracer(value, tokens)
+            piece.trace(TRACE_TYPES["IDENTIFIER"])
+            pushStack("identifiers", piece)
         self._parser.onFullIdentifier(onFullIdentifier)
 
         def onIdentifiers(tokens, branch):
             if branch == "fu":
-                identifier = popStack("identifiers")
+                piece = popStack("identifiers")
+                identifier = piece.obj
                 identifiers = [identifier]
+                piece.update(identifiers, tokens, [])
             elif branch == "fu CO ids":
-                identifiers = popStack("identifiers")
-                nextIdentifier = popStack("identifiers")
+                piece = popStack("identifiers")
+                identifiers = piece.obj
+                nextPiece = popStack("identifiers")
+                nextIdentifier = nextPiece.obj
                 identifiers.append(nextIdentifier)
-            pushStack("identifiers", identifiers)
+                piece.update(identifiers, tokens, nextPiece.traces)
+            pushStack("identifiers", piece)
         self._parser.onIdentifiers(onIdentifiers)
 
         def onNumber(tokens, branch):
             if branch == "NU" or branch == "EN":
                 numberStr = str(tokens[0])
                 value = Numeric(numberStr)
-            pushStack("numbers", value)
+            piece = StackPieceTracer(value, tokens)
+            pushStack("numbers", piece)
         self._parser.onNumber(onNumber)
 
         def onValue(tokens, branch):
             if branch == "fu":
-                value = popStack("identifiers")
+                piece = popStack("identifiers")
             if branch == "nu":
-                value = popStack("numbers")
-            pushStack("values", value)
+                piece = popStack("numbers")
+            pushStack("values", piece)
         self._parser.onValue(onValue)
 
         def onOperationANY(tokens, branch):
@@ -181,17 +191,20 @@ class Interpreter:
                 "opx oph oph",
             ]
             if branch in binaryOpBranches:
-                operatorStr = popStack("operations")
-                rightExpr = popStack("expressions")
-                leftExpr = popStack("expressions")
-                newExpr = Expression(leftExpr, operatorStr, rightExpr)
+                opPiece = popStack("operations")
+                rightPiece = popStack("expressions")
+                leftPiece = popStack("expressions")
+                newExpr = Expression(leftPiece.obj, opPiece.obj, rightPiece.obj)
+                piece = leftPiece.update(newExpr, tokens, rightPiece.traces)
             elif branch == "DA opx":
-                expr = popStack("expressions")
+                piece = popStack("expressions")
+                expr = piece.obj
                 newExpr = NegativeExpression(expr)
+                piece.update(newExpr, tokens)
             else:
                 # nothing to do for carry-over branches
                 return
-            pushStack("expressions", newExpr)
+            pushStack("expressions", piece)
                 
         self._parser.onOperationLow(onOperationANY)
         self._parser.onOperationMid(onOperationANY)
@@ -199,44 +212,48 @@ class Interpreter:
         self._parser.onOperationMax(onOperationANY)
 
         def onOperatorANY(tokens, branch):
-            operatorStr = tokens[0]
-            pushStack("operations", operatorStr)
+            operatorStr = str(tokens[0])
+            piece = StackPieceTracer(operatorStr, tokens)
+            # can't use piece.trace() here without reviewing onOperation;
+            # that callback ignores this piece's traces
+            pushStack("operations", piece)
         self._parser.onOperatorLow(onOperatorANY)
         self._parser.onOperatorMid(onOperatorANY)
         self._parser.onOperatorHigh(onOperatorANY)
 
         def onEvaluation(tokens, branch):
             if branch == "va":
-                expr = popStack("values")
+                piece = popStack("values")
             elif branch == "PAO ex PAC":
                 # no need to process;
                 # the expression is already in the right place
                 return
-            pushStack("expressions", expr)
+            pushStack("expressions", piece)
         self._parser.onEvaluation(onEvaluation)
 
         def onLeftAliasANY(tokens, branch):
             if branch == "fu":
-                identifier = popStack("identifiers")
+                idPiece = popStack("identifiers")
+                identifier = idPiece.obj
                 identifiers = (identifier,)
-                args = None
+                idsPiece = idPiece.update(identifiers, tokens, [])
+                argsPiece = StackPieceTracer(None, [])
             elif branch == "BRO ids BRC":
-                identifiers = popStack("identifiers")
-                args = None
+                idsPiece = popStack("identifiers")
+                argsPiece = StackPieceTracer(None, [])
             else:
                 self._throwBranchNotImplemented("alias names".format(branch))
-            pushStack("aliasNames", identifiers)
-            pushStack("templateArgs", args)
+            pushStack("aliasNames", idsPiece)
+            pushStack("templateArgs", argsPiece)
         self._parser.onLeftAlias(onLeftAliasANY)
         self._parser.onLeftAliasTemp(onLeftAliasANY)
 
         def onRightAlias(tokens, branch):
             if branch == "ex":
-                expr = popStack("expressions")
-                rightHand = expr
+                rightHandPiece = popStack("expressions")
             else:
                 self._throwBranchNotImplemented("alias expressions".format(branch))
-            pushStack("aliasRightHands", rightHand)
+            pushStack("aliasRightHands", rightHandPiece)
         self._parser.onRightAlias(onRightAlias)
 
         def onRightAliasTemp(tokens, branch):
@@ -300,3 +317,45 @@ class Interpreter:
         
         self._print("(Internal error) {}: {}".format(type(e).__name__, e))
         return False
+
+
+TRACE_TYPES = {
+    "IDENTIFIER": "IDENTIFIER",
+}
+
+# contains an element of the stack as well as some helpful metadata
+class StackPieceTracer:
+    def __init__(self, obj, tokens):
+        self._obj = obj
+        self._tokens = tokens
+        self._traces = []
+
+    @property
+    def obj(self):
+        return self._obj
+
+    # keyword arguments intentionally avoided to force thinking
+    # about all parameters
+    def update(self, obj, tokens, withTraces):
+        self._obj = obj
+        self._tokens = tokens
+        for trace in withTraces:
+            self._traces.append(trace)
+        return self
+
+    def trace(self, traceType):
+        if traceType not in TRACE_TYPES:
+            raise ValueError("Interpreter stack can only trace given a valid type")
+        traceStart = self._tokens[0].placementStart
+        traceEnd = self._tokens[-1].placementEnd
+        trace = {
+            "type": traceType,
+            "obj": self._obj,
+            "start": traceStart,
+            "end": traceEnd,
+        }
+        self._traces.append(trace)
+
+    @property
+    def traces(self):
+        return iter(self._traces)
