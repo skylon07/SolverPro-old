@@ -111,7 +111,7 @@ class Interpreter:
             if branch == "id":
                 tokenStrs = map(lambda token: str(token), tokens)
                 fullId = ''.join(tokenStrs)
-                value = IdentifierValue(fullId)
+                value = VariableValue(fullId)
             pushStack("identifiers", value)
         self._parser.onFullIdentifier(onFullIdentifier)
 
