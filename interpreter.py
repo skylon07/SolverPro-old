@@ -45,8 +45,8 @@ class Interpreter:
             
             elif result["type"] == "expression":
                 expr = result["expression"]
-                result = self._engine.substitute(expr)
-                self._print(str(result))
+                subExpr = self._engine.substitute(expr)
+                self._print(str(subExpr))
             
             elif result["type"] == "command":
                 self._throwBranchNotImplemented("command executions")
@@ -111,7 +111,7 @@ class Interpreter:
             if branch == "id":
                 tokenStrs = map(lambda token: str(token), tokens)
                 fullId = ''.join(tokenStrs)
-                value = VariableValue(fullId)
+                value = Identifier(fullId)
             pushStack("identifiers", value)
         self._parser.onFullIdentifier(onFullIdentifier)
 
@@ -129,7 +129,7 @@ class Interpreter:
         def onNumber(tokens, branch):
             if branch == "NU" or branch == "EN":
                 numberStr = str(tokens[0])
-                value = NumericValue(numberStr)
+                value = Numeric(numberStr)
             pushStack("numbers", value)
         self._parser.onNumber(onNumber)
 

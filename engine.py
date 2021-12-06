@@ -6,45 +6,45 @@ import sympy
 
 class Engine:
     def __init__(self):
-        self._aliases = dict()
+        self._identifiers = dict()
 
     def setAlias(self, identifier, value):
-        if not isinstance(identifier, VariableValue):
-            raise TypeError("Engine.setAlias(identifier, value) -- identifier was not an VariableValue()")
-        if not isinstance(value, Value):
-            raise TypeError("Engine.setAlias(identifier, value) -- value was not a Value()")
+        if not isinstance(identifier, Identifier):
+            raise TypeError("Engine.setAlias(identifier, value) -- identifier was not an Identifier()")
+        if not isinstance(value, (Numeric, Identifier)):
+            raise TypeError("Engine.setAlias(identifier, value) -- value was not a Numeric() or Identifier()")
 
-        self._aliases[identifier] = value
+        self._identifiers[identifier] = value
 
     def setAliases(self, identifiers, value):
-        if not isinstance(value, Value):
-            raise TypeError("Engine.setAliases(identifiers, value) -- value was not a Value()")
+        if not isinstance(value, (Numeric, Identifier)):
+            raise TypeError("Engine.setAliases(identifiers, value) -- value was not a Numeric() or Identifier()")
         for identifier in identifiers:
-            if not isinstance(identifier, VariableValue):
-                raise TypeError("Engine.setAliases(identifiers, value) -- identifiers was not a list of VariableValue()s")
+            if not isinstance(identifier, Identifier):
+                raise TypeError("Engine.setAliases(identifiers, value) -- identifiers was not a list of Identifier()s")
         
         for identifier in identifiers:
             self.setAlias(identifier, value)
 
     def getAlias(self, identifier):
-        return self._aliases.get(identifier)
+        return self._identifiers.get(identifier)
 
     # substitutes all known values into a given object
     def substitute(self, subsable):
         if not isinstance(subsable, Substitutable):
             raise TypeError("Engine.evaluate(subsable) -- subsable must be a Substitutable()")
         
-        substDict = self._aliases
+        substDict = self._identifiers
         return subsable.substitute(substDict)
 
-    def roundFloat(self, numericValue):
-        if not isinstance(numericValue, NumericValue):
-            raise TypeError("Engine.roundFloat() received a non-NumericValue()")
+    def roundFloat(self, numeric):
+        if not isinstance(numeric, Numeric):
+            raise TypeError("Engine.roundFloat() received a non-Numeric()")
         
-        rawFloat = numericValue.asSymbol(self._identifiers)
+        rawFloat = numeric.asSymbol(self._identifiers)
         # special case for 0 (log10 gives domain error)
         if rawFloat == 0:
-            return numericValue
+            return numeric
         # number of digits to most signifigant figure
         numDigits = int(log10(abs(rawFloat)))
         if numDigits >= 0:
@@ -56,7 +56,7 @@ class Engine:
         # the opposite of numDigits, therefore we use -numDigits)
         roundTo = 12 - numDigits
         roundFloat = round(rawFloat, roundTo)
-        return NumericValue(roundFloat)
+        return Numeric(roundFloat)
 
 
 # abstract class that gives a blueprint for repr strings for objects
@@ -144,41 +144,6 @@ class immutable:
         argsHash = repr(argsTuple)
         # kwargsHash ignored; kwargs not currently allowed
         return hash((callHash, argsHash))
-
-
-# represents a single name within the program
-# (used as the key to a dictionary holding what it identifies)
-class Identifier(Displayable):
-    def __init__(self, idStr):
-        self._ensureId(idStr)
-        self._id = idStr
-
-    def __str__(self):
-        return self._id
-
-    # these functions are defined to allow equivelant identifiers
-    # to modify the same dictionary bucket
-    def __eq__(self, otherId):
-        if isinstance(otherId, Identifier):
-            return self._id == otherId
-        return False
-
-    def __hash__(self):
-        return hash(self._id)
-
-    # ensures the Identifier() holds a valid name
-    @classmethod
-    def _ensureId(cls, idStr):
-        if type(idStr) is str:
-            # empty strs not allowed
-            if len(idStr) > 0:
-                # first must be alpha char
-                if idStr[0].isalpha():
-                    # rest must be alphanumeric
-                    rest = idStr[1:]
-                    if rest.isalnum() or len(rest) == 0:
-                        return
-        raise ValueError("Identifier() tried to construct with invalid idStr argument")
 
 
 # represents the list of all solutions for variables in a single relation
@@ -308,7 +273,7 @@ class Expression(Expressable):
             # this should never happen, since oper is validated on construction
             raise ValueError("Expression tried to substitute with an invalid operator")
         # resolves floating-point errors
-        if isinstance(result, NumericValue):
+        if isinstance(result, Numeric):
             return Engine.roundFloat(result)
         return result
         
@@ -321,7 +286,7 @@ class NegativeExpression(Expressable):
         self._expr = expr
 
     def __str__(self):
-        if isinstance(self._expr, (Value, TemplateCall)):
+        if isinstance(self._expr, (Numeric, Identifier, TemplateCall)):
             return "-{}".format(self._expr)
         return "-({})".format(self._expr)
 
@@ -334,18 +299,82 @@ class NegativeExpression(Expressable):
         return -result
 
 
-# abstract data structure for defining (e)value(able)s (variables or numbers)
-class Value(Expressable):
+class Numeric(Expressable):
+    def __init__(self, number):
+        validTypes = (float, int, str)
+        if type(number) not in validTypes:
+            raise TypeError("Numeric constructed with invalid value")
+            
+        self._symbol = float(number)
+
     @property
     def _reprName(self):
-        return "Value"
+        return "Numeric"
+
+    # overrides Value.__str__ (allows printing ints)
+    def __str__(self):
+        forceFormatAboveThis = 1e16
+        if self._symbol < forceFormatAboveThis:
+            symAsInt = int(self._symbol)
+            isInt = symAsInt == self._symbol
+            if isInt:
+                return str(symAsInt)
+        return str(self._symbol)
+
+    def asSymbol(self, templatesDict):
+        return self._sym
+
+    def substitute(self, substDict):
+        return self
+
+    def __add__(self, other):
+        if isinstance(other, Numeric):
+            newVal = self._symbol + other._symbol
+            return Numeric(newVal)
+        return super().__add__(other)
     
+    def __sub__(self, other):
+        if isinstance(other, Numeric):
+            newVal = self._symbol - other._symbol
+            return Numeric(newVal)
+        return super().__sub__(other)
+
+    def __mul__(self, other):
+        if isinstance(other, Numeric):
+            newVal = self._symbol * other._symbol
+            return Numeric(newVal)
+        return super().__mul__(other)
+
+    def __truediv__(self, other):
+        if isinstance(other, Numeric):
+            newVal = self._symbol / other._symbol
+            return Numeric(newVal)
+        return super().__truediv__(other)
+
+    def __pow__(self, other):
+        if isinstance(other, Numeric):
+            newVal = self._symbol ** other._symbol
+            return Numeric(newVal)
+        return super().__pow__(other)
+
+
+# represents a single name within the program
+# (used as the key to a dictionary holding what it identifies)
+class Identifier(Expressable):
+    def __init__(self, idStr):
+        self._ensureId(idStr)
+        self._symbol = sympy.Symbol(idStr)
+
+    @property
+    def _reprName(self):
+        return "Identifier"
+
     def __str__(self):
         return str(self._symbol)
 
     def asSymbol(self, templatesDict):
         return self._symbol
-
+    
     def substitute(self, substDict):
         sub = substDict.get(self)
         if sub:
@@ -357,73 +386,29 @@ class Value(Expressable):
             raise TypeError("Value() substituted and got a non-Substitutable()")
         return result
 
-    @abstractproperty
-    def _symbol(self):
-        return # sympy-processable value
+    # these functions are defined to allow equivelant identifiers
+    # to modify the same dictionary bucket
+    def __eq__(self, otherId):
+        if isinstance(otherId, Identifier):
+            return self._symbol == otherId._symbol
+        return False
 
-class NumericValue(Value):
-    def __init__(self, number):
-        validTypes = (float, int, str)
-        if type(number) not in validTypes:
-            raise TypeError("NumericValue constructed with invalid value")
-            
-        self.__symbol = float(number)
+    def __hash__(self):
+        return hash(str(self))
 
-    @property
-    def _symbol(self):
-        return self.__symbol
-
-    # overrides Value.__str__ (allows printing ints)
-    def __str__(self):
-        forceFormatAboveThis = 1e16
-        if self._symbol < forceFormatAboveThis:
-            symAsInt = int(self._symbol)
-            isInt = symAsInt == self._symbol
-            if isInt:
-                return str(symAsInt)
-        return super().__str__()
-
-    def __add__(self, other):
-        if isinstance(other, NumericValue):
-            newVal = self._symbol + other._symbol
-            return NumericValue(newVal)
-        return super().__add__(other)
-    
-    def __sub__(self, other):
-        if isinstance(other, NumericValue):
-            newVal = self._symbol - other._symbol
-            return NumericValue(newVal)
-        return super().__sub__(other)
-
-    def __mul__(self, other):
-        if isinstance(other, NumericValue):
-            newVal = self._symbol * other._symbol
-            return NumericValue(newVal)
-        return super().__mul__(other)
-
-    def __truediv__(self, other):
-        if isinstance(other, NumericValue):
-            newVal = self._symbol / other._symbol
-            return NumericValue(newVal)
-        return super().__truediv__(other)
-
-    def __pow__(self, other):
-        if isinstance(other, NumericValue):
-            newVal = self._symbol ** other._symbol
-            return NumericValue(newVal)
-        return super().__pow__(other)
-
-
-class VariableValue(Value):
-    def __init__(self, identifier):
-        if type(identifier) is not str:
-            raise TypeError("VariableValue constructed with invalid value")
-
-        self.__symbol = sympy.Symbol(identifier)
-
-    @property
-    def _symbol(self):
-        return self.__symbol
+    # ensures the Identifier() holds a valid name
+    @classmethod
+    def _ensureId(cls, idStr):
+        if type(idStr) is str:
+            # empty strs not allowed
+            if len(idStr) > 0:
+                # first must be alpha char
+                if idStr[0].isalpha():
+                    # rest must be alphanumeric
+                    rest = idStr[1:]
+                    if rest.isalnum() or len(rest) == 0:
+                        return
+        raise ValueError("Identifier() tried to construct with invalid idStr argument")
 
 
 class Template(Substitutable, Displayable):
@@ -490,4 +475,3 @@ class TemplateCall(Expressable):
 
 if __name__ == "__main__":
     engine = Engine()
-    print(repr(engine.substitute(VariableValue("a"))))
