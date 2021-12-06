@@ -1292,7 +1292,7 @@ class TestSuites:
         try:
             parser.inspect(tokens, lineStr)
         except parser.ParseError as e:
-            expectedMessage = "                     ^\n    ParseError: Unexpected token BAD; expected EOL"
+            expectedMessage = "                    ^^^\n    ParseError: Unexpected token BAD; expected EOL"
             Tester.assertEqual(e.message, expectedMessage, "ParseError has correct printout")
         Tester.stopIfFailed()
 
@@ -1369,7 +1369,7 @@ class TestSuites:
         
         testLineOnInterpreter(
             "someUndefinedVal",
-            (ISP + "        ^", "rror", "ndefined"),
+            (ISP + "^^^^^^^^^^^^^^^^", "rror", "ndefined"),
             "errors when trying to access undefined values",
         )
         testLineOnInterpreter(
@@ -1676,7 +1676,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "obj.force",
-            (ISP + "    ^", "rror", "ndefined"),
+            (ISP + "    ^^^^^", "rror", "ndefined"),
             "errors when trying to access undefined object properties",
         )
         testLineOnInterpreter(
@@ -1917,7 +1917,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "obj1(5)",
-            (ISP + "  ^", "rror", "valuate", "lias"),
+            (ISP + "^^^^", "rror", "valuate", "lias"),
             "errors when trying to evaluate a non-template alias as a template alias",
         )
         testLineOnInterpreter(
@@ -1927,12 +1927,12 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "add(4, 5, 6)",
-            (ISP + " ^", "rror", "rguments"),
+            (ISP + "        ^^^", "rror", "rguments"),
             "errors when template alias is given too many arguments",
         )
         testLineOnInterpreter(
             "add(4)",
-            (ISP + " ^", "rror", "rguments"),
+            (ISP + "     ^", "rror", "rguments"),
             "errors when template alias is not given enough arguments",
         )
         resetState()
@@ -2117,7 +2117,7 @@ class TestSuites:
         Tester.stopIfFailed()
         testLineOnInterpreter(
             "!forget",
-            (ISP + "   ^", "rror", "equired"),
+            (ISP + "^^^^^^^", "rror", "equired"),
             "errors when trying to forget with no arguments",
         )
         testLineOnInterpreter(

@@ -127,7 +127,9 @@ class Parser:
                 self.unexpectedToken,
                 expectedTypesStr
             )
-            super().__init__(fullMessage, lineStr, self.unexpectedToken.placementCenter)
+            start = self.unexpectedToken.placementStart
+            end = self.unexpectedToken.placementEnd
+            super().__init__(fullMessage, lineStr, start, end)
 
     class EOLError(TracebackError):
         def __init__(self, eolToken, lineStr):
@@ -136,7 +138,10 @@ class Parser:
             self.unexpectedToken = eolToken
 
             fullMessage = "Unexpected end of line"
-            super().__init__(fullMessage, lineStr, self.unexpectedToken.placementCenter)
+            start = self.unexpectedToken.placementStart
+            # +1 needed since EOLs take up no space
+            end = start + 1
+            super().__init__(fullMessage, lineStr, start, end)
     
     def inspect(self, tokens, origLineStr):
         if len(tokens) > 0 and type(tokens[0]) is not Lexer.Token:

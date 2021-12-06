@@ -83,7 +83,11 @@ class Lexer():
 
         @property
         def placementCenter(self):
-            return self._placementStart + len(self._repStr) // 2
+            return self._placementStart + int(len(self._repStr) / 2)
+
+        @property
+        def placementEnd(self):
+            return self._placementStart + len(self._repStr)
 
         def _checkValidType(self):
             try:
