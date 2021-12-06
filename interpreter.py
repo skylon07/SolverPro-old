@@ -1,8 +1,41 @@
+from abc import ABC, abstractmethod
+
 from constants import INDENT
+from errors import TracebackError
 
 from lexer import Lexer
 from parser import Parser
 from engine import *
+
+
+class InterpreterError(TracebackError, ABC):
+    def __init__(self, badTraces):
+        message = self._generateMessage(badTraces)
+        badStarts = map(lambda trace: trace["start"], badTraces)
+        badEnds = map(lambda trace: trace["end"], badTraces)
+        super().__init__(message, badStarts, badEnds)
+
+    @abstractmethod
+    def __generateMessage(self, badTraces):
+        return # message string
+
+class UndefinedError(InterpreterError):
+    def _generateMessage(self, badTraces):
+        if len(badTraces) > 1:
+            plural = True
+        else:
+            plural = False
+        
+        badIdentifiers = map(lambda trace: str(trace["obj"]), badTraces)
+        return "{}{}ndefined identifier{} {} given: {}".format(
+            "An " if not plural else "",
+            "u" if not plural else "U",
+            "s" if plural else "",
+            "were" if plural else "was",
+            ','.join(badIdentifiers),
+        )
+
+
 class Interpreter:
     def __init__(self, outputFn):
         self._outputFn = outputFn
@@ -257,7 +290,7 @@ class Interpreter:
             Parser.ParseError,
             Parser.EOLError,
         )
-        if type(e) in parserErrors:
+        if type(e) in parserErrors or isinstance(e, InterpreterError):
             self._outputFn(e)
             return True
 
