@@ -232,7 +232,7 @@ class Expression(Expressable):
     def __init__(self, expr1, oper, expr2):
         if not isinstance(expr1, Expressable):
             raise TypeError("first argument for Expression must be an expression")
-        if oper not in OPERATORS:
+        if type(oper) is not str or oper not in OPERATORS:
             raise TypeError("second argument for Expression must be an operator")
         if not isinstance(expr2, Expressable):
             raise TypeError("third argument for Expression must be an expression")
