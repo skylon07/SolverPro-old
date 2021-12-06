@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from typing import Type
 
 import sympy
@@ -8,39 +8,36 @@ class Engine:
     pass
 
 
-# mixin class that provides a sympy representation of an object
-class Symbolable:
+# abstract class that gives a blueprint for repr strings for objects
+class Displayable(ABC):
     @abstractmethod
-    def asSymbol(self):
+    def __str__(self):
+        return # some string representation
+    
+    def __repr__(self):
+        return "<{}: {}>".format(self._reprName, self)
+
+    @abstractproperty
+    def _reprName(self):
+        return # name that represents type(self)
+    
+
+# mixin class that provides a sympy representation of an object
+class Symbolable(ABC):
+    @abstractmethod
+    def asSymbol(self, templatesDict):
         return # sympy.Symbol()/<something sympy can deal with, like numbers>
 
 
 # mixin class that provides an evaluation interface
-class Substitutable:
-    def __add__(self, other):
-        return Expression(self, '+', other)
-
-    def __sub__(self, other):
-        return Expression(self, '-', other)
-
-    def __mul__(self, other):
-        return Expression(self, '*', other)
-
-    def __truediv__(self, other):
-        return Expression(self, '/', other)
-
-    def __pow__(self, other):
-        return Expression(self, '^', other)
-
-    def __neg__(self):
-        return NegativeExpression(self)
-
+class Substitutable(ABC):
     @abstractmethod
-    # substDict[symbol] -> Substitutable() or numeric
+    # substDict[Identifier()] -> Substitutable()
     def substitute(self, substDict):
-        return # Substitutable() or numeric
+        return # Substitutable()
 
 
+# decorator that utilizes memory optimizations
 # (should obviously me used only for classes/functions
 # whose results can be treated as "immutable")
 class immutable:
@@ -130,6 +127,28 @@ class Relation(Symbolable):
     # returns symbol that is assumed equal to zero
     def asSymbol(self):
         return self._leftExpr - self._rightExpr
+
+
+# abstract class that gives operators to expression-like objects
+class Expressable(Symbolable, Substitutable, Displayable):
+    # operations for expressions
+    def __add__(self, other):
+        return Expression(self, '+', other)
+
+    def __sub__(self, other):
+        return Expression(self, '-', other)
+
+    def __mul__(self, other):
+        return Expression(self, '*', other)
+
+    def __truediv__(self, other):
+        return Expression(self, '/', other)
+
+    def __pow__(self, other):
+        return Expression(self, '^', other)
+
+    def __neg__(self):
+        return NegativeExpression(self)
 
 
 OPERATORS = {
