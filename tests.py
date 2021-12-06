@@ -1377,6 +1377,11 @@ class TestSuites:
             (ISP + "         ^", "rror", "ndefined"),
             "errors when trying to access undefined values",
         )
+        testLineOnInterpreter(
+            "a := b + cc",
+            (ISP + "     ^   ^^", "rror", "ndefined"),
+            "errors when trying to access undefined values (printing arrows for all undefined values)",
+        )
         resetState()
         Tester.stopIfFailed()
 

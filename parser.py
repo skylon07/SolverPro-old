@@ -107,7 +107,7 @@ class Parser:
         self.onFunctions = dict()
 
     class ParseError(TracebackError):
-        def __init__(self, expectedTypes, unexpectedToken, lineStr):
+        def __init__(self, expectedTypes, unexpectedToken):
             try:
                 iter(expectedTypes)
             except TypeError as e:
@@ -129,10 +129,10 @@ class Parser:
             )
             start = self.unexpectedToken.placementStart
             end = self.unexpectedToken.placementEnd
-            super().__init__(fullMessage, lineStr, start, end)
+            super().__init__(fullMessage, start, end)
 
     class EOLError(TracebackError):
-        def __init__(self, eolToken, lineStr):
+        def __init__(self, eolToken):
             if type(eolToken) is not Lexer.Token or eolToken.type != Lexer.types.EOL:
                 raise TypeError("EOLError was given a bad EOL-token argument")
             self.unexpectedToken = eolToken
@@ -141,7 +141,7 @@ class Parser:
             start = self.unexpectedToken.placementStart
             # +1 needed since EOLs take up no space
             end = start + 1
-            super().__init__(fullMessage, lineStr, start, end)
+            super().__init__(fullMessage, start, end)
     
     def inspect(self, tokens, origLineStr):
         if len(tokens) > 0 and type(tokens[0]) is not Lexer.Token:
@@ -896,7 +896,7 @@ class ParserMatcher:
 
     # helper functions to throw errors with expected types
     def _throwParseError(self, expectedTypes):
-        raise Parser.ParseError(expectedTypes, self.currToken, self.origLineStr)
+        raise Parser.ParseError(expectedTypes, self.currToken)
 
     def _throwEOLError(self):
-        raise Parser.EOLError(self.currToken, self.origLineStr)
+        raise Parser.EOLError(self.currToken)
