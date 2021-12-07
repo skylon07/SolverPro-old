@@ -227,6 +227,9 @@ class Numeric(Expressable):
             return Numeric(newVal)
         return super().__pow__(other)
 
+    def __neg__(self):
+        return Numeric(-self._symbol)
+
 
 # represents a single name within the program
 # (used as the key to a dictionary holding what it identifies)
