@@ -185,7 +185,7 @@ class Interpreter:
                 identifiers = piece.obj
                 nextPiece = popStack("identifiers")
                 nextIdentifier = nextPiece.obj
-                identifiers.append(nextIdentifier)
+                identifiers.insert(0, nextIdentifier)
                 piece.update(identifiers, tokens, nextPiece.traces)
             pushStack("identifiers", piece)
         self._parser.onIdentifiers(onIdentifiers)
