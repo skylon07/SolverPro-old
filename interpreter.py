@@ -214,7 +214,6 @@ class Interpreter:
         self._parser.onNumber(onNumber)
 
         def onFullIdentifier(tokens, branch):
-            # TODO: check that the value is defined
             if branch == "id":
                 tokenStrs = map(lambda token: str(token), tokens)
                 fullId = ''.join(tokenStrs)
