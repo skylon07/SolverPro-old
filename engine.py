@@ -358,9 +358,6 @@ class Expression(Expressable):
         else:
             # this should never happen, since oper is validated on construction
             raise ValueError("Expression tried to substitute with an invalid operator")
-        # resolves floating-point errors
-        if isinstance(result, Numeric):
-            return Engine.roundFloat(result)
         return result
         
 
