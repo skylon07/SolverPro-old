@@ -891,7 +891,8 @@ class ParserMatcher:
                     fn(tuple(tokens), branch)
                 except TypeError as e:
                     if "positional argument" in str(e):
-                        raise TypeError("Parser tried to execute callback defined with the wrong number of arguments; {}".format(e))
+                        if str(e)[0:2] == "on":
+                            raise TypeError("Parser tried to execute callback defined with the wrong number of arguments; {}".format(e))
                     raise e
 
     # helper functions to throw errors with expected types
