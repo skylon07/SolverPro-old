@@ -370,8 +370,12 @@ class NegativeExpression(Expressable):
         
         self._expr = expr
 
+    @property
+    def _reprName(self):
+        return "NegExpression"
+
     def __str__(self):
-        if isinstance(self._expr, (Numeric, Identifier, TemplateCall)):
+        if isinstance(self._expr, (Numeric, Identifier, TemplateCall, NegativeExpression)):
             return "-{}".format(self._expr)
         return "-({})".format(self._expr)
 
