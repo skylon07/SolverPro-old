@@ -16,8 +16,13 @@ class InterpreterError(TracebackError, ABC):
         super().__init__(message, badStarts, badEnds)
 
     @abstractmethod
-    def __generateMessage(self, badTraces):
+    def _generateMessage(self, badTraces):
         return # message string
+
+
+class InterpreterWarning(InterpreterError):
+    def warn(self, outputFn):
+        outputFn(self.message)
 
 class UndefinedError(InterpreterError):
     def _generateMessage(self, badTraces):
@@ -26,13 +31,29 @@ class UndefinedError(InterpreterError):
         else:
             plural = False
         
-        badIdentifiers = map(lambda trace: str(trace["obj"]), badTraces)
+        badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
         return "{}{}ndefined identifier{} {} given: {}".format(
             "An " if not plural else "",
             "u" if not plural else "U",
             "s" if plural else "",
             "were" if plural else "was",
-            ','.join(badIdentifiers),
+            ','.join(badIdentifierStrs),
+        )
+
+# meant to be called, not raised
+class UnusedArgumentsWarning(InterpreterWarning):
+    def _generateMessage(self, badTraces):
+        if len(badTraces) > 1:
+            plural = True
+        else:
+            plural = False
+
+        badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
+        return "Variable{} {} {} not used in {} template definition".format(
+            "s" if plural else "",
+            ','.join(badIdentifierStrs),
+            "were" if plural else "was",
+            "their" if plural else "its",
         )
 
 
@@ -75,7 +96,14 @@ class Interpreter:
             elif result["type"] == "alias":
                 isTemplate = result["templateArgs"].obj is not None
                 if isTemplate:
-                    self._throwBranchNotImplemented("template alias executions")
+                    idsPiece = result["aliasNames"]
+                    # only one identifier allowed by parser for template alias names
+                    identifier = idsPiece.obj[0]
+                    argsPiece = result["templateArgs"]
+                    rightHandPiece = result["rightHand"]
+                    self._ensureTemplateUses(argsPiece, rightHandPiece)
+                    template = Template(argsPiece.obj, rightHandPiece.obj)
+                    self._engine.setAlias(identifier, template)
                 else:
                     idsPiece = result["aliasNames"]
                     rightHandPiece = result["rightHand"]
@@ -114,17 +142,33 @@ class Interpreter:
         self._assertParseStackEmpty()
         return result
 
+    # errors when identifiers are not defined
     def _ensureDefined(self, stackPiece):
         badTraces = []
         for trace in stackPiece.traces:
-            traceType = trace["type"]
-            if traceType == TRACE_TYPES["IDENTIFIER"]:
+            if trace["type"] == TRACE_TYPES["IDENTIFIER"]:
                 identifier = trace["obj"]
                 if not self._engine.isDefined(identifier):
                     badTraces.append(trace)
         if len(badTraces) > 0:
             raise UndefinedError(badTraces)
 
+    # warns when a template's arguments are not used
+    def _ensureTemplateUses(self, argNamesPiece, rightHandPiece):
+        badTraces = []
+        for argTrace in argNamesPiece.traces:
+            if argTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
+                inRightHand = False
+                for rightHandTrace in rightHandPiece.traces:
+                    if rightHandTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
+                        if argTrace["obj"] == rightHandTrace["obj"]:
+                            inRightHand = True
+                            break
+                if not inRightHand:
+                    badTraces.append(argTrace)
+        if len(badTraces) > 0:
+            warning = UnusedArgumentsWarning(badTraces)
+            warning.warn(self._outputFn)
 
     def _bindToParser(self):
         def pushStack(key, stackPiece):
@@ -316,6 +360,7 @@ class Interpreter:
         self._parser.onEvaluation(onEvaluation)
 
         def onLeftAliasANY(tokens, branch):
+            isTemplateBranch = branch in ("fu PAO PAC", "fu PAO ids PAC")
             if branch == "fu":
                 idPiece = popStack("identifiers")
                 identifier = idPiece.obj
@@ -325,8 +370,17 @@ class Interpreter:
             elif branch == "BRO ids BRC":
                 idsPiece = popStack("identifiers")
                 argsPiece = StackPieceTracer(None, [])
-            else:
-                self._throwBranchNotImplemented("alias names".format(branch))
+            elif isTemplateBranch:
+                if branch == "fu PAO ids PAC":
+                    argsPiece = popStack("identifiers")
+                    if type(argsPiece.obj) is not list:
+                        raise TypeError("Interpreter -> onLeftAliasTemplate() got arguments from stack that were not in list form")
+                else:
+                    argsPiece = StackPieceTracer([], [])
+                idPiece = popStack("identifiers")
+                identifier = idPiece.obj
+                identifiers = (identifier,)
+                idsPiece = idPiece.update(identifiers, tokens, [])
             pushStack("aliasNames", idsPiece)
             pushStack("templateArgs", argsPiece)
         self._parser.onLeftAlias(onLeftAliasANY)
@@ -341,12 +395,15 @@ class Interpreter:
         self._parser.onRightAlias(onRightAlias)
 
         def onRightAliasTemp(tokens, branch):
-            if False:
-                pass
-            else:
-                self._throwBranchNotImplemented("alias template expressions".format(branch))
-            TODO_somethingNeedsToGoHere = None
-            pushStack("aliasRightHands", TODO_somethingNeedsToGoHere)
+            if branch == "ex":
+                piece = popStack("expressions")
+            elif branch == "re":
+                self._throwBranchNotImplemented("relations on right-side of alias templates")
+            elif branch == "co":
+                self._throwBranchNotImplemented("commands on right-side of alias templates")
+            elif branch == "ob":
+                self._throwBranchNotImplemented("objects on right-side of alias templates")
+            pushStack("aliasRightHands", piece)
         self._parser.onRightAliasTemp(onRightAliasTemp)
 
         # TODO: finish these features

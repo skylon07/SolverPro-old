@@ -69,9 +69,11 @@ class Engine:
     def setAlias(self, identifier, value):
         if not isinstance(identifier, Identifier):
             raise TypeError("Engine.setAlias(identifier, value) -- identifier was not an Identifier()")
-        if not isinstance(value, (Numeric, Identifier)):
+        if not isinstance(value, (Numeric, Identifier, Template)):
             raise TypeError("Engine.setAlias(identifier, value) -- value was not a Numeric() or Identifier()")
 
+        if not callable(identifier.__hash__) or not callable(identifier.__eq__):
+            raise TypeError("Identifier() cannot be used as dictionary key")
         self._identifiers[identifier] = value
 
     def setAliases(self, identifiers, value):
@@ -106,7 +108,10 @@ class Displayable(ABC):
         return # some string representation
     
     def __repr__(self):
-        return "<{}: {}>".format(self._reprName, self)
+        try:
+            return "<{}: {}>".format(self._reprName, self)
+        except RecursionError as e:
+            raise RecursionError("(Inside class Displayable.__repr__(); did you define _reprName as @property?)")
 
     @abstractproperty
     def _reprName(self):
@@ -399,6 +404,7 @@ class Template(Substitutable, Displayable):
         self._argNames = paramNames
         self._rightHand = rightHand
 
+    @property
     def _reprName(self):
         return "Template"
 
@@ -433,6 +439,9 @@ class TemplateCall(Expressable):
     @property
     def _reprName(self):
         return "TemplateCall"
+
+    def __str__(self):
+        return "{}({})".format(self._name, self._params)
 
     def asSymbol(self, templatesDict):
         template = templatesDict[self._name]

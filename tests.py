@@ -1458,7 +1458,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "alias(x, y) := x + 5",
-            ("nused", "ariable ", "x"),
+            ("nused", "ariable ", "y"),
             "prints a warning for unused template variables (one unused)",
         )
         testLineOnInterpreter(
