@@ -146,7 +146,7 @@ class Interpreter:
     def _ensureDefined(self, stackPiece):
         badTraces = []
         for trace in stackPiece.traces:
-            if trace["type"] == TRACE_TYPES["IDENTIFIER"]:
+            if trace["type"] == TRACE_TYPES["UNDEF_ID"]:
                 identifier = trace["obj"]
                 if not self._engine.isDefined(identifier):
                     badTraces.append(trace)
@@ -157,10 +157,10 @@ class Interpreter:
     def _ensureTemplateUses(self, argNamesPiece, rightHandPiece):
         badTraces = []
         for argTrace in argNamesPiece.traces:
-            if argTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
+            if argTrace["type"] == TRACE_TYPES["UNDEF_ID"]:
                 inRightHand = False
                 for rightHandTrace in rightHandPiece.traces:
-                    if rightHandTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
+                    if rightHandTrace["type"] == TRACE_TYPES["UNDEF_ID"]:
                         if argTrace["obj"] == rightHandTrace["obj"]:
                             inRightHand = True
                             break
@@ -219,7 +219,7 @@ class Interpreter:
                 fullId = ''.join(tokenStrs)
                 value = Identifier(fullId)
             piece = StackPieceTracer(value, tokens)
-            piece.trace(TRACE_TYPES["IDENTIFIER"])
+            piece.trace(TRACE_TYPES["UNDEF_ID"])
             pushStack("identifiers", piece)
         self._parser.onFullIdentifier(onFullIdentifier)
 
@@ -318,9 +318,6 @@ class Interpreter:
                 # (parser productions return right-to-left)
                 opList.insert(0, oper)
                 opList.insert(0, nextExpr)
-                # TAG: update_reverses_traces
-                # this call to update() causes the traces to be appended
-                # in the reverse order of their creation (not sure if this is bad...)
                 piece = opListPiece.update(opList, tokens, nextOpListPiece.traces)
             # all other productions that just chain precedence
             else:
@@ -460,11 +457,19 @@ class Interpreter:
 
 
 TRACE_TYPES = {
-    "IDENTIFIER": "IDENTIFIER",
+    "UNDEF_ID": "UNDEF_ID",
 }
 
 # contains an element of the stack as well as some helpful metadata
 class StackPieceTracer:
+    __traceId_DO_NOT_MODIFY = 0
+    @classmethod
+    def _getUniqueTraceId(cls):
+        # ...except for here, obviously
+        traceId = cls.__traceId_DO_NOT_MODIFY
+        cls.__traceId_DO_NOT_MODIFY += 1
+        return traceId
+
     def __init__(self, obj, tokens):
         self._obj = obj
         self._tokens = tokens
@@ -480,7 +485,7 @@ class StackPieceTracer:
         self._obj = obj
         self._tokens = tokens
         for trace in withTraces:
-            self._traces.append(trace)
+            self._insertTraceSorted(trace)
         return self
 
     def trace(self, traceType):
@@ -488,9 +493,8 @@ class StackPieceTracer:
             raise ValueError("Interpreter stack can only trace given a valid type")
         traceStart = self._tokens[0].placementStart
         traceEnd = self._tokens[-1].placementEnd
-        # TODO: sort by traces created first (not sure if needed?)
-        #   ^ see tag: update_reverses_traces
         trace = {
+            "id": self._getUniqueTraceId(),
             "type": traceType,
             "obj": self._obj,
             "start": traceStart,
@@ -501,3 +505,35 @@ class StackPieceTracer:
     @property
     def traces(self):
         return iter(self._traces)
+
+    def _insertTraceSorted(self, trace):
+        lowBound = 0
+        upBound = len(self._traces)
+        while upBound != lowBound:
+            bisectIdx = int((lowBound + upBound) / 2)
+            bisectTrace = self._traces[bisectIdx]
+            if trace["id"] < bisectTrace["id"]:
+                upBound = bisectIdx
+            elif trace["id"] > bisectTrace["id"]:
+                lowBound = bisectIdx + 1
+            else:
+                raise ValueError("trace ids were not unique")
+        self._traces[lowBound:upBound] = [trace]
+
+if __name__ == "__main__":
+    piece1 = StackPieceTracer(Identifier("a"), [Lexer.Token("a", "IDENTIFIER", 0)])
+    piece2 = StackPieceTracer(Identifier("b"), [Lexer.Token("b", "IDENTIFIER", 0)])
+    
+    piece2.trace(TRACE_TYPES["UNDEF_ID"])
+    piece1.trace(TRACE_TYPES["UNDEF_ID"])
+    piece1.trace(TRACE_TYPES["UNDEF_ID"])
+    piece2.trace(TRACE_TYPES["UNDEF_ID"])
+    piece1.trace(TRACE_TYPES["UNDEF_ID"])
+    piece2.trace(TRACE_TYPES["UNDEF_ID"])
+    piece1.trace(TRACE_TYPES["UNDEF_ID"])
+    piece1.trace(TRACE_TYPES["UNDEF_ID"])
+    piece2.trace(TRACE_TYPES["UNDEF_ID"])
+    piece2.trace(TRACE_TYPES["UNDEF_ID"])
+
+    piece1.update((piece1.obj, piece2.obj), [], piece2.traces)
+    
