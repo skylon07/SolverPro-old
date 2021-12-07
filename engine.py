@@ -315,7 +315,24 @@ class Expression(Expressable):
         return "Expression"
 
     def __str__(self):
-        return "{} {} {}".format(self._leftExpr, self._oper, self._rightExpr)
+        precedence = {
+            '+': 1,
+            '-': 1,
+            '*': 2,
+            '/': 2,
+            '^': 3,
+        }
+        left = str(self._leftExpr)
+        right = str(self._rightExpr)
+        if isinstance(self._leftExpr, Expression):
+            if precedence[self._oper] > precedence[self._leftExpr._oper]:
+                # preserve order of operations
+                left = '({})'.format(left)
+        if isinstance(self._rightExpr, Expression):
+            if precedence[self._oper] > precedence[self._rightExpr._oper]:
+                # preserve order of operations
+                right = '({})'.format(right)
+        return "{} {} {}".format(left, self._oper, right)
     
     def asSymbol(self, templatesDict):
         sym1 = self._leftExpr.asSymbol(templatesDict)
