@@ -1417,7 +1417,7 @@ class TestSuites:
             "can print new values",
         )
         testLineOnInterpreter(
-            "-val - --5 + -3",
+            "-val---5 +-3",
             "-18",
             "can process negative (and double negative) values",
         )

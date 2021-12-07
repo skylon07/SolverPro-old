@@ -45,8 +45,14 @@ class Interpreter:
             "identifiers": [],
             "numbers": [],
             "values": [],
+            
             "operations": [],
             "expressions": [],
+            # these stacks hold operation lists, not single values
+            "operationslow": [],
+            "operationsmid": [],
+            "operationshigh": [],
+            "operationsmax": [],
 
             "aliasNames": [],
             "templateArgs": [],
@@ -208,37 +214,101 @@ class Interpreter:
         self._parser.onOperatorMid(onOperatorANY)
         self._parser.onOperatorHigh(onOperatorANY)
 
+        def evaluateOperationList(opList):
+            if type(opList) is not list:
+                raise TypeError("cannot evaluate non-list-type as operation list")
+            # collapses operations left-to-right
+            while len(opList) > 1:
+                try:
+                    leftExpr = opList.pop(0)
+                    oper = opList.pop(0)
+                    rightExpr = opList.pop(0)
+                except IndexError as e:
+                    if "pop from empty" in str(e):
+                        raise IndexError("Interpreter -> evaluateOperationList(opList) given bad opList")
+                newExpr = Expression(leftExpr, oper, rightExpr)
+                opList.insert(0, newExpr)
+            resultExpr = opList[0]
+            return resultExpr
         def onOperationANY(tokens, branch):
-            binaryOpBranches = [
+            if branch in ("opm opl opl", "opm"):
+                stackName = "operationslow"
+                nextStack = "operationsmid"
+            elif branch in ("oph opm opm", "oph"):
+                stackName = "operationsmid"
+                nextStack = "operationshigh"
+            elif branch in ("opx oph oph", "opx"):
+                stackName = "operationshigh"
+                nextStack = "operationsmax"
+            elif branch in ("DA opx", "ev"):
+                stackName = "operationsmax"
+                        
+            isOperatorBranch = branch in (
                 "opm opl opl",
                 "oph opm opm",
                 "opx oph oph",
-            ]
-            if branch in binaryOpBranches:
-                opPiece = popStack("operations")
-                rightPiece = popStack("expressions")
-                leftPiece = popStack("expressions")
-                newExpr = Expression(leftPiece.obj, opPiece.obj, rightPiece.obj)
-                piece = leftPiece.update(newExpr, tokens, rightPiece.traces)
-            elif branch == "DA opx":
+            )
+            # operation-max production
+            if branch == "DA opx":
+                opListPiece = popStack("operationsmax")
+                opList = opListPiece.obj
+                expr = evaluateOperationList(opList)
+                newExpr = NegativeExpression(expr)
+                newOpList = [newExpr]
+                piece = opListPiece.update(newOpList, tokens, [])
+            elif branch == "ev":
                 piece = popStack("expressions")
                 expr = piece.obj
-                newExpr = NegativeExpression(expr)
-                piece.update(newExpr, tokens)
+                exprs = [expr]
+                # lower precedence productions expect the stack to contain lists
+                piece.update(exprs, tokens, [])
+            # all other productions that use an operator
+            elif isOperatorBranch:
+                opListPiece = popStack(stackName)
+                operPiece = popStack("operations")
+                nextOpListPiece = popStack(nextStack)
+                opList = opListPiece.obj
+                oper = operPiece.obj
+                nextOpList = nextOpListPiece.obj
+                nextExpr = evaluateOperationList(nextOpList)
+                # inserted on left to later be evaluated left-to-right
+                # (parser productions return right-to-left)
+                opList.insert(0, oper)
+                opList.insert(0, nextExpr)
+                # TAG: update_reverses_traces
+                # this call to update() causes the traces to be appended
+                # in the reverse order of their creation (not sure if this is bad...)
+                piece = opListPiece.update(opList, tokens, nextOpListPiece.traces)
+            # all other productions that just chain precedence
             else:
-                # nothing to do for carry-over branches
-                return
-            pushStack("expressions", piece)
-                
+                nextOpListPiece = popStack(nextStack)
+                nextOpList = nextOpListPiece.obj
+                expr = evaluateOperationList(nextOpList)
+                # productions that use operators will append to this list later
+                opList = [expr]
+                piece = nextOpListPiece.update(opList, tokens, [])
+            pushStack(stackName, piece)
         self._parser.onOperationLow(onOperationANY)
         self._parser.onOperationMid(onOperationANY)
         self._parser.onOperationHigh(onOperationANY)
         self._parser.onOperationMax(onOperationANY)
 
+        def onExpression(tokens, branch):
+            opListPiece = popStack("operationslow")
+            opList = opListPiece.obj
+            expr = evaluateOperationList(opList)
+            piece = opListPiece.update(expr, tokens, [])
+            pushStack("expressions", piece)
+        self._parser.onExpression(onExpression)
+
         def onEvaluation(tokens, branch):
+            exprBranches = (
+                "PAO ex PAC",
+                "BRO ex BRC",
+            )
             if branch == "va":
                 piece = popStack("values")
-            elif branch == "PAO ex PAC":
+            elif branch in exprBranches:
                 # no need to process;
                 # the expression is already in the right place
                 return
@@ -362,6 +432,8 @@ class StackPieceTracer:
             raise ValueError("Interpreter stack can only trace given a valid type")
         traceStart = self._tokens[0].placementStart
         traceEnd = self._tokens[-1].placementEnd
+        # TODO: sort by traces created first (not sure if needed?)
+        #   ^ see tag: update_reverses_traces
         trace = {
             "type": traceType,
             "obj": self._obj,
