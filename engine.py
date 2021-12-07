@@ -98,27 +98,6 @@ class Engine:
         substDict = self._identifiers
         return subsable.substitute(substDict)
 
-    def roundFloat(self, numeric):
-        if not isinstance(numeric, Numeric):
-            raise TypeError("Engine.roundFloat() received a non-Numeric()")
-        
-        rawFloat = numeric.asSymbol(self._identifiers)
-        # special case for 0 (log10 gives domain error)
-        if rawFloat == 0:
-            return numeric
-        # number of digits to most signifigant figure
-        numDigits = int(log10(abs(rawFloat)))
-        if numDigits >= 0:
-            # because log10(1) gives 0; we want 1
-            numDigits += 1
-        # we care about 12 signifigant digits
-        # (round() using positive arg will round after decimal;
-        # with negative arg will round before decimal; this is 
-        # the opposite of numDigits, therefore we use -numDigits)
-        roundTo = 12 - numDigits
-        roundFloat = round(rawFloat, roundTo)
-        return Numeric(roundFloat)
-
 
 # abstract class that gives a blueprint for repr strings for objects
 class Displayable(ABC):
@@ -176,8 +155,9 @@ class Numeric(Expressable):
         validTypes = (float, int, str)
         if type(number) not in validTypes:
             raise TypeError("Numeric constructed with invalid value")
-            
-        self._symbol = float(number)
+        
+        # removes floating point errors
+        self._symbol = self._roundFloat(float(number))
 
     @property
     def _reprName(self):
@@ -194,10 +174,28 @@ class Numeric(Expressable):
         return str(self._symbol)
 
     def asSymbol(self, templatesDict):
-        return self._sym
+        return self._symbol
 
     def substitute(self, substDict):
         return self
+
+    @classmethod
+    def _roundFloat(cls, rawFloat):
+        # special case for 0 (log10 gives domain error)
+        if rawFloat == 0:
+            return rawFloat
+        # number of digits to most signifigant figure
+        numDigits = int(log10(abs(rawFloat)))
+        if numDigits >= 0:
+            # because log10(1) gives 0; we want 1
+            numDigits += 1
+        # we care about 12 signifigant digits
+        # (round() using positive arg will round after decimal;
+        # with negative arg will round before decimal; this is 
+        # the opposite of numDigits, therefore we use -numDigits)
+        roundTo = 12 - numDigits
+        roundFloat = round(rawFloat, roundTo)
+        return roundFloat
 
     def __add__(self, other):
         if isinstance(other, Numeric):
