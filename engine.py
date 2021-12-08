@@ -63,25 +63,46 @@ class immutable:
 
 
 class Engine:
+    @property
+    def _validIdKeys(self):
+        return (
+            Identifier,
+        )
+    _validIdKeysNames = (
+        "Identifier",
+    )
+    @property
+    def _validIdVals(self):
+        return (
+            Numeric,
+            Identifier,
+            Template,
+        )
+    _validIdValsNames = (
+        "Numeric",
+        "Identifier",
+        "Template",
+    )
+
     def __init__(self):
         self._identifiers = dict()
 
     def setAlias(self, identifier, value):
-        if not isinstance(identifier, Identifier):
-            raise TypeError("Engine.setAlias(identifier, value) -- identifier was not an Identifier()")
-        if not isinstance(value, (Numeric, Identifier, Template)):
-            raise TypeError("Engine.setAlias(identifier, value) -- value was not a Numeric() or Identifier()")
+        if not isinstance(identifier, self._validIdKeys):
+            raise TypeError("Engine.setAlias(identifier, value) -- identifier was not one of {}".format(self._validIdKeysNames))
+        if not isinstance(value, self._validIdVals):
+            raise TypeError("Engine.setAlias(identifier, value) -- value was not one of {}".format(self._validIdValsNames))
 
         if not callable(identifier.__hash__) or not callable(identifier.__eq__):
             raise TypeError("Identifier() cannot be used as dictionary key")
         self._identifiers[identifier] = value
 
     def setAliases(self, identifiers, value):
-        if not isinstance(value, (Numeric, Identifier)):
-            raise TypeError("Engine.setAliases(identifiers, value) -- value was not a Numeric() or Identifier()")
+        if not isinstance(value, self._validIdVals):
+            raise TypeError("Engine.setAliases(identifiers, value) -- value was not one of {}".format(self._validIdValsNames))
         for identifier in identifiers:
-            if not isinstance(identifier, Identifier):
-                raise TypeError("Engine.setAliases(identifiers, value) -- identifiers was not a list of Identifier()s")
+            if not isinstance(identifier, self._validIdKeys):
+                raise TypeError("Engine.setAliases(identifiers, value) -- identifiers was not a list with each item one of {}".format(self._validIdKeysNames))
         
         for identifier in identifiers:
             self.setAlias(identifier, value)
@@ -256,7 +277,10 @@ class Identifier(Expressable):
     def substitute(self, substDict):
         sub = substDict.get(self)
         if sub:
-            result = sub.substitute(substDict)
+            if isinstance(sub, Identifier):
+                result = sub.substitute(substDict)
+            else:
+                result = sub
         else:
             result = self
 
@@ -404,20 +428,23 @@ class Template(Substitutable, Displayable):
         self._argNames = paramNames
         self._rightHand = rightHand
 
+    def __call__(self, argsDict):
+        if len(argsDict) < len(self._argNames):
+            raise ValueError("Template.substitute() not given enough substitutions")
+        for key in argsDict:
+            if key not in self._argNames:
+                raise ValueError("Template.substitute() can only substitute arguments that were part of its definition")
+        return self._rightHand.substitute(argsDict)
+
     @property
     def _reprName(self):
         return "Template"
 
     def __str__(self):
-        argNamesStr = ','.join(str(name) for name in self._argNames)
+        argNamesStr = ', '.join(str(name) for name in self._argNames)
         return "({}) -> {}".format(argNamesStr, self._rightHand)
 
     def substitute(self, substDict):
-        if len(substDict) < len(self._argNames):
-            raise ValueError("Template.substitute() not given enough substitutions")
-        for key in substDict:
-            if key not in self._argNames:
-                raise ValueError("Template.substitute() can only substitute arguments that were part of its definition")
         return self._rightHand.substitute(substDict)
 
     @property
@@ -445,6 +472,8 @@ class TemplateCall(Expressable):
 
     def asSymbol(self, templatesDict):
         template = templatesDict[self._name]
+        if not isinstance(template, Template):
+            raise TypeError("TemplateCall substituted and got a non-template")
         subs = self._substituteTemplate(template)
         return subs.asSymbol(templatesDict)
 
@@ -456,7 +485,7 @@ class TemplateCall(Expressable):
     def _substituteTemplate(self, template):
         namesAndValues = zip(template.argNames, self._params)
         substDict = {name: value for name, value in namesAndValues}
-        return template.substitute(substDict)
+        return template(substDict)
 
 
 # data structure for two equal expressions
