@@ -85,6 +85,11 @@ class Engine:
     )
 
     def __init__(self):
+        for keyName, keyType in zip(self._validIdKeysNames, self._validIdKeys):
+            # checking this way ensures that an explicit definition of
+            # __hash__ and __eq__ are provided
+            if not callable(keyType.__hash__) or not callable(keyType.__eq__):
+                raise TypeError("{}() cannot be used as dictionary key".format(keyName))
         self._identifiers = dict()
 
     def setAlias(self, identifier, value):
@@ -93,8 +98,6 @@ class Engine:
         if not isinstance(value, self._validIdVals):
             raise TypeError("Engine.setAlias(identifier, value) -- value was not one of {}".format(self._validIdValsNames))
 
-        if not callable(identifier.__hash__) or not callable(identifier.__eq__):
-            raise TypeError("Identifier() cannot be used as dictionary key")
         self._identifiers[identifier] = value
 
     def setAliases(self, identifiers, value):
@@ -156,6 +159,18 @@ class Substitutable(ABC):
 
 # abstract class that gives operators to expression-like objects
 class Expressable(Symbolable, Substitutable, Displayable):
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self, other):
+        if isinstance(other, Expressable):
+            return str(self) == str(other)
+        return False
+
+    @abstractmethod
+    def __str__(self):
+        return # a unique string that can be used to check equality
+    
     # operations for expressions
     def __add__(self, other):
         return Expression(self, '+', other)
@@ -296,7 +311,7 @@ class Identifier(Expressable):
         return False
 
     def __hash__(self):
-        return hash(str(self))
+        return super().__hash__()
 
     # ensures the Identifier() holds a valid name
     @classmethod
