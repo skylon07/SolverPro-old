@@ -1472,6 +1472,11 @@ class TestSuites:
             "can assign aliases to template aliases",
         )
         testLineOnInterpreter(
+            "myTemplate := myTemplate",
+            None,
+            "can assign aliases to self",
+        )
+        testLineOnInterpreter(
             "myTemplate",
             "(x, y) -> 4 + 5",
             "can print template aliases (through another alias)",
