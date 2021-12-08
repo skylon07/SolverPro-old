@@ -443,6 +443,14 @@ class Template(Substitutable, Displayable):
         self._argNames = paramNames
         self._rightHand = rightHand
 
+    @property
+    def rightHand(self):
+        return self._rightHand
+
+    @property
+    def argNames(self):
+        return self._argNames
+
     def __call__(self, argsDict):
         if len(argsDict) < len(self._argNames):
             raise ValueError("Template.substitute() not given enough substitutions")
@@ -462,10 +470,6 @@ class Template(Substitutable, Displayable):
     def substitute(self, substDict):
         return self._rightHand.substitute(substDict)
 
-    @property
-    def argNames(self):
-        return self._argNames
-
 
 class TemplateCall(Expressable):
     def __init__(self, name, params):
@@ -483,7 +487,12 @@ class TemplateCall(Expressable):
         return "TemplateCall"
 
     def __str__(self):
-        return "{}({})".format(self._name, self._params)
+        paramsStr = ', '.join(str(expr) for expr in self._params)
+        return "{}({})".format(self._name, paramsStr)
+
+    @property
+    def nameId(self):
+        return self._name
 
     def asSymbol(self, templatesDict):
         template = templatesDict[self._name]

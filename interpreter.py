@@ -59,6 +59,15 @@ class UnusedArgumentsWarning(InterpreterWarning):
         )
 
 
+class BadTemplateEvaluationError(InterpreterError):
+    def _generateMessage(self, badTraces):
+        templateCall = badTraces[0]["obj"]
+        templateName = str(templateCall.nameId)
+        return "Template {} does not evaluate to an expression; it cannot be used in an expression".format(
+            templateName,
+        )
+
+
 class Interpreter:
     def __init__(self, outputFn):
         self._outputFn = outputFn
@@ -186,6 +195,19 @@ class Interpreter:
             warning = UnusedArgumentsWarning(badTraces)
             warning.warn(self._outputFn)
 
+    # errors when a template that doesn't return an expression is used in an expression
+    def _ensureValidTemplates(self, exprPiece):
+        badTraces = []
+        for templateTrace in exprPiece.traces:
+            if templateTrace["type"] == TRACE_TYPES["TEMPLATE_CALL"]:
+                templateId = templateTrace["obj"].nameId
+                template = self._engine.getAlias(templateId)
+                shouldBeExpr = template.rightHand
+                if not isinstance(shouldBeExpr, Expressable):
+                    badTraces.append(templateTrace)
+        if len(badTraces) > 0:
+            raise BadTemplateEvaluationError(badTraces)
+
     def _bindToParser(self):
         def pushStack(key, stackPiece):
             if not isinstance(stackPiece, StackPieceTracer):
@@ -263,9 +285,20 @@ class Interpreter:
             elif branch == "nu":
                 piece = popStack("numbers")
             elif branch == "fu PAO tes PAC":
-                pass # TODO: evaluate the template
+                argsPiece = popStack("expressions")
+                namePiece = popStack("identifiers")
+                argExprs = argsPiece.obj
+                nameId = namePiece.obj
+                templateCall = TemplateCall(nameId, argExprs)
+                piece = argsPiece.update(templateCall, tokens, namePiece.traces)
+                piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
             elif branch == "fu PAO PAC":
-                pass # TODO: evaluate the template
+                namePiece = popStack("identifiers")
+                argExprs = []
+                nameId = namePiece.obj
+                templateCall = TemplateCall(nameId, argExprs)
+                piece = namePiece.update(templateCall, tokens, [])
+                piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
             pushStack("values", piece)
         self._parser.onValue(onValue)
 
@@ -427,6 +460,22 @@ class Interpreter:
                 self._throwBranchNotImplemented("objects on right-side of alias templates")
             pushStack("aliasRightHands", piece)
         self._parser.onRightAliasTemp(onRightAliasTemp)
+
+        def onTemplateArguments(tokens, branch):
+            if branch == "ex":
+                piece = popStack("expressions")
+                expr = piece.obj
+                exprs = [expr]
+                piece.update(exprs, tokens, [])
+            elif branch == "ex CO tes":
+                piece = popStack("expressions")
+                exprs = piece.obj
+                nextPiece = popStack("expressions")
+                nextExpr = nextPiece.obj
+                exprs.insert(0, nextExpr)
+                piece.update(exprs, tokens, nextPiece.traces)
+            pushStack("expressions", piece)
+        self._parser.onTemplateArguments(onTemplateArguments)
 
         # TODO: finish these features
         def onUnit(tokens, branch):
