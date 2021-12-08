@@ -1072,13 +1072,19 @@ class TestSuites:
         expTokens = lexer.process(".8e-6<unit>", withEOL=False)
         unitTokens = lexer.process("unit", withEOL=False)
         testInspectPerforms(tokens, lineStr, "onValue", [(unitTokens, "fu"), (expTokens, "nu un")], "E-number with units")
+        lineStr = "a(b, c)"
+        tokens = lexer.process(lineStr)
+        eval1 = lexer.process("b", withEOL=False)
+        eval2 = lexer.process("c", withEOL=False)
+        eval3 = lexer.process("a(b, c)", withEOL=False)
+        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fu"), (eval2, "fu"), (eval3, "fu PAO tes PAC")], "can evaluate template arguments (single identifiers)")
         lineStr = "a(b + c, d)"
         tokens = lexer.process(lineStr)
         eval1 = lexer.process("b", withEOL=False)
         eval2 = lexer.process("c", withEOL=False)
         eval3 = lexer.process("d", withEOL=False)
         eval4 = lexer.process("a(b + c, d)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fu"), (eval2, "fu"), (eval3, "fu"), (eval4, "fu PAO tes PAC")], "can evaluate template arguments")
+        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fu"), (eval2, "fu"), (eval3, "fu"), (eval4, "fu PAO tes PAC")], "can evaluate template arguments (with expressions)")
         lineStr = "a()"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a()", withEOL=False)
@@ -1944,6 +1950,21 @@ class TestSuites:
             "add(4)",
             (ISP + "     ^", "rror", "rguments"),
             "errors when template alias is not given enough arguments",
+        )
+        testLineOnInterpreter(
+            "objtemp() := {}",
+            None,
+            "can create a template alias that doesn't evaluate to an expression (this test uses an empty object)",
+        )
+        testLineOnInterpreter(
+            "4 + objtemp()",
+            (ISP + "    ^^^^^^^^^", "rror", "not", "xpression"),
+            "Templates that do not return expressions error when used in expressions",
+        )
+        testLineOnInterpreter(
+            "objtemp() * 4 + objtemp()",
+            (ISP + "^^^^^^^^^       ^^^^^^^^^", "rror", "not", "xpression"),
+            "Templates that do not return expressions error when used in expressions (and the interpreter highlights all of them)",
         )
         resetState()
         Tester.stopIfFailed()
