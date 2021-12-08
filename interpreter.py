@@ -20,11 +20,13 @@ class InterpreterError(TracebackError, ABC):
         return # message string
 
 
+# not meant to be raised; just inherits from TracebackError for its formatting capabilities
 class InterpreterWarning(InterpreterError):
     def warn(self, outputFn):
         outputFn(self.message)
 
-class UndefinedError(InterpreterError):
+
+class UndefinedIdentifierError(InterpreterError):
     def _generateMessage(self, badTraces):
         if len(badTraces) > 1:
             plural = True
@@ -40,7 +42,7 @@ class UndefinedError(InterpreterError):
             ','.join(badIdentifierStrs),
         )
 
-# meant to be called, not raised
+
 class UnusedArgumentsWarning(InterpreterWarning):
     def _generateMessage(self, badTraces):
         if len(badTraces) > 1:
@@ -105,19 +107,28 @@ class Interpreter:
                     identifier = idsPiece.obj[0]
                     argsPiece = result["templateArgs"]
                     rightHandPiece = result["rightHand"]
+
                     self._ensureTemplateUses(argsPiece, rightHandPiece)
+
                     template = Template(argsPiece.obj, rightHandPiece.obj)
                     self._engine.setAlias(identifier, template)
+
                 else:
                     idsPiece = result["aliasNames"]
                     rightHandPiece = result["rightHand"]
+
                     self._ensureDefined(rightHandPiece)
+                    self._ensureValidTemplates(rightHandPiece)
+
                     rightWithSubs = self._engine.substitute(rightHandPiece.obj)
                     self._engine.setAliases(idsPiece.obj, rightWithSubs)
             
             elif result["type"] == "expression":
                 exprPiece = result["expression"]
+
                 self._ensureDefined(exprPiece)
+                self._ensureValidTemplates(exprPiece)
+                
                 subExpr = self._engine.substitute(exprPiece.obj)
                 self._print(str(subExpr))
             
@@ -151,21 +162,21 @@ class Interpreter:
     def _ensureDefined(self, stackPiece):
         badTraces = []
         for trace in stackPiece.traces:
-            if trace["type"] == TRACE_TYPES["UNDEF_ID"]:
+            if trace["type"] == TRACE_TYPES["IDENTIFIER"]:
                 identifier = trace["obj"]
                 if not self._engine.isDefined(identifier):
                     badTraces.append(trace)
         if len(badTraces) > 0:
-            raise UndefinedError(badTraces)
+            raise UndefinedIdentifierError(badTraces)
 
-    # warns when a template's arguments are not used
+    # warns when a template's arguments are not used in its definition
     def _ensureTemplateUses(self, argNamesPiece, rightHandPiece):
         badTraces = []
         for argTrace in argNamesPiece.traces:
-            if argTrace["type"] == TRACE_TYPES["UNDEF_ID"]:
+            if argTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
                 inRightHand = False
                 for rightHandTrace in rightHandPiece.traces:
-                    if rightHandTrace["type"] == TRACE_TYPES["UNDEF_ID"]:
+                    if rightHandTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
                         if argTrace["obj"] == rightHandTrace["obj"]:
                             inRightHand = True
                             break
@@ -183,6 +194,8 @@ class Interpreter:
         def popStack(key):
             return self._parseStack[key].pop()
         
+        # each callback should generally be popping StackPieces from one stack,
+        # potentially modifying their data, and pushing onto another stack
         def onStart(tokens, branch):
             if branch == "re EOL":
                 self._parseResult = {
@@ -224,7 +237,7 @@ class Interpreter:
                 fullId = ''.join(tokenStrs)
                 value = Identifier(fullId)
             piece = StackPieceTracer(value, tokens)
-            piece.trace(TRACE_TYPES["UNDEF_ID"])
+            piece.trace(TRACE_TYPES["IDENTIFIER"])
             pushStack("identifiers", piece)
         self._parser.onFullIdentifier(onFullIdentifier)
 
@@ -269,6 +282,8 @@ class Interpreter:
         def evaluateOperationList(opList):
             if type(opList) is not list:
                 raise TypeError("cannot evaluate non-list-type as operation list")
+            if not isinstance(opList[0], Expressable):
+                raise RuntimeError("tried to evaluate operation list with a non-expressable (left-hand)")
             # collapses operations left-to-right
             while len(opList) > 1:
                 try:
@@ -278,6 +293,8 @@ class Interpreter:
                 except IndexError as e:
                     if "pop from empty" in str(e):
                         raise IndexError("Interpreter -> evaluateOperationList(opList) given bad opList")
+                if not isinstance(rightExpr, Expressable):
+                    raise RuntimeError("tried to evaluate operation list with a non-expressable (right-hand)")
                 newExpr = Expression(leftExpr, oper, rightExpr)
                 opList.insert(0, newExpr)
             resultExpr = opList[0]
@@ -466,7 +483,8 @@ class Interpreter:
 
 
 TRACE_TYPES = {
-    "UNDEF_ID": "UNDEF_ID",
+    "IDENTIFIER": "IDENTIFIER",
+    "TEMPLATE_CALL": "TEMPLATE_CALL",
 }
 
 # contains an element of the stack as well as some helpful metadata
@@ -526,23 +544,23 @@ class StackPieceTracer:
             elif trace["id"] > bisectTrace["id"]:
                 lowBound = bisectIdx + 1
             else:
-                raise ValueError("trace ids were not unique")
+                raise ValueError("trace ids were not unique (or a trace was re-added into the list)")
         self._traces[lowBound:upBound] = [trace]
 
 if __name__ == "__main__":
     piece1 = StackPieceTracer(Identifier("a"), [Lexer.Token("a", "IDENTIFIER", 0)])
     piece2 = StackPieceTracer(Identifier("b"), [Lexer.Token("b", "IDENTIFIER", 0)])
     
-    piece2.trace(TRACE_TYPES["UNDEF_ID"])
-    piece1.trace(TRACE_TYPES["UNDEF_ID"])
-    piece1.trace(TRACE_TYPES["UNDEF_ID"])
-    piece2.trace(TRACE_TYPES["UNDEF_ID"])
-    piece1.trace(TRACE_TYPES["UNDEF_ID"])
-    piece2.trace(TRACE_TYPES["UNDEF_ID"])
-    piece1.trace(TRACE_TYPES["UNDEF_ID"])
-    piece1.trace(TRACE_TYPES["UNDEF_ID"])
-    piece2.trace(TRACE_TYPES["UNDEF_ID"])
-    piece2.trace(TRACE_TYPES["UNDEF_ID"])
+    piece2.trace(TRACE_TYPES["IDENTIFIER"])
+    piece1.trace(TRACE_TYPES["IDENTIFIER"])
+    piece1.trace(TRACE_TYPES["IDENTIFIER"])
+    piece2.trace(TRACE_TYPES["IDENTIFIER"])
+    piece1.trace(TRACE_TYPES["IDENTIFIER"])
+    piece2.trace(TRACE_TYPES["IDENTIFIER"])
+    piece1.trace(TRACE_TYPES["IDENTIFIER"])
+    piece1.trace(TRACE_TYPES["IDENTIFIER"])
+    piece2.trace(TRACE_TYPES["IDENTIFIER"])
+    piece2.trace(TRACE_TYPES["IDENTIFIER"])
 
     piece1.update((piece1.obj, piece2.obj), [], piece2.traces)
     
