@@ -18,7 +18,7 @@ if __name__ == "__main__":
             except Exception as e:
                 interpreter._handleError(e)
         print(INDENT + "interpretation:\n" + INDENT * 2 + str(runLine()))
-        # interpreter.executeLine(userInp)
+        interpreter.executeLine(userInp)
 
     def onExpression(tokens, branch):
         print("expression:", branch, tokens)
