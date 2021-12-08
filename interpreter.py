@@ -62,6 +62,16 @@ class Interpreter:
         self._outputFn = outputFn
         self._solutions = list()
 
+        # self._parseStack = ...
+        self._resetParseStack()
+        self._parseResult = None
+
+        self._lexer = Lexer()
+        self._parser = Parser()
+        self._engine = Engine()
+        self._bindToParser()
+
+    def _resetParseStack(self):
         self._parseStack = {
             "identifiers": [],
             "numbers": [],
@@ -79,12 +89,6 @@ class Interpreter:
             "templateArgs": [],
             "aliasRightHands": [],
         }
-        self._parseResult = None
-
-        self._lexer = Lexer()
-        self._parser = Parser()
-        self._engine = Engine()
-        self._bindToParser()
 
     # treats the string as user input
     def executeLine(self, string):
@@ -127,6 +131,7 @@ class Interpreter:
                 raise TypeError("Interpreter encountered an unexpected result type")
         except Exception as e:
             self._handleError(e)
+            self._resetParseStack()
 
     # helper that can turn strings into engine-useable data structures
     def evaluateLine(self, string):
@@ -242,8 +247,12 @@ class Interpreter:
         def onValue(tokens, branch):
             if branch == "fu":
                 piece = popStack("identifiers")
-            if branch == "nu":
+            elif branch == "nu":
                 piece = popStack("numbers")
+            elif branch == "fu PAO tes PAC":
+                pass # TODO: evaluate the template
+            elif branch == "fu PAO PAC":
+                pass # TODO: evaluate the template
             pushStack("values", piece)
         self._parser.onValue(onValue)
 
