@@ -88,6 +88,7 @@ class Engine:
     @property
     def _validIdKeys(self):
         return (
+            # Solutions() relies on Identifier being confirmed here
             Identifier,
         )
     _validIdKeysNames = (
@@ -112,7 +113,10 @@ class Engine:
             # __hash__ and __eq__ are provided
             if not callable(keyType.__hash__) or not callable(keyType.__eq__):
                 raise TypeError("{}() cannot be used as dictionary key".format(keyName))
-        self._identifiers = dict()
+        
+        self._identifiers = list()
+        self._aliases = dict()
+        self._solutions = list()
 
     def setAlias(self, identifier, value):
         if not isinstance(identifier, self._validIdKeys):
@@ -120,7 +124,8 @@ class Engine:
         if not isinstance(value, self._validIdVals):
             raise TypeError("Engine.setAlias(identifier, value) -- value was not one of {}".format(self._validIdValsNames))
 
-        self._identifiers[identifier] = value
+        self._identifiers.append(identifier)
+        self._aliases[identifier] = value
 
     def setAliases(self, identifiers, value):
         if not isinstance(value, self._validIdVals):
@@ -133,18 +138,48 @@ class Engine:
             self.setAlias(identifier, value)
 
     def getAlias(self, identifier):
-        return self._identifiers.get(identifier)
+        return self._aliases.get(identifier)
 
     def isDefined(self, identifier):
-        return identifier in self._identifiers
+        # dicts have faster lookup than lists, therefore aliases is used
+        return identifier in self._aliases
 
     # substitutes all known values into a given object
     def substitute(self, subsable):
         if not isinstance(subsable, Substitutable):
-            raise TypeError("Engine.evaluate(subsable) -- subsable must be a Substitutable()")
+            raise TypeError("Engine.substitute(subsable) -- subsable must be a Substitutable()")
         
-        substDict = self._identifiers
-        return subsable.substitute(substDict)
+        substDict = self._aliases
+        substituted = subsable.substitute(substDict)
+        return substituted
+
+    def addRelation(self, relation):
+        if not isinstance(relation, Relation):
+            raise TypeError("Engine.addRelation() can only add Relation() objects")
+
+        newSols = Solutions(relation)
+        self._solutions.append(newSols)
+
+    # due to the nature of Solutions.solveFor(), this returns a non-standard Engine object
+    def getSolutionsFor(self, expr):
+        if not isinstance(expr, Expressable):
+            raise TypeError("Engine.getSolutionsFor(identifier) not given an Identifier()")
+        
+        if isinstance(expr, Numeric):
+            numeric = expr
+            return SolutionSet([numeric])
+        
+        elif isinstance(expr, Identifier) and self.isDefined(expr):
+            identifier = expr
+            return SolutionSet([self.substitute(identifier)])
+                
+        else:
+            allSolutions = set()
+            for sols in self._solutions:
+                solSet = sols.solveFor(expr, self._aliases)
+                # using a set ensures each unique solution only appears once
+                allSolutions = allSolutions.union(solSet)
+            return SolutionSet(allSolutions)
 
 
 # abstract class that gives a blueprint for repr strings for objects
@@ -580,7 +615,7 @@ class TemplateCall(Expressable):
 
     def _doesContain(self, identifier, templatesDict):
         template = templatesDict[self._name]
-        return template._doesContain(identifier)
+        return template._doesContain(identifier, templatesDict)
 
 
 # data structure for two equal expressions
@@ -625,18 +660,86 @@ class Relation(Symbolable, Containable):
         left = self._leftExpr
         right = self._rightExpr
         return left._doesContain(identifier, templatesDict) or right._doesContain(identifier, templatesDict)
-
+    
 
 # represents the list of all solutions for variables in a single relation
 class Solutions(Containable):
     def __init__(self, relation):
-        pass
+        if not isinstance(relation, Relation):
+            raise TypeError("Solutions(relation) can only be created if relation is a Relation()")
+        
+        self._relation = relation
 
-    def __repr__(self):
-        pass
+    @property
+    def relation(self):
+        return self._relation
 
-    def solveVar(symbol):
-        pass
+    @property
+    def _reprName(self):
+        return "Solutions"
+    
+    def __str__(self):
+        # this weird syntax produces "{...}*" where '...' is self._relation
+        return "*{{{}}}".format(self._relation)
+
+    def _substituteSelf(self, substDict):
+        newRelation = self._relation._substituteSelf(substDict)
+        return Solutions(newRelation)
+
+    def _doesContain(self, identifier, templatesDict):
+        return self._relation._doesContain(identifier, templatesDict)
+
+    # unlike most functions, this one returns a raw sympy object, not an Engine data structure
+    def solveFor(self, symbolable, templatesDict):
+        if not isinstance(symbolable, Symbolable):
+            raise TypeError("Solutions.solveFor() cannot solve for non-Identifier() types")
+        
+        equation = self._relation.asSymbol(templatesDict)
+        solveSym = symbolable.asSymbol(templatesDict)
+        solutions = sympy.solveset(equation, solveSym)
+        return solutions
+
+
+# different from solutions; this is a wrapper that signifies what
+# kind of answer a Solutions() object solved to
+class SolutionSet(Displayable):
+    def __init__(self, solutions):
+        self._solutions = solutions
+        self._isNumeric = self._calcIsNumeric()
+
+    @property
+    def isNumeric(self):
+        return self._isNumeric
+
+    @property
+    def _reprName(self):
+        return "SolutionSet"
+
+    def __str__(self):
+        return "{}".format(self._solutions)
+
+    def __iter__(self):
+        for sol in self._solutions:
+            # these errors would raise in cases of relation contradiction
+            if self._isNumeric and not self._isNumericLike(sol):
+                raise TypeError("SolutionSet received mismatching elements; some Numeric(), some not (expected Numeric)")
+            elif not self._isNumeric and self._isNumericLike(sol):
+                raise TypeError("SolutionSet received mismatching elements; some Numeric(), some not (expected NOT Numeric)")
+            
+            yield sol
+        
+    def __len__(self):
+        return len(self._solutions)
+
+    def _calcIsNumeric(self):
+        if len(self._solutions) == 0:
+            return False
+        for firstSol in self._solutions:
+            return self._isNumericLike(firstSol)
+
+    @classmethod
+    def _isNumericLike(cls, numeric):
+        return isinstance(numeric, (Numeric, sympy.Number))
 
 
 if __name__ == "__main__":
@@ -649,6 +752,6 @@ if __name__ == "__main__":
     sol = Solutions(rel)
     print(repr(sol))
     
-    print(sol.solveVar(Identifier('b'), dict()))
-    print(type(sol.solveVar(Identifier('b'), dict())))
+    print(sol.solveFor(Identifier('b'), dict()))
+    print(type(sol.solveFor(Identifier('b'), dict())))
     

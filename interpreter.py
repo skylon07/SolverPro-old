@@ -51,6 +51,16 @@ class UnusedArgumentsWarning(InterpreterWarning):
         )
 
 
+class InvalidExpressionError(InterpreterError):
+    def _generateMessage(self, badTraces):
+        plural = len(badTraces) > 1
+        badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
+        return "The variable{} {} cannot be evaluated in an expression".format(
+            "s" if plural else "",
+            ','.join(badIdentifierStrs)
+        )
+
+
 class BadTemplateEvaluationError(InterpreterError):
     def _generateMessage(self, badTraces):
         templateCall = badTraces[0]["obj"]
@@ -98,7 +108,16 @@ class Interpreter:
         try:
             result = self.evaluateLine(string)
             if result["type"] == "relation":
-                self._throwBranchNotImplemented("relation executions")
+                leftPiece = result["leftHandExpr"]
+                rightPiece = result["rightHandExpr"]
+                self._ensureIdentifiersAreExpressable(leftPiece)
+                self._ensureIdentifiersAreExpressable(rightPiece)
+                self._ensureValidTemplateEvals(leftPiece)
+                self._ensureValidTemplateEvals(rightPiece)
+                leftExpr = leftPiece.obj
+                rightExpr = rightPiece.obj
+                relation = Relation(leftExpr, rightExpr)
+                self._engine.addRelation(relation)
             
             elif result["type"] == "alias":
                 isTemplate = result["templateArgs"].obj is not None
@@ -117,21 +136,55 @@ class Interpreter:
                 else:
                     idsPiece = result["aliasNames"]
                     rightHandPiece = result["rightHand"]
+                    rightHand = rightHandPiece.obj
 
                     self._ensureDefined(rightHandPiece)
-                    self._ensureValidTemplates(rightHandPiece)
+                    if isinstance(rightHand, Expression):
+                        self._ensureIdentifiersAreExpressable(rightHandPiece)
+                    self._ensureValidTemplateEvals(rightHandPiece)
 
-                    rightWithSubs = self._engine.substitute(rightHandPiece.obj)
+                    rightWithSubs = self._engine.substitute(rightHand)
                     self._engine.setAliases(idsPiece.obj, rightWithSubs)
             
             elif result["type"] == "expression":
                 exprPiece = result["expression"]
+                expr = exprPiece.obj
 
-                self._ensureDefined(exprPiece)
-                self._ensureValidTemplates(exprPiece)
+                if isinstance(expr, Expression):
+                    self._ensureIdentifiersAreExpressable(exprPiece)
+                self._ensureValidTemplateEvals(exprPiece)
+
+                if isinstance(expr, Identifier) and self._engine.isDefined(expr):
+                    identifier = expr
+                    sub = self._engine.substitute(identifier)
+                    self._print(sub)
+                    return
+
+                solSet = self._engine.getSolutionsFor(expr)
+                if solSet.isNumeric:
+                    strMap = map(lambda numeric: str(numeric), solSet)
+                    self._print(' or '.join(strMap))
+                    return
                 
-                subExpr = self._engine.substitute(exprPiece.obj)
-                self._print(str(subExpr))
+                if len(solSet) == 0:
+                    # this will find any undefined variables (wasn't checked yet)
+                    self._ensureDefined(exprPiece)
+
+                    # must be a purely numeric expression!
+                    numeric = self._engine.substitute(expr)
+                    if not isinstance(numeric, Numeric):
+                        # this shouldn't ever happen, but in case it does...
+                        raise TypeError("(Somehow) a non-numeric value came from what should be a purely numeric expression")
+                    self._print(numeric)
+                    return
+                
+                for sol in solSet:
+                    solStr = str(sol)
+                    parseResult = self.evaluateLine(solStr)
+                    exprPiece = parseResult["expression"]
+                    expr = exprPiece.obj
+                    subExpr = self._engine.substitute(expr)
+                    self._print(subExpr)
             
             elif result["type"] == "command":
                 self._throwBranchNotImplemented("command executions")
@@ -159,7 +212,7 @@ class Interpreter:
         self._assertParseStackEmpty()
         return result
 
-    # errors when identifiers are not defined
+    # errors when identifiers are not defined (aka aliased)
     def _ensureDefined(self, stackPiece):
         badTraces = []
         for trace in stackPiece.traces:
@@ -187,8 +240,20 @@ class Interpreter:
             warning = UnusedArgumentsWarning(badTraces)
             warning.warn(self._outputFn)
 
-    # errors when a template that doesn't return an expression is used in an expression
-    def _ensureValidTemplates(self, exprPiece):
+    # errors when an identifier in an expression doesn't return an expressable
+    def _ensureIdentifiersAreExpressable(self, exprPiece):
+        badTraces = []
+        for idTrace in exprPiece.traces:
+            if idTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
+                identifier = idTrace["obj"]
+                alias = self._engine.substitute(identifier)
+                if not isinstance(alias, Expressable):
+                    badTraces.append(idTrace)
+        if len(badTraces) > 0:
+            raise InvalidExpressionError(badTraces)
+
+    # errors when a template evaluates to a non-expressable in an expression
+    def _ensureValidTemplateEvals(self, exprPiece):
         badTraces = []
         for templateTrace in exprPiece.traces:
             if templateTrace["type"] == TRACE_TYPES["TEMPLATE_CALL"]:
@@ -214,6 +279,8 @@ class Interpreter:
             if branch == "re EOL":
                 self._parseResult = {
                     "type": "relation",
+                    "rightHandExpr": popStack("expressions"),
+                    "leftHandExpr": popStack("expressions"),
                 }
             elif branch == "al EOL":
                 self._parseResult = {
@@ -281,6 +348,8 @@ class Interpreter:
                 namePiece = popStack("identifiers")
                 argExprs = argsPiece.obj
                 nameId = namePiece.obj
+                # TODO: evaluate this template call immediately...?
+                #       (needs to be in branch above, in case this is template alias definition)
                 templateCall = TemplateCall(nameId, argExprs)
                 piece = argsPiece.update(templateCall, tokens, namePiece.traces)
                 piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
@@ -482,10 +551,6 @@ class Interpreter:
             if branch == "ID PE id":
                 self._throwBranchNotImplemented("identifiers")
         self._parser.onIdentifier(onIdentifier)
-
-        def onRelation(tokens, branch):
-            self._throwBranchNotImplemented("relations")
-        self._parser.onRelation(onRelation)
 
         def onCommand(tokens, branch):
             self._throwBranchNotImplemented("commands")

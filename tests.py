@@ -1507,6 +1507,11 @@ class TestSuites:
             "() -> sqrt(global)",
             "does not replace 'sqrt(' in instances of referencing definitions"
         )
+        testLineOnInterpreter(
+            "4 + myTemplate",
+            ("rror", "xpression", "ariable"),
+            "errors when trying to operate on template reference"
+        )
         resetState()
         Tester.stopIfFailed()
 
