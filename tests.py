@@ -1647,6 +1647,8 @@ class TestSuites:
             "5",
             "prints variables assigned from single-var relations"
         )
+        # TODO: is this really what we want? How does alias dict work if
+        #       a^2 = 4 is given? (a = -2, 2)
         testLineOnInterpreter(
             "a = 60",
             None,
