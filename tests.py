@@ -1512,6 +1512,11 @@ class TestSuites:
             ("rror", "xpression", "ariable"),
             "errors when trying to operate on template reference"
         )
+        testLineOnInterpreter(
+            "-myTemplate",
+            ("rror", "xpression", "ariable"),
+            "errors when trying to negate a template reference"
+        )
         resetState()
         Tester.stopIfFailed()
 
@@ -1591,6 +1596,26 @@ class TestSuites:
             "processes all possible values when considering variables"
         )
         resetState()
+        testLineOnInterpreter(
+            "template() := 4",
+            None,
+            "can process template alias before relations",
+        )
+        testLineOnInterpreter(
+            "a + b = template()",
+            None,
+            "can process template aliases in relations",
+        )
+        testLineOnInterpreter(
+            "template() := 2",
+            None,
+            "can redefine template aliases after being used",
+        )
+        testLineOnInterpreter(
+            "a + b",
+            "4",
+            "evaluates the template alias when the relation is instantiated, not when the relation is checked (aka result here should not be 2)"
+        )
         Tester.stopIfFailed()
 
         # ensure interpreter catches contradictions

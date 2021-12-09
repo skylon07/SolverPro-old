@@ -116,6 +116,7 @@ class Engine:
         
         self._identifiers = list()
         self._aliases = dict()
+        self._aliases_templatesOnly = dict()
         self._solutions = list()
 
     def setAlias(self, identifier, value):
@@ -126,6 +127,8 @@ class Engine:
 
         self._identifiers.append(identifier)
         self._aliases[identifier] = value
+        if isinstance(value, Template):
+            self._aliases_templatesOnly[identifier] = value
 
     def setAliases(self, identifiers, value):
         if not isinstance(value, self._validIdVals):
@@ -150,6 +153,15 @@ class Engine:
             raise TypeError("Engine.substitute(subsable) -- subsable must be a Substitutable()")
         
         substDict = self._aliases
+        substituted = subsable.substitute(substDict)
+        return substituted
+
+    # substitutes only template calls
+    def substituteTemplates(self, subsable):
+        if not isinstance(subsable, Substitutable):
+            raise TypeError("Engine.substituteTemplates(subsable) -- subsable must be a Substitutable()")
+        
+        substDict = self._aliases_templatesOnly
         substituted = subsable.substitute(substDict)
         return substituted
 
@@ -744,14 +756,20 @@ class SolutionSet(Displayable):
 
 if __name__ == "__main__":
     engine = Engine()
-    rel = Relation(
-        Expression(Numeric(4), '-', Identifier('b')),
-        NegativeExpression(Identifier('a')),
-    )
-    print(repr(rel))
-    sol = Solutions(rel)
-    print(repr(sol))
-    
-    print(sol.solveFor(Identifier('b'), dict()))
-    print(type(sol.solveFor(Identifier('b'), dict())))
-    
+    engine.setAlias(Identifier("outer"), Template(
+        [Identifier('x'), Identifier('y')],
+        Expression(Identifier('x'), '+', Identifier('y')),
+    ))
+    engine.setAlias(Identifier("inner1"), Template(
+        [Identifier('x')],
+        Expression(Identifier('x'), '+', Numeric(1)),
+    ))
+    engine.setAlias(Identifier("inner2"), Template(
+        [Identifier('x')],
+        Expression(Identifier('x'), '+', Numeric(2)),
+    ))
+    a = engine.substitute(TemplateCall(Identifier("outer"), [
+        TemplateCall(Identifier("inner1"), [Numeric(5)]),
+        TemplateCall(Identifier("inner2"), [Numeric(2)]),
+    ]))
+    print(repr(a)) # numeric 10?

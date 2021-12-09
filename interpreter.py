@@ -116,7 +116,9 @@ class Interpreter:
                 self._ensureValidTemplateEvals(rightPiece)
                 leftExpr = leftPiece.obj
                 rightExpr = rightPiece.obj
-                relation = Relation(leftExpr, rightExpr)
+                subLeftExpr = self._engine.substituteTemplates(leftExpr)
+                subRightExpr = self._engine.substituteTemplates(rightExpr)
+                relation = Relation(subLeftExpr, subRightExpr)
                 self._engine.addRelation(relation)
             
             elif result["type"] == "alias":
@@ -139,8 +141,7 @@ class Interpreter:
                     rightHand = rightHandPiece.obj
 
                     self._ensureDefined(rightHandPiece)
-                    if isinstance(rightHand, Expression):
-                        self._ensureIdentifiersAreExpressable(rightHandPiece)
+                    self._ensureIdentifiersAreExpressable(rightHandPiece)
                     self._ensureValidTemplateEvals(rightHandPiece)
 
                     rightWithSubs = self._engine.substitute(rightHand)
@@ -150,8 +151,7 @@ class Interpreter:
                 exprPiece = result["expression"]
                 expr = exprPiece.obj
 
-                if isinstance(expr, Expression):
-                    self._ensureIdentifiersAreExpressable(exprPiece)
+                self._ensureIdentifiersAreExpressable(exprPiece)
                 self._ensureValidTemplateEvals(exprPiece)
 
                 if isinstance(expr, Identifier) and self._engine.isDefined(expr):
@@ -241,16 +241,17 @@ class Interpreter:
             warning.warn(self._outputFn)
 
     # errors when an identifier in an expression doesn't return an expressable
-    def _ensureIdentifiersAreExpressable(self, exprPiece):
-        badTraces = []
-        for idTrace in exprPiece.traces:
-            if idTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
-                identifier = idTrace["obj"]
-                alias = self._engine.substitute(identifier)
-                if not isinstance(alias, Expressable):
-                    badTraces.append(idTrace)
-        if len(badTraces) > 0:
-            raise InvalidExpressionError(badTraces)
+    def _ensureIdentifiersAreExpressable(self, exprPiece, force=False):
+        if isinstance(exprPiece.obj, (Expression, NegativeExpression)) or force:
+            badTraces = []
+            for idTrace in exprPiece.traces:
+                if idTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
+                    identifier = idTrace["obj"]
+                    alias = self._engine.substitute(identifier)
+                    if not isinstance(alias, Expressable):
+                        badTraces.append(idTrace)
+            if len(badTraces) > 0:
+                raise InvalidExpressionError(badTraces)
 
     # errors when a template evaluates to a non-expressable in an expression
     def _ensureValidTemplateEvals(self, exprPiece):
@@ -348,8 +349,6 @@ class Interpreter:
                 namePiece = popStack("identifiers")
                 argExprs = argsPiece.obj
                 nameId = namePiece.obj
-                # TODO: evaluate this template call immediately...?
-                #       (needs to be in branch above, in case this is template alias definition)
                 templateCall = TemplateCall(nameId, argExprs)
                 piece = argsPiece.update(templateCall, tokens, namePiece.traces)
                 piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
