@@ -111,7 +111,7 @@ class Parser:
             try:
                 iter(expectedTypes)
             except TypeError as e:
-                if "not iterable" in str(e):
+                if "is not iterable" in str(e):
                     raise TypeError("Attempted to create ParseError with invalid list of expected types")
                 raise e
             if type(expectedTypes) is str or (len(expectedTypes) > 0 and type(expectedTypes[0]) is not str):

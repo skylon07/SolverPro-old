@@ -1524,12 +1524,12 @@ class TestSuites:
         testLineOnInterpreter(
             "a",
             "b + c",
-            "can print previous relations (in simplest form)",
+            "can print previous relations (in simplest form; b is not substituted)",
         )
         testLineOnInterpreter(
             "c",
             "a - b",
-            "can print relations based on solutions for variables"
+            "can print relations based on solutions for variables (again, in simplest form)"
         )
         testLineOnInterpreter(
             "b",
