@@ -28,11 +28,7 @@ class InterpreterWarning(InterpreterError):
 
 class UndefinedIdentifierError(InterpreterError):
     def _generateMessage(self, badTraces):
-        if len(badTraces) > 1:
-            plural = True
-        else:
-            plural = False
-        
+        plural = len(badTraces) > 1
         badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
         return "{}{}ndefined identifier{} {} given: {}".format(
             "An " if not plural else "",
@@ -45,11 +41,7 @@ class UndefinedIdentifierError(InterpreterError):
 
 class UnusedArgumentsWarning(InterpreterWarning):
     def _generateMessage(self, badTraces):
-        if len(badTraces) > 1:
-            plural = True
-        else:
-            plural = False
-
+        plural = len(badTraces) > 1
         badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
         return "Variable{} {} {} not used in {} template definition".format(
             "s" if plural else "",
