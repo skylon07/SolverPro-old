@@ -166,21 +166,50 @@ class Displayable(ABC):
 
 # mixin class that provides a sympy representation of an object
 class Symbolable(ABC):
-    @abstractmethod
     def asSymbol(self, templatesDict):
+        symbol = self._selfAsSymbol(templatesDict)
+        if not isinstance(symbol, (sympy.Expr, float, int)):
+            raise TypeError("Symbolable._selfAsSymbol() returned non-symbol type")
+        return symbol
+    
+    @abstractmethod
+    def _selfAsSymbol(self, templatesDict):
         return # sympy.Symbol()/<something sympy can deal with, like numbers>
 
 
 # mixin class that provides an evaluation interface
 class Substitutable(ABC):
+    def substitute(self, substDict):
+        subsable = self._substituteSelf(substDict)
+        if not isinstance(subsable, Substitutable):
+            raise TypeError("Substitutable._substituteSelf() did not return a Substitutable()")
+        return subsable
+
     @abstractmethod
     # substDict[Identifier()] -> Substitutable()
-    def substitute(self, substDict):
+    def _substituteSelf(self, substDict):
         return # Substitutable()
 
 
+# represents something that "contains" Identifier() objects
+class Containable(Substitutable, Displayable):
+    def contains(self, identifier, templatesDict):
+        if not isinstance(identifier, Identifier):
+            raise TypeError("Containable.contains() can only be given an Identifier()")
+
+        contains = self._doesContain(identifier, templatesDict)
+        if type(contains) is not bool:
+            raise TypeError("Containable._doesContain() did not return a boolean")
+        self.__container[identifier] = contains
+        return contains
+    
+    @abstractmethod
+    def _doesContain(self, identifier, templatesDict):
+        return # boolean
+
+
 # abstract class that gives operators to expression-like objects
-class Expressable(Symbolable, Substitutable, Displayable):
+class Expressable(Symbolable, Containable):
     def __hash__(self):
         return hash(str(self))
 
@@ -236,11 +265,14 @@ class Numeric(Expressable):
                 return str(symAsInt)
         return str(self._symbol)
 
-    def asSymbol(self, templatesDict):
+    def _selfAsSymbol(self, templatesDict):
         return self._symbol
 
-    def substitute(self, substDict):
+    def _substituteSelf(self, substDict):
         return self
+
+    def _doesContain(self, identifier, templatesDict):
+        return False
 
     @classmethod
     def _roundFloat(cls, rawFloat):
@@ -308,22 +340,23 @@ class Identifier(Expressable):
     def __str__(self):
         return str(self._symbol)
 
-    def asSymbol(self, templatesDict):
+    def _selfAsSymbol(self, templatesDict):
         return self._symbol
     
-    def substitute(self, substDict):
+    def _substituteSelf(self, substDict):
         sub = substDict.get(self)
         if sub:
             if isinstance(sub, Identifier):
-                result = sub.substitute(substDict)
+                result = sub._substituteSelf(substDict)
             else:
                 result = sub
         else:
             result = self
-
-        if not isinstance(result, Substitutable):
-            raise TypeError("Value() substituted and got a non-Substitutable()")
         return result
+
+    def _doesContain(self, identifier, templatesDict):
+        # base case for expressions checking if this identifier is the one in question
+        return self == identifier
 
     # these functions are defined to allow equivelant identifiers
     # to modify the same dictionary bucket
@@ -400,15 +433,20 @@ class Expression(Expressable):
                 right = '({})'.format(right)
         return "{} {} {}".format(left, self._oper, right)
     
-    def asSymbol(self, templatesDict):
-        sym1 = self._leftExpr.asSymbol(templatesDict)
-        sym2 = self._rightExpr.asSymbol(templatesDict)
+    def _selfAsSymbol(self, templatesDict):
+        sym1 = self._leftExpr._selfAsSymbol(templatesDict)
+        sym2 = self._rightExpr._selfAsSymbol(templatesDict)
         return self._operate(sym1, sym2)
 
-    def substitute(self, substDict):
-        val1 = self._leftExpr.substitute(substDict)
-        val2 = self._rightExpr.substitute(substDict)
+    def _substituteSelf(self, substDict):
+        val1 = self._leftExpr._substituteSelf(substDict)
+        val2 = self._rightExpr._substituteSelf(substDict)
         return self._operate(val1, val2)
+
+    def _doesContain(self, identifier, templatesDict):
+        left = self._leftExpr
+        right = self._rightExpr
+        return left._doesContain(identifier, templatesDict) or right._doesContain(identifier, templatesDict)
 
     def _operate(self, val1, val2):
         if self._oper == '+':
@@ -445,16 +483,19 @@ class NegativeExpression(Expressable):
             return "-{}".format(self._expr)
         return "-({})".format(self._expr)
 
-    def asSymbol(self, templatesDict):
-        sym = self._expr.asSymbol(templatesDict)
+    def _selfAsSymbol(self, templatesDict):
+        sym = self._expr._selfAsSymbol(templatesDict)
         return -sym
 
-    def substitute(self, substDict):
-        result = self._expr.substitute(substDict)
+    def _substituteSelf(self, substDict):
+        result = self._expr._substituteSelf(substDict)
         return -result
 
+    def _doesContain(self, identifier, templatesDict):
+        return self._expr._doesContain(identifier, templatesDict)
 
-class Template(Substitutable, Displayable):
+
+class Template(Containable):
     def __init__(self, paramNames, rightHand):
         for paramName in paramNames:
             if not isinstance(paramName, Identifier):
@@ -479,6 +520,7 @@ class Template(Substitutable, Displayable):
         for key in argsDict:
             if key not in self._argNames:
                 raise ValueError("Template.substitute() can only substitute arguments that were part of its definition")
+        # _substituteSelf() is not used to validate the return value
         return self._rightHand.substitute(argsDict)
 
     @property
@@ -489,8 +531,11 @@ class Template(Substitutable, Displayable):
         argNamesStr = ', '.join(str(name) for name in self._argNames)
         return "({}) -> {}".format(argNamesStr, self._rightHand)
 
-    def substitute(self, substDict):
-        return self._rightHand.substitute(substDict)
+    def _substituteSelf(self, substDict):
+        return self._rightHand._substituteSelf(substDict)
+
+    def _doesContain(self, identifier, templatesDict):
+        return self._rightHand._doesContain(identifier, templatesDict)
 
 
 class TemplateCall(Expressable):
@@ -516,26 +561,31 @@ class TemplateCall(Expressable):
     def nameId(self):
         return self._name
 
-    def asSymbol(self, templatesDict):
+    def _selfAsSymbol(self, templatesDict):
         template = templatesDict[self._name]
         if not isinstance(template, Template):
             raise TypeError("TemplateCall substituted and got a non-template")
         subs = self._substituteTemplate(template)
-        return subs.asSymbol(templatesDict)
+        return subs._selfAsSymbol(templatesDict)
 
-    def substitute(self, substDict):
+    def _substituteSelf(self, substDict):
         template = substDict[self._name]
-        subs = self._substituteTemplate(template)
-        return subs.substitute(substDict)
+        subsable = self._substituteTemplate(template)
+        return subsable._substituteSelf(substDict)
 
     def _substituteTemplate(self, template):
         namesAndValues = zip(template.argNames, self._params)
         substDict = {name: value for name, value in namesAndValues}
         return template(substDict)
 
+    def _doesContain(self, identifier, templatesDict):
+        template = templatesDict[self._name]
+        return template._doesContain(identifier)
+
 
 # data structure for two equal expressions
-class Relation(Symbolable, Substitutable, Displayable):
+# (this class intentionally not an Expressable)
+class Relation(Symbolable, Containable):
     def __init__(self, expr1, expr2):
         if not isinstance(expr1, Expressable):
             raise TypeError("first argument for Relation must be an expression")
@@ -561,17 +611,24 @@ class Relation(Symbolable, Substitutable, Displayable):
         return self._rightExpr
     
     # returns symbol that is assumed equal to zero
-    def asSymbol(self, templatesDict):
-        return self._leftExpr - self._rightExpr
+    def _selfAsSymbol(self, templatesDict):
+        leftSym = self._leftExpr._selfAsSymbol(templatesDict)
+        rightSym = self._rightExpr._selfAsSymbol(templatesDict)
+        return leftSym - rightSym
 
-    def substitute(self, substDict):
-        leftSub = self._leftExpr.substitute(substDict)
-        rightSub = self.rightExpr.substitute(substDict)
+    def _substituteSelf(self, substDict):
+        leftSub = self._leftExpr._substituteSelf(substDict)
+        rightSub = self.rightExpr._substituteSelf(substDict)
         return Relation(leftSub, rightSub)
+
+    def _doesContain(self, identifier, templatesDict):
+        left = self._leftExpr
+        right = self._rightExpr
+        return left._doesContain(identifier, templatesDict) or right._doesContain(identifier, templatesDict)
 
 
 # represents the list of all solutions for variables in a single relation
-class Solution():
+class Solutions(Containable):
     def __init__(self, relation):
         pass
 
@@ -584,3 +641,14 @@ class Solution():
 
 if __name__ == "__main__":
     engine = Engine()
+    rel = Relation(
+        Expression(Numeric(4), '-', Identifier('b')),
+        NegativeExpression(Identifier('a')),
+    )
+    print(repr(rel))
+    sol = Solutions(rel)
+    print(repr(sol))
+    
+    print(sol.solveVar(Identifier('b'), dict()))
+    print(type(sol.solveVar(Identifier('b'), dict())))
+    
