@@ -7,6 +7,7 @@ import sympy
 # decorator that utilizes memory optimizations
 # (should obviously me used only for classes/functions
 # whose results can be treated as "immutable")
+# TODO: use this class when a performance boost is needed (or to see how much of a boost it gives)
 class immutable:
     _immutables = dict()
     _immutableClasses = list()
@@ -57,9 +58,30 @@ class immutable:
     @classmethod
     def _makeCallId(cls, someCallable, argsTuple, kwargsDict):
         callHash = hash(someCallable)
-        argsHash = repr(argsTuple)
+        hashableTuple = tuple(cls._makeHashable(item) for item in argsTuple)
+        argsHash = hash(hashableTuple)
         # kwargsHash ignored; kwargs not currently allowed
         return hash((callHash, argsHash))
+
+    @classmethod
+    def _makeHashable(cls, obj):
+        # sorts unordered data types for hashing
+        if isinstance(obj, set):
+            # TODO: what if items aren't comparable? ex 2 < '3'
+            hashed = sorted(cls._makeHashable(item) for item in obj)
+            return "set:{}".format(hashed)
+        if isinstance(obj, dict):
+            # key is already hashable to be in dict
+            hashed = sorted((key, cls._makeHashable(obj[key])) for key in obj)
+            return "dict:{}".format(hashed)
+        
+        # treat lists as tuples
+        if isinstance(obj, list):
+            hashed = [cls._makeHashable(item) for item in obj]
+            return "list:{}".format(hashed)
+        
+        # if object isn't hashable, this will error eventually (just add a case in this function)
+        return obj
 
 
 class Engine:
