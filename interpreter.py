@@ -8,7 +8,15 @@ from parser import Parser
 from engine import *
 
 
-class InterpreterError(TracebackError, ABC):
+class InterpreterError(Exception):
+    pass # just used as a type-group
+
+
+class InterpreterNotImplementedError(InterpreterError):
+    pass
+
+
+class InterpreterTracebackError(TracebackError, InterpreterError, ABC):
     def __init__(self, badTraces):
         message = self._generateMessage(badTraces)
         badStarts = map(lambda trace: trace["start"], badTraces)
@@ -21,12 +29,12 @@ class InterpreterError(TracebackError, ABC):
 
 
 # not meant to be raised; just inherits from TracebackError for its formatting capabilities
-class InterpreterWarning(InterpreterError):
+class InterpreterTracebackWarning(InterpreterTracebackError):
     def warn(self, outputFn):
         outputFn(self.message)
 
 
-class UndefinedIdentifierError(InterpreterError):
+class UndefinedIdentifierError(InterpreterTracebackError):
     def _generateMessage(self, badTraces):
         plural = len(badTraces) > 1
         badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
@@ -39,7 +47,7 @@ class UndefinedIdentifierError(InterpreterError):
         )
 
 
-class UnusedArgumentsWarning(InterpreterWarning):
+class UnusedArgumentsWarning(InterpreterTracebackWarning):
     def _generateMessage(self, badTraces):
         plural = len(badTraces) > 1
         badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
@@ -51,7 +59,7 @@ class UnusedArgumentsWarning(InterpreterWarning):
         )
 
 
-class InvalidExpressionError(InterpreterError):
+class InvalidExpressionError(InterpreterTracebackError):
     def _generateMessage(self, badTraces):
         plural = len(badTraces) > 1
         badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
@@ -61,7 +69,7 @@ class InvalidExpressionError(InterpreterError):
         )
 
 
-class BadTemplateEvaluationError(InterpreterError):
+class BadTemplateEvaluationError(InterpreterTracebackError):
     def _generateMessage(self, badTraces):
         templateCall = badTraces[0]["obj"]
         templateName = str(templateCall.nameId)
@@ -568,19 +576,15 @@ class Interpreter:
             raise RuntimeError("Interpreter did not use all items in the parse stack")
 
     def _throwBranchNotImplemented(self, featureNamePlural):
-        raise NotImplementedError("SolverPro cannot process {} (yet)".format(featureNamePlural))
+        raise InterpreterNotImplementedError("SolverPro cannot process {} (yet)".format(featureNamePlural))
 
     def _handleError(self, e):
         parserErrors = (
             Parser.ParseError,
             Parser.EOLError,
         )
-        if type(e) in parserErrors or isinstance(e, InterpreterError):
+        if isinstance(e, parserErrors) or isinstance(e, InterpreterError):
             self._outputFn(e)
-            return True
-
-        if type(e) is NotImplementedError:
-            self._print(type(e).__name__ + ':', e)
             return True
         
         self._print("(Internal error) {}: {}".format(type(e).__name__, e))
