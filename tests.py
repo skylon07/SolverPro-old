@@ -1309,21 +1309,26 @@ class TestSuites:
             argsStrs = map(lambda arg: str(arg), args)
             sep = kwargs.get('sep')
             sep = sep if sep is not None else ' '
-            state["lastPrint"] = sep.join(argsStrs)
+            end = kwargs.get('end')
+            end = end if end else '\n'
+            state["fakePrintResults"].append(sep.join(argsStrs))
+            state["lastPrints"] = end.join(state["fakePrintResults"])
         def resetState():
             state["interpreter"] = Interpreter(fakePrint)
-            state["lastPrint"] = None
+            state["lastPrints"] = None
+            state["fakePrintResults"] = []
         resetState()
         def testLineOnInterpreter(line, expectedOutput, testName):
-            state["lastPrint"] = ""
+            state["lastPrints"] = ""
+            state["fakePrintResults"] = []
             state["interpreter"].executeLine(line)
             if expectedOutput is None:
-                Tester.assertEqual("", state["lastPrint"], testName)
+                Tester.assertEqual("", state["lastPrints"], testName)
             elif type(expectedOutput) is str:
-                Tester.assertEqual(INDENT + expectedOutput, state["lastPrint"], testName)
+                Tester.assertEqual(INDENT + expectedOutput, state["lastPrints"], testName)
             else:
                 for expected in expectedOutput:
-                    if not Tester.assertIn(expected, state["lastPrint"], testName):
+                    if not Tester.assertIn(expected, state["lastPrints"], testName):
                         break
 
         # test interpreter prints errors
@@ -1558,7 +1563,7 @@ class TestSuites:
         )
         testLineOnInterpreter("a := 4", None, "can store more variables after relations are created")
         testLineOnInterpreter("c := 2", None, "can store more variables after relations are created")
-        testLineOnInterpreter("d := 2", None, "can store more variables after relations are created")
+        testLineOnInterpreter("d := 1", None, "can store more variables after relations are created")
         testLineOnInterpreter(
             "b",
             "2",
@@ -1577,7 +1582,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "b",
-            "√(a)",
+            ("√(a)", "-√(a)"),
             "replaces 'sqrt(' (given by sympy) with '√('"
         )
         testLineOnInterpreter(
