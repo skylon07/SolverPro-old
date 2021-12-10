@@ -142,7 +142,8 @@ def solveFor(eqStr, sym):
     eq = simplify("{} - ({})".format(left, right))
     
     # TODO: make algorithm compatible with all solutions
-    sols = {str(sol) for sol in solveset(eq, sym)}
+    # sols = {str(sol) for sol in solveset(eq, sym)}
+    sols = {str(sol) for sol in solveFn(eq, sym)}
     for sol in sols:
         return sol
 
@@ -168,8 +169,8 @@ eqs = [
     # "a^2 + b^2 = c^2"
 
     # NO WORKIE!!!
-    "a = b / 5",
-    "b = a",
+    # "a = b / 5",
+    # "b = a",
 ]
 import itertools
 allSyms = [b, a, c]
@@ -177,9 +178,17 @@ allSyms = [b, a, c]
 allSyms = list(itertools.permutations(allSyms, len(allSyms)))
 for syms in allSyms:
     print(syms)
-    result = solveEqs(eqs, syms)
-    print("a={}\tb={}\tc={}".format(
-        result[a],
-        result[b],
-        result[c],
+    solveFn = solveset
+    result1 = solveEqs(eqs, syms)
+    print("slvst:\ta={}\tb={}\tc={}".format(
+        result1[a],
+        result1[b],
+        result1[c],
+    ))
+    solveFn = solve
+    result2 = solveEqs(eqs, syms)
+    print("slv:\ta={}\tb={}\tc={}".format(
+        result1[a],
+        result1[b],
+        result1[c],
     ))
