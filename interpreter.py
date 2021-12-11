@@ -656,20 +656,249 @@ class StackPieceTracer:
                 raise ValueError("trace ids were not unique (or a trace was re-added into the list)")
         self._traces[lowBound:upBound] = [trace]
 
-if __name__ == "__main__":
-    piece1 = StackPieceTracer(Identifier("a"), [Lexer.Token("a", "IDENTIFIER", 0)])
-    piece2 = StackPieceTracer(Identifier("b"), [Lexer.Token("b", "IDENTIFIER", 0)])
-    
-    piece2.trace(TRACE_TYPES["IDENTIFIER"])
-    piece1.trace(TRACE_TYPES["IDENTIFIER"])
-    piece1.trace(TRACE_TYPES["IDENTIFIER"])
-    piece2.trace(TRACE_TYPES["IDENTIFIER"])
-    piece1.trace(TRACE_TYPES["IDENTIFIER"])
-    piece2.trace(TRACE_TYPES["IDENTIFIER"])
-    piece1.trace(TRACE_TYPES["IDENTIFIER"])
-    piece1.trace(TRACE_TYPES["IDENTIFIER"])
-    piece2.trace(TRACE_TYPES["IDENTIFIER"])
-    piece2.trace(TRACE_TYPES["IDENTIFIER"])
 
-    piece1.update((piece1.obj, piece2.obj), [], piece2.traces)
-    
+class InterpreterDatabase:
+    @property
+    def _validDefinitionKeys(self):
+        return (
+            Identifier,
+            Variable,
+        )
+    @property
+    def _validDefinitionVals(self):
+        return (
+            Numeric,
+            Template,
+        )
+
+    def __init__(self):
+        self._settingDefinition = False
+        self._settingInference = False
+        
+        def definitions(key, value):
+            return self._settingDefinition
+        def inferences(key, value):
+            return self._settingInference
+        def templates(key, value):
+            return isinstance(value, Template)
+
+        def FDConst():
+            return FilteredDict(templates)
+
+        self._dict = FilteredDict(definitions, inferences, dictConstructor=FDConst)
+
+    def define(self, identifier, value):
+        self._checkKeysVals([identifier], [value])
+        
+        self._settingDefinition = True
+        self._dict[identifier] = value
+        self._settingDefinition = False
+
+    def defineList(self, identifiers, value):
+        self._checkKeysVals(identifiers, [value])
+        
+        self._settingDefinition = True
+        self._dict.update(
+            (identifier, value)
+            for identifier in identifiers
+        )
+        self._settingDefinition = False
+
+    def getDefinition(self, identifier):
+        return self._dict["definitions"].get(identifier)
+
+    def isDefined(self, identifier):
+        return identifier in self._dict["definitions"]
+
+    def setInference(self, identifier):
+        pass
+
+    def getInference(self, identifier):
+        pass
+
+    def isInferred(self, identifier):
+        return identifier in self._dict["inferences"]
+
+    def _checkKeysVals(self, keys, values):
+        try:
+            trying = "keys"
+            iter(keys)
+            trying = "values"
+            iter(values)
+        except TypeError as e:
+            if "is not iterable" in str(e):
+                raise TypeError("database tried to mass-insert {} but was not given an iterable".format(trying))
+
+        for key in keys:
+            if not isinstance(key, self._validDefinitionKeys):
+                validKeyNames = ', '.join(map(lambda item: repr(item), self._validDefinitionKeys))
+                raise TypeError("database tried to insert key that was not one of these: {}".format(validKeyNames))
+        for value in values:
+            if not isinstance(value, self._validDefinitionVals):
+                validValNames = ', '.join(map(lambda item: repr(item), self._validDefinitionVals))
+                raise TypeError("database tried to insert value that was not one of these: {}".format(validValNames))
+
+    # substitutes known/inferred values into a given object
+    # (defined/inferred are forced-kwargs)
+    def substitute(self, subsable, *args, defined=True, inferred=True):
+        if len(args) != 0:
+            numArgs = len(args) + 1
+            raise TypeError("substitute() takes 1 positional argument but {} were given".format(numArgs))
+        if not isinstance(subsable, Substitutable):
+            raise TypeError("substitute(subsable) -- subsable must be a Substitutable()")
+        
+        if defined and not inferred:
+            substDict = self._definitions
+        elif inferred and not defined:
+            substDict = self._inferences
+        elif defined and inferred:
+            substDict = self._defsAndInfs
+        else:
+            raise ValueError("substitute(defined=False, inferred=False) -- one kwarg must be True!")
+
+        substituted = subsable.substitute(substDict)
+        return substituted
+
+    # substitutes known/inferred values only for template calls
+    # (defined/inferred are forced-kwargs)
+    def substituteTemplates(self, subsable, *args, defined=True, inferred=True):
+        if len(args) != 0:
+            numArgs = len(args) + 1
+            raise TypeError("substituteTemplates() takes 1 positional argument but {} were given".format(numArgs))
+        if not isinstance(subsable, Substitutable):
+            raise TypeError("substituteTemplates(subsable) -- subsable must be a Substitutable()")
+        
+        if defined and not inferred:
+            substDict = self._definitions_templatesOnly
+        elif inferred and not defined:
+            substDict = self._inferences_templatesOnly
+        elif defined and inferred:
+            substDict = self._defsAndInfs_templatesOnly
+        else:
+            raise ValueError("substituteTemplates(defined=False, inferred=False) -- one kwarg must be True!")
+            
+        substituted = subsable.substitute(substDict)
+        return substituted
+
+
+# a dictionary in every way, with an added filter() function
+class FilteredDict(dict):
+    __argCountsAsserted = False
+
+    def __init__(self, *slotFns, dictConstructor=dict):
+        self._filtered = dict()
+        self._dictConstructor = dictConstructor
+        for slotData in slotFns:
+            if type(slotData) == tuple:
+                if len(slotData) != 2:
+                    raise ValueError("FilteredDict must be given 2-tuples (tuple arguments with 2 elements)")
+                slotName, slotFn = slotData
+                if type(slotName) is not str or slotName == "":
+                    raise TypeError("FilteredDict tuple argument's first item must be a non-empty string")
+                if not callable(slotFn):
+                    raise TypeError("FilteredDict tuple argument's second item was not a function")
+            else:
+                slotFn = slotData
+                if not callable(slotFn):
+                    raise TypeError("FilteredDict received a non-callable function argument")
+                slotName = slotFn.__name__
+                if slotName == "<lambda>":
+                    raise TypeError("FilteredDict cannot accept unnamed lambda functions (use 2-tuples (name, lambda) to name them)")
+            # helps to know this when creating instead of getting errors
+            # in update() or __setitem__()...
+            if self._getArgCounts(slotFn) != 2:
+                raise TypeError("FilteredDict requires functions to take two arguments (key, value)")
+            self._filtered[slotName] = (slotFn, self._newDict())
+
+    # returns a filtered version of self
+    def filter(self, slotName):
+        filterData = self._filtered.get(slotName)
+        if filterData is None:
+            raise KeyError("FilteredDict was not created with the slot name {}".format(slotName))
+        filterFn, filteredDict = filterData
+        return filteredDict
+
+    def _newDict(self):
+        newDict = self._dictConstructor()
+        if not isinstance(newDict, dict):
+            raise TypeError("FilteredDict was given a dictConstructor() that does not return dicts")
+        return newDict
+
+    # dict overrides
+    def __repr__(self):
+        superRepr = super().__repr__()
+        slotNames = ','.join(self._filtered.keys())
+        return "FilteredDict({}){}".format(slotNames, superRepr)
+
+    def __setitem__(self, key, val):
+        # queued now and added later in case there are errors
+        # (we don't want partially-updated dicts!)
+        filtersShouldAdd = set()
+        for filterKey in self._filtered:
+            filterFn, filterDict = self._filtered[filterKey]
+            shouldBeInFilter = filterFn(key, val)
+            if shouldBeInFilter:
+                filtersShouldAdd.add(filterKey)
+        
+        # whew! now we can update
+        super().__setitem__(key, val)
+        for filterKey in filtersShouldAdd:
+            filterFn, filterDict = self._filtered[filterKey]
+            filterDict[key] = val
+
+    def __delitem__(self, key):
+        super().__delitem__(key)
+        for filterKey in self._filtered:
+            filterFn, filterDict = self._filtered[filterKey]
+            if key in filterDict:
+                del filterDict[key]
+
+    def update(self, sequence):
+        # this ensures the sequence is a valid structure, and allows both the
+        # loop and super().update() to consume the sequence iter
+        allItemsToUpdate = dict(sequence)
+        # will be queued now and added later once we know no errors pop up
+        # (we don't want partially updated dicts!)
+        filtersToAdd = dict()
+        for key in allItemsToUpdate:
+            val = allItemsToUpdate[key]
+            for filterKey in self._filtered:
+                filterFn, filterDict = self._filtered[filterKey]
+                shouldBeInFilter = filterFn(key, val)
+                if shouldBeInFilter:
+                    if filtersToAdd.get(filterKey) is None:
+                        filtersToAdd[filterKey] = dict()
+                    filtersToAdd[filterKey][key] = val
+        
+        # whew! now we can update
+        super().update(allItemsToUpdate)
+        for filterKey in filtersToAdd:
+            filterFn, filterDict = self._filtered[filterKey]
+            filterDict.update(filtersToAdd[filterKey])
+
+    def copy(self):
+        raise NotImplementedError("FilteredDict can't copy")
+
+    def clear(self):
+        raise NotImplementedError("FilteredDict can't clear")
+
+    @classmethod
+    def _getArgCounts(cls, fn):
+        # through some dir() digging, I found this out...
+        #   def fn(arg1, arg2, arg3=3, arg4=4):
+        #       someVar = arg1
+        #       anotherVar = arg2
+        # tried this...
+        #   fn.__code__.co_varnames
+        #       (arg1, arg2, arg3, arg4, someVar, anotherVar)
+        # and this...
+        #   fn.__code__.co_varnames[:fn.__code__.co_argcount]
+        #       (arg1, arg2, arg3, arg4)
+        # listed arguments every time!
+
+        # (this number includes keyword arguments)
+        return fn.__code__.co_argcount
+        
+
+if __name__ == "__main__":
+    interpreter = Interpreter(print)
