@@ -695,7 +695,6 @@ class InterpreterDatabase:
     def _validDefinitionKeys(self):
         return (
             Identifier,
-            Variable,
         )
     @property
     def _validDefinitionVals(self):
@@ -703,8 +702,21 @@ class InterpreterDatabase:
             Numeric,
             Template,
         )
+    @property
+    def _validInferenceKeys(self):
+        return (
+            Identifier,
+            Variable,
+        )
+    @property
+    def _validInferenceVals(self):
+        return (
+            Expressable,
+        )
 
     def __init__(self):
+        self._assertEqDictKeys()
+        
         self._settingDefinition = False
         self._settingInference = False
         
@@ -715,60 +727,118 @@ class InterpreterDatabase:
         def templates(key, value):
             return isinstance(value, Template)
 
-        def FDConst():
-            return FilteredDict(templates)
+        self._dict = FilteredDict(
+            definitions,
+            inferences,
+            templates,
+        )
 
-        self._dict = FilteredDict(definitions, inferences, dictConstructor=FDConst)
-
+    # working with definitions...
     def define(self, identifier, value):
-        self._checkKeysVals([identifier], [value])
+        self._checkKeysVals([identifier], [value], "definitions")
         
         self._settingDefinition = True
         self._dict[identifier] = value
         self._settingDefinition = False
 
-    def defineList(self, identifiers, value):
-        self._checkKeysVals(identifiers, [value])
+    def updateDefinitions(self, identifiers, values):
+        self._checkKeysVals(identifiers, values, "definitions")
         
         self._settingDefinition = True
         self._dict.update(
             (identifier, value)
-            for identifier in identifiers
+            for identifier, value in zip(identifiers, values)
         )
         self._settingDefinition = False
 
     def getDefinition(self, identifier):
-        return self._dict["definitions"].get(identifier)
+        return self._dict.filter("definitions").get(identifier)
 
     def isDefined(self, identifier):
-        return identifier in self._dict["definitions"]
+        return identifier in self._dict.filter("definitions")
 
-    def setInference(self, identifier):
-        pass
+    # working with inferences...
+    def setInference(self, identifier, value):
+        self._checkKeysVals([identifier], [value], "inferences")
+
+        self._settingInference = True
+        self._dict[identifier] = value
+        self._settingInference = False
+
+    def updateInferences(self, identifiers, values):
+        self._checkKeysVals(identifiers, values, "inferences")
+
+        self._settingInference = True
+        self._dict.update(
+            (identifier, value)
+            for identifier, value in zip(identifiers, values)
+        )
+        self._settingInference = False
 
     def getInference(self, identifier):
-        pass
+        return self._dict.filter("inferences").get(identifier)
 
     def isInferred(self, identifier):
-        return identifier in self._dict["inferences"]
+        return identifier in self._dict.filter("inferences")
 
-    def _checkKeysVals(self, keys, values):
+    # "either" checks
+    def getExisting(self, identifier):
+        return self._dict.get(identifier)
+
+    def doesExist(self, identifier):
+        return identifier in self._dict
+
+    def _assertEqDictKeys(self):
+        validKeyLists = (
+            self._validDefinitionKeys,
+            self._validInferenceKeys,
+        )
+        objs = {
+            Identifier: ('name',),
+            Variable: ('name',),
+        }
+        for validKeyList in validKeyLists:
+            for idx1 in range(len(validKeyList)):
+                cls1 = validKeyList[idx1]
+                args1 = objs[cls1]
+                newObj1 = cls1(args1)
+                for idx2 in range(len(validKeyList)):
+                    cls2 = validKeyList[idx2]
+                    args2 = objs[cls2]
+                    newObj2 = cls2(args2)
+                    # both __eq__ and __hash__ are required to be dictionary keys
+                    assert newObj1 == newObj2, "{} and {} are not equivelant dictionary keys".format(newObj1, newObj2)
+                    assert hash(newObj1) == hash(newObj2), "{} and {} are not same-hash dictionary keys".format(newObj1, newObj2)
+                    
+    def _checkKeysVals(self, keys, values, settingType):
+        if settingType not in ("definitions", "inferences"):
+            raise TypeError("Database cannot check keys/vals for {}".format(settingType))
+        
         try:
+            # this tests both if the values are iterable, and it prevents
+            # consuming generators for the calling function
             trying = "keys"
-            iter(keys)
+            keys = list(keys)
             trying = "values"
-            iter(values)
+            values = list(values)
         except TypeError as e:
             if "is not iterable" in str(e):
                 raise TypeError("database tried to mass-insert {} but was not given an iterable".format(trying))
 
+        if settingType == "definitions":
+            validKeys = self._validDefinitionKeys
+            validVals = self._validDefinitionVals
+        elif settingType == "inferences":
+            validKeys = self._validInferenceKeys
+            validVals = self._validInferenceVals
+
         for key in keys:
-            if not isinstance(key, self._validDefinitionKeys):
-                validKeyNames = ', '.join(map(lambda item: repr(item), self._validDefinitionKeys))
+            if not isinstance(key, validKeys):
+                validKeyNames = ', '.join(map(lambda item: repr(item), validKeys))
                 raise TypeError("database tried to insert key that was not one of these: {}".format(validKeyNames))
         for value in values:
-            if not isinstance(value, self._validDefinitionVals):
-                validValNames = ', '.join(map(lambda item: repr(item), self._validDefinitionVals))
+            if not isinstance(value, validVals):
+                validValNames = ', '.join(map(lambda item: repr(item), validVals))
                 raise TypeError("database tried to insert value that was not one of these: {}".format(validValNames))
 
     # substitutes known/inferred values into a given object
@@ -780,47 +850,29 @@ class InterpreterDatabase:
         if not isinstance(subsable, Substitutable):
             raise TypeError("substitute(subsable) -- subsable must be a Substitutable()")
         
-        if defined and not inferred:
-            substDict = self._definitions
-        elif inferred and not defined:
-            substDict = self._inferences
-        elif defined and inferred:
-            substDict = self._defsAndInfs
+        if defined and inferred:
+            substDict = self._dict
+        elif not inferred:
+            substDict = self._dict.filter("defined")
+        elif not defined:
+            substDict = self._dict.filter("inferences")
         else:
             raise ValueError("substitute(defined=False, inferred=False) -- one kwarg must be True!")
 
         substituted = subsable.substitute(substDict)
         return substituted
 
-    # substitutes known/inferred values only for template calls
-    # (defined/inferred are forced-kwargs)
-    def substituteTemplates(self, subsable, *args, defined=True, inferred=True):
-        if len(args) != 0:
-            numArgs = len(args) + 1
-            raise TypeError("substituteTemplates() takes 1 positional argument but {} were given".format(numArgs))
-        if not isinstance(subsable, Substitutable):
-            raise TypeError("substituteTemplates(subsable) -- subsable must be a Substitutable()")
-        
-        if defined and not inferred:
-            substDict = self._definitions_templatesOnly
-        elif inferred and not defined:
-            substDict = self._inferences_templatesOnly
-        elif defined and inferred:
-            substDict = self._defsAndInfs_templatesOnly
-        else:
-            raise ValueError("substituteTemplates(defined=False, inferred=False) -- one kwarg must be True!")
-            
+    # substitutes only for template calls
+    def substituteTemplates(self, subsable):
+        substDict = self._dict.filter("templates")
         substituted = subsable.substitute(substDict)
         return substituted
 
 
 # a dictionary in every way, with an added filter() function
 class FilteredDict(dict):
-    __argCountsAsserted = False
-
-    def __init__(self, *slotFns, dictConstructor=dict):
+    def __init__(self, *slotFns):
         self._filtered = dict()
-        self._dictConstructor = dictConstructor
         for slotData in slotFns:
             if type(slotData) == tuple:
                 if len(slotData) != 2:
@@ -841,21 +893,46 @@ class FilteredDict(dict):
             # in update() or __setitem__()...
             if self._getArgCounts(slotFn) != 2:
                 raise TypeError("FilteredDict requires functions to take two arguments (key, value)")
-            self._filtered[slotName] = (slotFn, self._newDict())
+            self._filtered[slotName] = (slotFn, self._ChildDict(self, slotName))
 
     # returns a filtered version of self
     def filter(self, slotName):
         filterData = self._filtered.get(slotName)
         if filterData is None:
             raise KeyError("FilteredDict was not created with the slot name {}".format(slotName))
-        filterFn, filteredDict = filterData
-        return filteredDict
+        filterFn, childDict = filterData
+        return childDict
 
-    def _newDict(self):
-        newDict = self._dictConstructor()
-        if not isinstance(newDict, dict):
-            raise TypeError("FilteredDict was given a dictConstructor() that does not return dicts")
-        return newDict
+    class _ChildDict(dict):
+        def __init__(self, parent, slotName):
+            self._parent = parent
+            self._name = slotName
+        
+        # dict overrides
+        def __repr__(self):
+            superRepr = super().__repr__()
+            return "FilteredDict.filter({}){}".format(self._name, superRepr)
+
+        def __setitem__(self, key, val):
+            self._parent.__setitem__(key, val)
+        def _self__setitem__(self, key, val):
+            super().__setitem__(key, val)
+
+        def __delitem__(self, key):
+            self._parent.__delitem__(key)
+        def _self__delitem__(self, key):
+            super().__delitem__(key)
+
+        def update(self, sequence):
+            self._parent.update(sequence)
+        def _self_update(self, key, val):
+            super().update(key, val)
+
+        def copy(self):
+            raise NotImplementedError("FilteredDict.filter() can't copy")
+
+        def clear(self):
+            raise NotImplementedError("FilteredDict.filter can't clear")
 
     # dict overrides
     def __repr__(self):
@@ -867,24 +944,30 @@ class FilteredDict(dict):
         # queued now and added later in case there are errors
         # (we don't want partially-updated dicts!)
         filtersShouldAdd = set()
+        filtersShouldRemove = set()
         for filterKey in self._filtered:
-            filterFn, filterDict = self._filtered[filterKey]
+            filterFn, childDict = self._filtered[filterKey]
             shouldBeInFilter = filterFn(key, val)
             if shouldBeInFilter:
                 filtersShouldAdd.add(filterKey)
+            elif key in childDict:
+                filtersShouldRemove.add(filterKey)
         
         # whew! now we can update
         super().__setitem__(key, val)
         for filterKey in filtersShouldAdd:
-            filterFn, filterDict = self._filtered[filterKey]
-            filterDict[key] = val
+            filterFn, childDict = self._filtered[filterKey]
+            childDict._self__setitem__(key, val)
+        for filterKey in filtersShouldRemove:
+            filterFn, childDict = self._filtered[filterKey]
+            childDict._self__delitem__(key)
 
     def __delitem__(self, key):
         super().__delitem__(key)
         for filterKey in self._filtered:
-            filterFn, filterDict = self._filtered[filterKey]
-            if key in filterDict:
-                del filterDict[key]
+            filterFn, childDict = self._filtered[filterKey]
+            if key in childDict:
+                childDict._self__delitem__(key)
 
     def update(self, sequence):
         # this ensures the sequence is a valid structure, and allows both the
@@ -893,21 +976,31 @@ class FilteredDict(dict):
         # will be queued now and added later once we know no errors pop up
         # (we don't want partially updated dicts!)
         filtersToAdd = dict()
+        filtersToRemove = dict()
         for key in allItemsToUpdate:
             val = allItemsToUpdate[key]
             for filterKey in self._filtered:
-                filterFn, filterDict = self._filtered[filterKey]
+                filterFn, childDict = self._filtered[filterKey]
                 shouldBeInFilter = filterFn(key, val)
                 if shouldBeInFilter:
                     if filtersToAdd.get(filterKey) is None:
                         filtersToAdd[filterKey] = dict()
                     filtersToAdd[filterKey][key] = val
+                elif key in childDict:
+                    if filtersToRemove.get(filterKey) is None:
+                        filtersToRemove[filterKey] = set()
+                    filtersToRemove[filterKey].add(key)
         
         # whew! now we can update
         super().update(allItemsToUpdate)
         for filterKey in filtersToAdd:
-            filterFn, filterDict = self._filtered[filterKey]
-            filterDict.update(filtersToAdd[filterKey])
+            filterFn, childDict = self._filtered[filterKey]
+            childDict._self_update(filtersToAdd[filterKey])
+        for filterKey in filtersToRemove:
+            removeEach = filtersToRemove[filterKey]
+            filterFn, childDict = self._filtered[filterKey]
+            for key in removeEach:
+                childDict._self__delitem__(key)
 
     def copy(self):
         raise NotImplementedError("FilteredDict can't copy")
@@ -931,7 +1024,7 @@ class FilteredDict(dict):
 
         # (this number includes keyword arguments)
         return fn.__code__.co_argcount
-        
+
 
 if __name__ == "__main__":
     interpreter = Interpreter(print)
