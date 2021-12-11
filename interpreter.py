@@ -274,13 +274,62 @@ class Interpreter:
         if len(badTraces) > 0:
             raise BadTemplateEvaluationError(badTraces)
 
+class InterpreterParser:
+    def __init__(self):
+        self._lexer = Lexer()
+        self._parser = Parser()
+        self._bindToParser()
+
+        # self._stacks = ...
+        self._resetStack()
+        self._parseResult = None
+
+    @property
+    def lastResult(self):
+        return self._parseResult
+
+    def _resetStack(self):
+        self._stacks = {
+            "identifiers": [],
+            "numbers": [],
+            "values": [],
+            
+            "operations": [],
+            "expressions": [],
+            # these stacks hold operation lists, not single values
+            "operationslow": [],
+            "operationsmid": [],
+            "operationshigh": [],
+            "operationsmax": [],
+
+            "aliasNames": [],
+            "templateArgs": [],
+            "aliasRightHands": [],
+        }
+
+    def evaluateLine(self, string):
+        try:
+            if '\n' in string:
+                raise ValueError("Interpreter expected a single line to evaluate; given multiple lines (in a single string)")
+
+            tokens = self._lexer.process(string)
+            self._parser.inspect(tokens, string)
+            # stack should be empty (otherwise, parser callbacks aren't
+            # communicating/working properly)
+            self._assertParseStackEmpty()
+            return self.lastResult
+        finally:
+            self._resetStack()
+
     def _bindToParser(self):
+        # this function is only run on initialization; these helper functions
+        # aren't too inefficient
         def pushStack(key, stackPiece):
             if not isinstance(stackPiece, StackPieceTracer):
                 raise TypeError("Interpreter pushed non-tracer type to stack")
-            return self._parseStack[key].append(stackPiece)
+            return self._stacks[key].append(stackPiece)
         def popStack(key):
-            return self._parseStack[key].pop()
+            return self._stacks[key].pop()
         
         # each callback should generally be popping StackPieces from one stack,
         # potentially modifying their data, and pushing onto another stack
@@ -563,9 +612,6 @@ class Interpreter:
             self._throwBranchNotImplemented("commands")
         self._parser.onCommand(onCommand)
 
-    def _print(self, *args):
-        self._outputFn(INDENT, *args, sep='')
-
     def _assertParseStackEmpty(self):
         badStackNames = []
         for stackName in self._parseStack:
@@ -578,24 +624,11 @@ class Interpreter:
     def _throwBranchNotImplemented(self, featureNamePlural):
         raise InterpreterNotImplementedError("SolverPro cannot process {} (yet)".format(featureNamePlural))
 
-    def _handleError(self, e):
-        parserErrors = (
-            Parser.ParseError,
-            Parser.EOLError,
-        )
-        if isinstance(e, parserErrors) or isinstance(e, InterpreterError):
-            self._outputFn(e)
-            return True
-        
-        self._print("(Internal error) {}: {}".format(type(e).__name__, e))
-        return False
-
 
 TRACE_TYPES = {
     "IDENTIFIER": "IDENTIFIER",
     "TEMPLATE_CALL": "TEMPLATE_CALL",
 }
-
 # contains an element of the stack as well as some helpful metadata
 class StackPieceTracer:
     __traceId_DO_NOT_MODIFY = 0
