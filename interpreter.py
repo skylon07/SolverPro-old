@@ -365,7 +365,7 @@ class InterpreterParser:
         def onNumber(tokens, branch):
             if branch == "NU" or branch == "EN":
                 numberStr = str(tokens[0])
-                value = Numeric(numberStr)
+                value = Represent(Numeric, numberStr)
             piece = StackPieceTracer(value, tokens)
             pushStack("numbers", piece)
         self._parser.onNumber(onNumber)
@@ -374,7 +374,7 @@ class InterpreterParser:
             if branch == "id":
                 tokenStrs = map(lambda token: str(token), tokens)
                 fullId = ''.join(tokenStrs)
-                value = Identifier(fullId)
+                value = Represent(Identifier, fullId)
             piece = StackPieceTracer(value, tokens)
             piece.trace(TRACE_TYPES["IDENTIFIER"])
             pushStack("identifiers", piece)
@@ -406,22 +406,32 @@ class InterpreterParser:
                 namePiece = popStack("identifiers")
                 argExprs = argsPiece.obj
                 nameId = namePiece.obj
-                templateCall = TemplateCall(nameId, argExprs)
-                piece = argsPiece.update(templateCall, tokens, namePiece.traces)
+                templateResult = self._evaluateTemplate(nameId, argExprs)
+                piece = argsPiece.update(templateResult, tokens, namePiece.traces)
                 piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
             elif branch == "fu PAO PAC":
                 namePiece = popStack("identifiers")
                 argExprs = []
                 nameId = namePiece.obj
-                templateCall = TemplateCall(nameId, argExprs)
-                piece = namePiece.update(templateCall, tokens, [])
+                templateResult = self._evaluateTemplate(nameId, argExprs)
+                piece = namePiece.update(templateResult, tokens, [])
                 piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
             pushStack("values", piece)
         self._parser.onValue(onValue)
 
+        # (specifically binary operators)
         def onOperatorANY(tokens, branch):
-            operatorStr = str(tokens[0])
-            piece = StackPieceTracer(operatorStr, tokens)
+            if branch == "PL":
+                operatorFn = lambda a, b: a + b
+            elif branch == "DA":
+                operatorFn = lambda a, b: a - b
+            elif branch == "ST":
+                operatorFn = lambda a, b: a * b
+            elif branch == "SL":
+                operatorFn = lambda a, b: a / b
+            elif branch == "CA":
+                operatorFn = lambda a, b: a ** b
+            piece = StackPieceTracer(operatorFn, tokens)
             # can't use piece.trace() here without reviewing onOperation;
             # that callback ignores this piece's traces
             pushStack("operations", piece)
@@ -429,6 +439,7 @@ class InterpreterParser:
         self._parser.onOperatorMid(onOperatorANY)
         self._parser.onOperatorHigh(onOperatorANY)
 
+        # specifically binary operations
         def evaluateOperationList(opList):
             if type(opList) is not list:
                 raise TypeError("cannot evaluate non-list-type as operation list")
@@ -445,7 +456,7 @@ class InterpreterParser:
                         raise IndexError("Interpreter -> evaluateOperationList(opList) given bad opList")
                 if not isinstance(rightExpr, Expressable):
                     raise RuntimeError("tried to evaluate operation list with a non-expressable (right-hand)")
-                newExpr = Expression(leftExpr, oper, rightExpr)
+                newExpr = Represent(Expression, oper, leftExpr, rightExpr)
                 opList.insert(0, newExpr)
             resultExpr = opList[0]
             return resultExpr
@@ -472,7 +483,8 @@ class InterpreterParser:
                 opListPiece = popStack("operationsmax")
                 opList = opListPiece.obj
                 expr = evaluateOperationList(opList)
-                newExpr = NegativeExpression(expr)
+                negOper = lambda x: -x
+                newExpr = Represent(Expression, negOper, expr)
                 newOpList = [newExpr]
                 piece = opListPiece.update(newOpList, tokens, [])
             elif branch == "ev":
@@ -612,6 +624,9 @@ class InterpreterParser:
             self._throwBranchNotImplemented("commands")
         self._parser.onCommand(onCommand)
 
+    def _evaluateTemplate(self, name, params):
+        return Represent.TemplateCall(name, params)
+
     def _assertParseStackEmpty(self):
         badStackNames = []
         for stackName in self._parseStack:
@@ -623,6 +638,35 @@ class InterpreterParser:
 
     def _throwBranchNotImplemented(self, featureNamePlural):
         raise InterpreterNotImplementedError("SolverPro cannot process {} (yet)".format(featureNamePlural))
+
+
+# used to keep track of data for creating an object, and avoids errors
+# until the Interpreter has done the checks it wants
+class Represent:
+    def __init__(self, repCls, *clsArgs):
+        self._cls = repCls
+        self._args = clsArgs
+
+    @property
+    def cls(self):
+        return self._cls
+
+    @property
+    def args(self):
+        return self._args
+
+    class TemplateCall:
+        def __init__(self, name, params):
+            self._name = name
+            self._params = params
+        
+        @property
+        def name(self):
+            return self._name
+
+        @property
+        def params(self):
+            return self._params
 
 
 TRACE_TYPES = {
