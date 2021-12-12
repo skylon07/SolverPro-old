@@ -768,13 +768,10 @@ class InterpreterDatabase:
             return self._settingDefinition
         def inferences(key, value):
             return self._settingInference
-        def templates(key, value):
-            return isinstance(value, Template)
 
         self._dict = FilteredDict(
             definitions,
             inferences,
-            templates,
         )
 
     # working with definitions...
@@ -903,12 +900,6 @@ class InterpreterDatabase:
         else:
             raise ValueError("substitute(defined=False, inferred=False) -- one kwarg must be True!")
 
-        substituted = subsable.substitute(substDict)
-        return substituted
-
-    # substitutes only for template calls
-    def substituteTemplates(self, subsable):
-        substDict = self._dict.filter("templates")
         substituted = subsable.substitute(substDict)
         return substituted
 
