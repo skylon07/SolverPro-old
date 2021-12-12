@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 from constants import INDENT, USER_INPUT
 
 
@@ -29,3 +31,72 @@ class TracebackError(Exception):
         linePtrs = ' ' * len(USER_INPUT) + linePtrs
         indentedMsg = INDENT + self.__mainMsg
         self.__message = '\n'.join((linePtrs, indentedMsg)) 
+
+class InterpreterError(Exception):
+    pass # just used as a type-group
+
+
+class InterpreterNotImplementedError(InterpreterError):
+    pass
+
+
+class InterpreterTracebackError(TracebackError, InterpreterError, ABC):
+    def __init__(self, badTraces):
+        message = self._generateMessage(badTraces)
+        badStarts = map(lambda trace: trace["start"], badTraces)
+        badEnds = map(lambda trace: trace["end"], badTraces)
+        super().__init__(message, badStarts, badEnds)
+
+    @abstractmethod
+    def _generateMessage(self, badTraces):
+        return # message string
+
+
+# not meant to be raised; just inherits from TracebackError for its formatting capabilities
+class InterpreterTracebackWarning(InterpreterTracebackError):
+    def warn(self, outputFn):
+        outputFn(self.message)
+
+
+class UndefinedIdentifierError(InterpreterTracebackError):
+    def _generateMessage(self, badTraces):
+        plural = len(badTraces) > 1
+        badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
+        return "{}{}ndefined identifier{} {} given: {}".format(
+            "An " if not plural else "",
+            "u" if not plural else "U",
+            "s" if plural else "",
+            "were" if plural else "was",
+            ','.join(badIdentifierStrs),
+        )
+
+
+class UnusedArgumentsWarning(InterpreterTracebackWarning):
+    def _generateMessage(self, badTraces):
+        plural = len(badTraces) > 1
+        badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
+        return "Variable{} {} {} not used in {} template definition".format(
+            "s" if plural else "",
+            ','.join(badIdentifierStrs),
+            "were" if plural else "was",
+            "their" if plural else "its",
+        )
+
+
+class InvalidExpressionError(InterpreterTracebackError):
+    def _generateMessage(self, badTraces):
+        plural = len(badTraces) > 1
+        badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
+        return "The variable{} {} cannot be evaluated in an expression".format(
+            "s" if plural else "",
+            ','.join(badIdentifierStrs)
+        )
+
+
+class BadTemplateEvaluationError(InterpreterTracebackError):
+    def _generateMessage(self, badTraces):
+        templateCall = badTraces[0]["obj"]
+        templateName = str(templateCall.nameId)
+        return "Template {} does not evaluate to an expression; it cannot be used in an expression".format(
+            templateName,
+        )

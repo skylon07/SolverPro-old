@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod, abstractproperty
 import string
 
-from engine import immutable
+from immutable import immutable
 
 class Lexer():
     class types(dict):
