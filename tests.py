@@ -1306,7 +1306,7 @@ class TestSuites:
     def Interpreter(cls):
         state = dict()
         def fakePrint(*args, **kwargs):
-            argsStrs = map(lambda arg: str(arg), args)
+            argsStrs = map(str, args)
             sep = kwargs.get('sep')
             sep = sep if sep is not None else ' '
             end = kwargs.get('end')

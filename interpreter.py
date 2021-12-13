@@ -381,7 +381,7 @@ class InterpreterParser:
 
         def onFullIdentifier(tokens, branch):
             if branch == "id":
-                tokenStrs = map(lambda token: str(token), tokens)
+                tokenStrs = map(str, tokens)
                 fullId = ''.join(tokenStrs)
                 value = Represent(Identifier, fullId)
             piece = StackPieceTracer(value, tokens)
@@ -885,11 +885,11 @@ class InterpreterDatabase:
 
         for key in keys:
             if not isinstance(key, validKeys):
-                validKeyNames = ', '.join(map(lambda item: repr(item), validKeys))
+                validKeyNames = ', '.join(map(repr, validKeys))
                 raise TypeError("database tried to insert key that was not one of these: {}".format(validKeyNames))
         for value in values:
             if not isinstance(value, validVals):
-                validValNames = ', '.join(map(lambda item: repr(item), validVals))
+                validValNames = ', '.join(map(repr, validVals))
                 raise TypeError("database tried to insert value that was not one of these: {}".format(validValNames))
 
     # substitutes known/inferred values into a given object
