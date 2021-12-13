@@ -1,81 +1,14 @@
 from abc import ABC, abstractmethod
+from typing import Type
+
+import sympy
 
 from constants import INDENT
-from errors import TracebackError
+from errors import *
 
 from lexer import Lexer
 from parser import Parser
-from engine import *
-
-
-class InterpreterError(Exception):
-    pass # just used as a type-group
-
-
-class InterpreterNotImplementedError(InterpreterError):
-    pass
-
-
-class InterpreterTracebackError(TracebackError, InterpreterError, ABC):
-    def __init__(self, badTraces):
-        message = self._generateMessage(badTraces)
-        badStarts = map(lambda trace: trace["start"], badTraces)
-        badEnds = map(lambda trace: trace["end"], badTraces)
-        super().__init__(message, badStarts, badEnds)
-
-    @abstractmethod
-    def _generateMessage(self, badTraces):
-        return # message string
-
-
-# not meant to be raised; just inherits from TracebackError for its formatting capabilities
-class InterpreterTracebackWarning(InterpreterTracebackError):
-    def warn(self, outputFn):
-        outputFn(self.message)
-
-
-class UndefinedIdentifierError(InterpreterTracebackError):
-    def _generateMessage(self, badTraces):
-        plural = len(badTraces) > 1
-        badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
-        return "{}{}ndefined identifier{} {} given: {}".format(
-            "An " if not plural else "",
-            "u" if not plural else "U",
-            "s" if plural else "",
-            "were" if plural else "was",
-            ','.join(badIdentifierStrs),
-        )
-
-
-class UnusedArgumentsWarning(InterpreterTracebackWarning):
-    def _generateMessage(self, badTraces):
-        plural = len(badTraces) > 1
-        badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
-        return "Variable{} {} {} not used in {} template definition".format(
-            "s" if plural else "",
-            ','.join(badIdentifierStrs),
-            "were" if plural else "was",
-            "their" if plural else "its",
-        )
-
-
-class InvalidExpressionError(InterpreterTracebackError):
-    def _generateMessage(self, badTraces):
-        plural = len(badTraces) > 1
-        badIdentifierStrs = map(lambda trace: str(trace["obj"]), badTraces)
-        return "The variable{} {} cannot be evaluated in an expression".format(
-            "s" if plural else "",
-            ','.join(badIdentifierStrs)
-        )
-
-
-class BadTemplateEvaluationError(InterpreterTracebackError):
-    def _generateMessage(self, badTraces):
-        templateCall = badTraces[0]["obj"]
-        templateName = str(templateCall.nameId)
-        return "Template {} does not evaluate to an expression; it cannot be used in an expression".format(
-            templateName,
-        )
+from structures import *
 
 
 class Interpreter:
@@ -83,92 +16,78 @@ class Interpreter:
         self._outputFn = outputFn
         self._solutions = list()
 
-        # self._parseStack = ...
-        self._resetParseStack()
-        self._parseResult = None
-
-        self._lexer = Lexer()
-        self._parser = Parser()
-        self._engine = Engine()
-        self._bindToParser()
-
-    def _resetParseStack(self):
-        self._parseStack = {
-            "identifiers": [],
-            "numbers": [],
-            "values": [],
-            
-            "operations": [],
-            "expressions": [],
-            # these stacks hold operation lists, not single values
-            "operationslow": [],
-            "operationsmid": [],
-            "operationshigh": [],
-            "operationsmax": [],
-
-            "aliasNames": [],
-            "templateArgs": [],
-            "aliasRightHands": [],
-        }
+        self._parser = InterpreterParser(self)
+        self._database = InterpreterDatabase()
 
     # treats the string as user input
     def executeLine(self, string):
         try:
-            result = self.evaluateLine(string)
+            result = self._parser.evaluateLine(string)
             if result["type"] == "relation":
                 leftPiece = result["leftHandExpr"]
                 rightPiece = result["rightHandExpr"]
-                self._ensureIdentifiersAreExpressable(leftPiece)
-                self._ensureIdentifiersAreExpressable(rightPiece)
-                self._ensureValidTemplateEvals(leftPiece)
-                self._ensureValidTemplateEvals(rightPiece)
-                leftExpr = leftPiece.obj
-                rightExpr = rightPiece.obj
-                subLeftExpr = self._engine.substituteTemplates(leftExpr)
-                subRightExpr = self._engine.substituteTemplates(rightExpr)
-                relation = Relation(subLeftExpr, subRightExpr)
-                self._engine.addRelation(relation)
+
+                # self._ensureIdentifiersAreExpressable(leftPiece)
+                # self._ensureIdentifiersAreExpressable(rightPiece)
+                # self._ensureValidTemplateParams(leftPiece)
+                # self._ensureValidTemplateParams(rightPiece)
+                # self._ensureValidTemplateReturns(leftPiece)
+                # self._ensureValidTemplateReturns(rightPiece)
+
+                leftExpr = self._evalRep(leftPiece.obj)
+                rightExpr = self._evalRep(rightPiece.obj)
+                relation = Relation(leftExpr, rightExpr)
+                # TODO: track relation
             
             elif result["type"] == "alias":
-                isTemplate = result["templateArgs"].obj is not None
+                isTemplate = result["templateParams"].obj is not None
                 if isTemplate:
                     idsPiece = result["aliasNames"]
-                    # only one identifier allowed by parser for template alias names
-                    identifier = idsPiece.obj[0]
-                    argsPiece = result["templateArgs"]
+                    paramsPiece = result["templateParams"]
                     rightHandPiece = result["rightHand"]
 
-                    self._ensureTemplateUses(argsPiece, rightHandPiece)
+                    # self._ensureTemplateUses(paramsPiece, rightHandPiece)
 
-                    template = Template(argsPiece.obj, rightHandPiece.obj)
-                    self._engine.setAlias(identifier, template)
+                    # only one identifier allowed by parser for template alias names
+                    identifier = self._evalRep(idsPiece.obj[0])
+                    params = tuple(self._evalRep(rep) for rep in paramsPiece.obj)
+                    rightHand = self._evalRep(rightHandPiece.obj)
+                    template = Template(identifier, params, rightHand)
+                    self._database.define(identifier, template)
 
                 else:
                     idsPiece = result["aliasNames"]
                     rightHandPiece = result["rightHand"]
-                    rightHand = rightHandPiece.obj
 
-                    self._ensureDefined(rightHandPiece)
-                    self._ensureIdentifiersAreExpressable(rightHandPiece)
-                    self._ensureValidTemplateEvals(rightHandPiece)
+                    # self._ensureExisting(rightHandPiece)
+                    # self._ensureIdentifiersAreExpressable(rightHandPiece)
+                    # self._ensureValidTemplateReturns(rightHandPiece)
 
-                    rightWithSubs = self._engine.substitute(rightHand)
-                    self._engine.setAliases(idsPiece.obj, rightWithSubs)
+                    idList = tuple(self._evalRep(rep) for rep in idsPiece.obj)
+                    rightHand = self._evalRep(rightHandPiece.obj)
+                    rightWithSubs = self._database.substitute(rightHand)
+                    rightIter = (rightWithSubs for i in range(len(idList)))
+                    self._database.updateDefinitions(idList, rightIter)
             
             elif result["type"] == "expression":
                 exprPiece = result["expression"]
-                expr = exprPiece.obj
+                
+                # self._ensureIdentifiersAreExpressable(exprPiece)
+                # self._ensureValidTemplateReturns(exprPiece)
 
-                self._ensureIdentifiersAreExpressable(exprPiece)
-                self._ensureValidTemplateEvals(exprPiece)
+                identifier = self._evalRep(exprPiece)
+                sub = self._database.substitute(identifier)
+                self._print(sub)
 
-                if isinstance(expr, Identifier) and self._engine.isDefined(expr):
+                return ## TODO: REMOVE OLD CODE BELOW ##
+
+                if isinstance(expr, Identifier) and self._database.isDefined(expr):
                     identifier = expr
-                    sub = self._engine.substitute(identifier)
+                    sub = self._database.substitute(identifier)
                     self._print(sub)
                     return
 
-                solSet = self._engine.getSolutionsFor(expr)
+                solSet = self._getSolutionsFor(expr)
                 if solSet.isNumeric:
                     strMap = map(lambda numeric: str(numeric), solSet)
                     self._print(' or '.join(strMap))
@@ -179,7 +98,7 @@ class Interpreter:
                     self._ensureDefined(exprPiece)
 
                     # must be a purely numeric expression!
-                    numeric = self._engine.substitute(expr)
+                    numeric = self._database.substitute(expr)
                     if not isinstance(numeric, Numeric):
                         # this shouldn't ever happen, but in case it does...
                         raise TypeError("(Somehow) a non-numeric value came from what should be a purely numeric expression")
@@ -191,7 +110,7 @@ class Interpreter:
                     parseResult = self.evaluateLine(solStr)
                     exprPiece = parseResult["expression"]
                     expr = exprPiece.obj
-                    subExpr = self._engine.substitute(expr)
+                    subExpr = self._database.substitute(expr)
                     self._print(subExpr)
             
             elif result["type"] == "command":
@@ -204,29 +123,46 @@ class Interpreter:
                 raise TypeError("Interpreter encountered an unexpected result type")
         except Exception as e:
             self._handleError(e)
-            self._resetParseStack()
 
-    # helper that can turn strings into engine-useable data structures
-    def evaluateLine(self, string):
-        if '\n' in string:
-            raise ValueError("Interpreter expected a single line to evaluate; given multiple lines (in a single string)")
+    # evaluates Represent() objects
+    def _evalRep(self, representation):
+        if isinstance(representation, Represent):
+            cls = representation.cls
+            rawArgs = representation.args
+            args = self._evalRepArgs(rawArgs)
+            return cls(*args)
 
-        tokens = self._lexer.process(string)
-        self._parser.inspect(tokens, string)
-        result = self._parseResult
-        self._parseResult = None
-        # stack should be empty (otherwise, parser callbacks aren't
-        # communicating/working properly)
-        self._assertParseStackEmpty()
-        return result
+        elif isinstance(representation, Represent.TemplateCall):
+            nameId = self._evalRep(representation.nameId)
+            rawParamVals = representation.params
+            paramVals = self._evalRepArgs(rawParamVals)
+            template = self._database.getDefinition(nameId)
+            paramNames = template.parameters
+            substDict = dict(zip(paramNames, paramVals))
+            return template.substitute(substDict)
 
-    # errors when identifiers are not defined (aka aliased)
-    def _ensureDefined(self, stackPiece):
+        else:
+            raise TypeError("Interpreter tried to evaluate an invalid Represent() type")
+
+    def _evalRepArgs(self, repArgs):
+        repTypes = (
+            Represent,
+            Represent.TemplateCall,
+        )
+        for arg in repArgs:
+            if isinstance(arg, repTypes):
+                yield self._evalRep(arg)
+            else:
+                yield arg
+
+    # errors when identifiers are not defined (aliased or inferred)
+    def _ensureExists(self, stackPiece):
         badTraces = []
         for trace in stackPiece.traces:
             if trace["type"] == TRACE_TYPES["IDENTIFIER"]:
-                identifier = trace["obj"]
-                if not self._engine.isDefined(identifier):
+                identifierRep = trace["obj"]
+                identifier = self._evalRep(identifierRep)
+                if not self._database.doesExist(identifier):
                     badTraces.append(trace)
         if len(badTraces) > 0:
             raise UndefinedIdentifierError(badTraces)
@@ -239,7 +175,11 @@ class Interpreter:
                 inRightHand = False
                 for rightHandTrace in rightHandPiece.traces:
                     if rightHandTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
-                        if argTrace["obj"] == rightHandTrace["obj"]:
+                        argIdRep = argTrace["obj"]
+                        argIdName = argIdRep.args[0]
+                        rightIdRep = rightHandTrace["obj"]
+                        rightIdName = rightIdRep.args[0]
+                        if argIdName == rightIdName:
                             inRightHand = True
                             break
                 if not inRightHand:
@@ -249,30 +189,99 @@ class Interpreter:
             warning.warn(self._outputFn)
 
     # errors when an identifier in an expression doesn't return an expressable
+    # (ex. reference, not call, to a template)
     def _ensureIdentifiersAreExpressable(self, exprPiece, force=False):
-        if isinstance(exprPiece.obj, (Expression, NegativeExpression)) or force:
-            badTraces = []
-            for idTrace in exprPiece.traces:
-                if idTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
-                    identifier = idTrace["obj"]
-                    alias = self._engine.substitute(identifier)
-                    if not isinstance(alias, Expressable):
-                        badTraces.append(idTrace)
-            if len(badTraces) > 0:
-                raise InvalidExpressionError(badTraces)
+        badTraces = []
+        for idTrace in exprPiece.traces:
+            if idTrace["type"] == TRACE_TYPES["IDENTIFIER"]:
+                identifierRep = idTrace["obj"]
+                identifier = self._evalRep(identifierRep)
+                # substitute() used to return alias = identifier if identifier not found
+                alias = self._database.substitute(identifier)
+                if not isinstance(alias, Expressable):
+                    badTraces.append(idTrace)
+        if len(badTraces) > 0:
+            raise InvalidExpressionError(badTraces)
+
+    # errors when template calls are made with non-template identifiers
+    def _ensureValidTemplateCallNames(self, anyPiece):
+        badTraces = []
+        for callTrace in anyPiece.traces:
+            if callTrace["type"] == TRACE_TYPES["TEMPLATE_CALL"]:
+                callRep = callTrace["obj"]
+                nameRep = callRep.nameId
+                nameId = self._evalRep(nameRep)
+                shouldBeTemplate = self._database.getExisting(nameId)
+                if not isinstance(shouldBeTemplate, Template):
+                    badTraces.append(callTrace)
+        if len(badTraces) > 0:
+            raise NotATemplateError(badTraces)
+
+    # errors when the number of args in a template call mismatches the template
+    def _ensureValidTemplateParams(self, anyPiece):
+        badTraces = []
+        for callTrace in anyPiece.traces:
+            if callTrace["type"] == TRACE_TYPES["TEMPLATE_CALL"]:
+                callRep = callTrace["obj"]
+                nameRep = callRep.nameId
+                nameId = self._evalRep(nameRep)
+                template = self._database.getExisting(nameId)
+                tempParamLen = len(template.parameters)
+                callParamLen = len(callRep.params)
+                if tempParamLen != callParamLen:
+                    modTrace = callTrace.copy()
+                    parenOffset = 1
+                    numParamsTooMany = callParamLen - tempParamLen
+                    if numParamsTooMany > 0:
+                        beforeOffset = -1
+                        endOffset = -parenOffset + beforeOffset
+                        endToken = modTrace["tokens"][endOffset]
+                        startOffset = numParamsTooMany * beforeOffset + endOffset
+                        startToken = modTrace["tokens"][startOffset]
+                    else:
+                        lastParenToken = modTrace["tokens"][-parenOffset]
+                        startToken = endToken = lastParenToken
+                    modTrace["start"] = startToken.placementStart
+                    modTrace["end"] = endToken.placementEnd
+                    badTraces.append(modTrace)
+        if len(badTraces) > 0:
+            raise InvalidExpressionError(badTraces)
 
     # errors when a template evaluates to a non-expressable in an expression
-    def _ensureValidTemplateEvals(self, exprPiece):
+    def _ensureValidTemplateReturns(self, exprPiece):
         badTraces = []
-        for templateTrace in exprPiece.traces:
-            if templateTrace["type"] == TRACE_TYPES["TEMPLATE_CALL"]:
-                templateId = templateTrace["obj"].nameId
-                template = self._engine.getAlias(templateId)
+        for callTrace in exprPiece.traces:
+            if callTrace["type"] == TRACE_TYPES["TEMPLATE_CALL"]:
+                callRep = callTrace["obj"]
+                templateIdRep = callRep.nameId
+                templateId = self._evalRep(templateIdRep)
+                template = self._database.getDefinition(templateId)
                 shouldBeExpr = template.rightHand
                 if not isinstance(shouldBeExpr, Expressable):
-                    badTraces.append(templateTrace)
+                    badTraces.append(callTrace)
         if len(badTraces) > 0:
             raise BadTemplateEvaluationError(badTraces)
+
+    # I/O helper functions
+    def _print(self, *args):
+        self._outputFn(INDENT, *args, sep='')
+
+    def _handleError(self, e):
+        parserErrors = (
+            Parser.ParseError,
+            Parser.EOLError,
+        )
+        if isinstance(e, parserErrors) or isinstance(e, InterpreterError):
+            self._outputFn(e)
+            return True
+        
+        self._print("(Internal error) {}: {}".format(type(e).__name__, e))
+        return False
+
+    # returns a StructureSet of ALL possible scenarios where 'expr' is true
+    def _getSolutionsFor(self, expr):
+        pass
+
 
 class InterpreterParser:
     def __init__(self):
@@ -303,7 +312,7 @@ class InterpreterParser:
             "operationsmax": [],
 
             "aliasNames": [],
-            "templateArgs": [],
+            "templateParams": [],
             "aliasRightHands": [],
         }
 
@@ -344,7 +353,7 @@ class InterpreterParser:
                 self._parseResult = {
                     "type": "alias",
                     "aliasNames": popStack("aliasNames"),
-                    "templateArgs": popStack("templateArgs"),
+                    "templateParams": popStack("templateParams"),
                     "rightHand": popStack("aliasRightHands"),
                 }
             elif branch == "ex EOL":
@@ -402,18 +411,18 @@ class InterpreterParser:
             elif branch == "nu":
                 piece = popStack("numbers")
             elif branch == "fu PAO tes PAC":
-                argsPiece = popStack("expressions")
+                paramsPiece = popStack("expressions")
                 namePiece = popStack("identifiers")
-                argExprs = argsPiece.obj
+                exprParams = paramsPiece.obj
                 nameId = namePiece.obj
-                templateResult = self._evaluateTemplate(nameId, argExprs)
-                piece = argsPiece.update(templateResult, tokens, namePiece.traces)
+                templateResult = self._evaluateTemplate(nameId, exprParams)
+                piece = paramsPiece.update(templateResult, tokens, namePiece.traces)
                 piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
             elif branch == "fu PAO PAC":
                 namePiece = popStack("identifiers")
-                argExprs = []
+                exprParams = []
                 nameId = namePiece.obj
-                templateResult = self._evaluateTemplate(nameId, argExprs)
+                templateResult = self._evaluateTemplate(nameId, exprParams)
                 piece = namePiece.update(templateResult, tokens, [])
                 piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
             pushStack("values", piece)
@@ -443,7 +452,7 @@ class InterpreterParser:
         def evaluateOperationList(opList):
             if type(opList) is not list:
                 raise TypeError("cannot evaluate non-list-type as operation list")
-            if not isinstance(opList[0], Expressable):
+            if not issubclass(opList[0].cls, Expressable):
                 raise RuntimeError("tried to evaluate operation list with a non-expressable (left-hand)")
             # collapses operations left-to-right
             while len(opList) > 1:
@@ -454,7 +463,7 @@ class InterpreterParser:
                 except IndexError as e:
                     if "pop from empty" in str(e):
                         raise IndexError("Interpreter -> evaluateOperationList(opList) given bad opList")
-                if not isinstance(rightExpr, Expressable):
+                if not issubclass(rightExpr.cls, Expressable):
                     raise RuntimeError("tried to evaluate operation list with a non-expressable (right-hand)")
                 newExpr = Represent(Expression, oper, leftExpr, rightExpr)
                 opList.insert(0, newExpr)
@@ -550,23 +559,23 @@ class InterpreterParser:
                 identifier = idPiece.obj
                 identifiers = (identifier,)
                 idsPiece = idPiece.update(identifiers, tokens, [])
-                argsPiece = StackPieceTracer(None, [])
+                paramsPiece = StackPieceTracer(None, [])
             elif branch == "BRO ids BRC":
                 idsPiece = popStack("identifiers")
-                argsPiece = StackPieceTracer(None, [])
+                paramsPiece = StackPieceTracer(None, [])
             elif isTemplateBranch:
                 if branch == "fu PAO ids PAC":
-                    argsPiece = popStack("identifiers")
-                    if type(argsPiece.obj) is not list:
+                    paramsPiece = popStack("identifiers")
+                    if type(paramsPiece.obj) is not list:
                         raise TypeError("Interpreter -> onLeftAliasTemplate() got arguments from stack that were not in list form")
                 else:
-                    argsPiece = StackPieceTracer([], [])
+                    paramsPiece = StackPieceTracer([], [])
                 idPiece = popStack("identifiers")
                 identifier = idPiece.obj
                 identifiers = (identifier,)
                 idsPiece = idPiece.update(identifiers, tokens, [])
             pushStack("aliasNames", idsPiece)
-            pushStack("templateArgs", argsPiece)
+            pushStack("templateParams", paramsPiece)
         self._parser.onLeftAlias(onLeftAliasANY)
         self._parser.onLeftAliasTemp(onLeftAliasANY)
 
@@ -656,13 +665,13 @@ class Represent:
         return self._args
 
     class TemplateCall:
-        def __init__(self, name, params):
-            self._name = name
+        def __init__(self, nameId, params):
+            self._nameId = nameId
             self._params = params
         
         @property
-        def name(self):
-            return self._name
+        def nameId(self):
+            return self._nameId
 
         @property
         def params(self):
@@ -710,6 +719,7 @@ class StackPieceTracer:
             "id": self._getUniqueTraceId(),
             "type": traceType,
             "obj": self._obj,
+            "tokens": self._tokens,
             "start": traceStart,
             "end": traceEnd,
         }
