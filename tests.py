@@ -1450,6 +1450,25 @@ class TestSuites:
         resetState()
         Tester.stopIfFailed()
 
+        # test comments
+        testLineOnInterpreter(
+            "val := 2 # comment",
+            None,
+            "can set values with comments",
+        )
+        testLineOnInterpreter(
+            "val # comment",
+            "2",
+            "can print stored values with comments",
+        )
+        testLineOnInterpreter(
+            "val * 7 # comment",
+            "14",
+            "can evaluate expressions with comments",
+        )
+        resetState()
+        Tester.stopIfFailed()
+
         # test template aliases (creation only)
         testLineOnInterpreter(
             "alias() := 4",
@@ -2007,6 +2026,31 @@ class TestSuites:
             "objtemp() * 4 + objtemp()",
             (ISP + "^^^^^^^^^       ^^^^^^^^^\n", "rror", "not", "xpression"),
             "Templates that do not return expressions error when used in expressions (and the interpreter highlights all of them)",
+        )
+        testLineOnInterpreter(
+            "metaTemp() := 1 + objTemp()",
+            None,
+            "Can create templates that would be invalid if created immediately (objTemp could be redefined)",
+        )
+        testLineOnInterpreter(
+            "metaTemp()",
+            (ISP + "^^^^^^^^^^\n", "rror", "not", "xpression"),
+            "Templates that return invalid expressions error",
+        )
+        testLineOnInterpreter(
+            "metaTemp() := 1 + metaTemp()",
+            (ISP + "                  ^^^^^^^^^^\n", "rror", "ecursive"),
+            "Errors when attempting to make recursive template definitions",
+        )
+        testLineOnInterpreter(
+            "metaTemp2() := 1 + metaTemp()",
+            None,
+            "Doesn't error (yet) when making a non-recursive template call",
+        )
+        testLineOnInterpreter(
+            "metaTemp() := 2 + metaTemp2()",
+            (ISP + "                  ^^^^^^^^^^\n", "rror", "ecursive"),
+            "Errors when attempting to make recursive template definitions (two-deep)",
         )
         resetState()
         Tester.stopIfFailed()
