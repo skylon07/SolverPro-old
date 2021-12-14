@@ -707,8 +707,8 @@ class TestSuites:
             resetOnDict()
 
         # ensure parser has error types
-        Tester.assertIs(type(parser.ParseError), type, "ensure parser has error types (ParseError)")
-        Tester.assertIs(type(parser.EOLError), type, "ensure parser has error types (EOLError)")
+        Tester.assertIs(isinstance(parser.ParseError, type), True, "ensure parser has error types (ParseError)")
+        Tester.assertIs(isinstance(parser.EOLError, type), True, "ensure parser has error types (EOLError)")
         Tester.stopIfFailed()
 
         # test bottom productions
@@ -2442,7 +2442,7 @@ class Tester:
             if type(errorType) is str:
                 if errorType in str(e):
                     return True
-            elif type(errorType) is type:
+            elif isinstance(errorType, type):
                 if isinstance(e, errorType):
                     return True
             elif isinstance(errorType, Exception):
