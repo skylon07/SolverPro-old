@@ -1694,6 +1694,25 @@ class TestSuites:
         resetState()
         Tester.stopIfFailed()
 
+        # test multi-value assignments
+        testLineOnInterpreter(
+            "a := [1, 2]",
+            None,
+            "can assign variable to a set of values",
+        )
+        testLineOnInterpreter(
+            "a",
+            ("1", "or", "2"),
+            "can print variables assigned with multiple values",
+        )
+        testLineOnInterpreter(
+            "a + a",
+            ("2", "or", "4"), # not 3!
+            "can evaluate expressions using variables with multiple values",
+        )
+        resetState()
+        Tester.stopIfFailed()
+
         # test single-var relations overwrite, like re-alias
         # (printing a warning, but only once!)
         testLineOnInterpreter(
