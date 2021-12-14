@@ -98,7 +98,7 @@ class Lexer():
     def process(self, lexString, withEOL=True):
         return tuple(self.processGen(lexString, withEOL))
     
-    def processGen(self, lexString, withEOL):
+    def processGen(self, lexString, withEOL=True):
         machines = [
             forgetMachine,
             listMachine,
