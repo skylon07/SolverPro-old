@@ -199,7 +199,7 @@ class Expressable(Symbolable, ABC):
         if isinstance(self, Numeric):
             return Numeric(operFn(self.value))
         # elif isinstance(self, SolutionSet):
-        #     mapping = map(operFn, self)
+        #     mapping = (operFn(expr) for expr in self)
         #     return SolutionSet(mapping)
         return Expression(operRep, operFn, self)
     
@@ -500,7 +500,7 @@ class Expression(Expressable, Containable, StructureBase):
         return formatStr.format(leftStr, self._operStr, rightStr)
     
     def _selfAsSymbol(self):
-        syms = map(lambda expr: expr.asSymbol(), self._exprs)
+        syms = (expr.asSymbol() for expr in self._exprs)
         return self._operate(syms)
 
     def _substituteSelf(self, substDict):
