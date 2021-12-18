@@ -616,6 +616,30 @@ class TestSuites:
             [lexer.types.E_NUMBER, lexer.types.E_NUMBER, lexer.types.NUMBER, lexer.types.IDENTIFIER, lexer.types.PLUS, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.IDENTIFIER, lexer.types.DASH, lexer.types.NUMBER, lexer.types.E_NUMBER, lexer.types.NUMBER, lexer.types.EOL],
             "can process scientific numbers with 'E' (little e cases)"
         )
+
+        results = lexer.process("1 2 3. 4.0 5.12 6.")
+        Tester.assertItersEqual(
+            results,
+            [T("1"), T("2"), T("3."), T("4.0"), T("5.12"), T("6."), EOL()],
+            "can process numbers with no period, single period and no 'rest', or single period with 'rest'",
+        )
+        Tester.assertItersEqual(
+            mapTokenType(results),
+            [lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.EOL],
+            "can process numbers with no period, single period and no 'rest', or single period with 'rest'",
+        )
+
+        results = lexer.process(".E+4 .1e5 4.E-7")
+        Tester.assertItersEqual(
+            results,
+            [T('.'), T("E"), T("+"), T("4"), T(".1e5"), T("4.E-7"), EOL()],
+            "can process E-numbers with different period combinations",
+        )
+        Tester.assertItersEqual(
+            mapTokenType(results),
+            [lexer.types.PERIOD, lexer.types.IDENTIFIER, lexer.types.PLUS, lexer.types.NUMBER, lexer.types.E_NUMBER, lexer.types.E_NUMBER, lexer.types.EOL],
+            "can process E-numbers with different period combinations",
+        )
         Tester.stopIfFailed()
 
         # test token error data
