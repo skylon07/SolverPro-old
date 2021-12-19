@@ -38,7 +38,10 @@ class Interpreter:
                 leftExpr = self._evalTemplates(leftExpr)
                 rightExpr = self._evalTemplates(rightExpr)
                 relation = Relation(leftExpr, rightExpr)
-                # TODO: track relation
+                sympySolutions = relation.solveAll()
+                solutions = {var: sympySolutions[var] for var in sympySolutions}
+                self._database.defineRelation(relation, solutions)
+                self._updateInferences()
             
             elif result["type"] == "alias":
                 isTemplate = result["templateParams"].obj is not None
@@ -57,10 +60,10 @@ class Interpreter:
 
                     # only one identifier allowed by parser for template alias names
                     identifier = self._evalRep(idsPiece.obj[0])
-                    params = tuple(self._evalRepArgs(paramsPiece.obj))
+                    params = tuple(self._evalRepIter(paramsPiece.obj))
                     rightHand = self._evalRep(rightHandPiece.obj)
                     template = Template(params, rightHand)
-                    self._database.define(identifier, template)
+                    self._database.setDefinition(identifier, template)
 
                 else:
                     idsPiece = result["aliasNames"]
@@ -75,15 +78,21 @@ class Interpreter:
                     self._ensureValidNumTemplateParams_REP(rightHandPiece)
                     # unused _ensureTemplateUses_REP: not defining a template
 
-                    idList = tuple(self._evalRepArgs(idsPiece.obj))
+                    idList = self._evalRepIter(idsPiece.obj)
                     rightHand = self._evalRep(rightHandPiece.obj)
                     
                     # TODO: TEMP ensures
 
                     rightHand = self._evalTemplates(rightHand)
-                    rightWithSubs = self._database.substitute(rightHand)
-                    rightIter = (rightWithSubs for i in range(len(idList)))
-                    self._database.updateDefinitions(idList, rightIter)
+                    rightHandDef = self._database.getDefinition(rightHand)
+                    if isinstance(rightHandDef, Template):
+                        for identifier in idList:
+                            self._database.setDefinition(identifier, rightHandDef)
+                    else:
+                        numSet = self._database.substitute(rightHand)
+                        for identifier in idList:
+                            variable = Variable(identifier)
+                            self._database.setDefinition(variable, numSet)
             
             elif result["type"] == "expression":
                 exprPiece = result["expression"]
@@ -102,8 +111,21 @@ class Interpreter:
                 # TODO:  TEMP ensures
 
                 expr = self._evalTemplates(expr)
-                sub = self._database.substitute(expr)
-                self._print(sub)
+                if isinstance(expr, Variable):
+                    varDef = self._database.getDefinition(expr)
+                    if isinstance(varDef, Template):
+                        self._print(varDef)
+                        return
+                
+                subSet = self._database.substitute(expr)
+                for firstSub in subSet:
+                    setOfNums = isinstance(firstSub, Numeric)
+                    break
+                subSetAsStrs = (str(item) for item in subSet)
+                if setOfNums:
+                    self._print(' or '.join(subSetAsStrs))
+                else:
+                    self._print('\n'.join(subSetAsStrs))
 
                 return ## TODO: REMOVE OLD CODE BELOW ##
 
@@ -155,29 +177,37 @@ class Interpreter:
         if isinstance(representation, Represent):
             cls = representation.cls
             rawArgs = representation.args
-            args = self._evalRepArgs(rawArgs)
+            args = self._evalRepIter(rawArgs)
             return cls(*args)
 
         elif isinstance(representation, Represent.TemplateCall):
             nameId = self._evalRep(representation.nameId)
             template = self._database.getDefinition(nameId)
             rawParamVals = representation.params
-            paramVals = self._evalRepArgs(rawParamVals)
-            return TemplateCall(nameId, template, *paramVals)
+            paramVals = self._evalRepIter(rawParamVals)
+            return TemplateCall(nameId, template, paramVals)
 
         else:
             raise TypeError("Interpreter tried to evaluate an invalid Represent() type")
 
-    def _evalRepArgs(self, repArgs):
+    def _evalRepIter(self, repsIter):
         repTypes = (
             Represent,
             Represent.TemplateCall,
         )
-        for arg in repArgs:
-            if isinstance(arg, repTypes):
-                yield self._evalRep(arg)
+        for item in repsIter:
+            if type(item) is list:
+                yield list(self._evalRepIter(item))
+            elif type(item) is tuple:
+                yield tuple(self._evalRepIter(item))
+            elif type(item) is set:
+                yield set(self._evalRepIter(item))
+            elif type(item) is type(x for x in []):
+                yield (x for x in self._evalRepIter(item))
+            elif isinstance(item, repTypes):
+                yield self._evalRep(item)
             else:
-                yield arg
+                yield item
 
     def _evalTemplates(self, containable):
         if isinstance(containable, Containable):
@@ -205,9 +235,8 @@ class Interpreter:
             if valTrace["type"] == TRACE_TYPES["VALUE"]:
                 valRep = valTrace["obj"]
                 value = self._evalRep(valRep)
-                # substitute() used to return value if value not found (or not substitutable)
-                possibleNonExpressable = self._database.substitute(value)
-                if not isinstance(possibleNonExpressable, Expressable):
+                possibleNonExpressable = self._database.getDefinition(value)
+                if possibleNonExpressable is not None and not isinstance(possibleNonExpressable, set):
                     badTraces.append(valTrace)
         if len(badTraces) > 0:
             raise InvalidExpressionError(badTraces)
@@ -299,9 +328,56 @@ class Interpreter:
         self._print("(Internal error) {}: {}".format(type(e).__name__, e))
         return False
 
-    # returns a StructureSet of ALL possible scenarios where 'expr' is true
-    def _getSolutionsFor(self, expr):
-        pass
+    # TODO: remove if not used
+    def _convertSympy(self, sympyExpr):
+        parseResult = self._parser.evaluateLine(str(sympyExpr))
+        exprRep = parseResult["expression"].obj
+        expr = self._evalRep(exprRep)
+        return expr
+
+    def _updateInferences(self):
+        solutions = {rel: self._database.getRelationSolutions(rel) for rel in self._database.iterateRelations()}
+        finalSolutionDict = self._recursiveSolve(solutions)
+        for var in finalSolutionDict:
+            solSetSyms = finalSolutionDict[var]
+            solSet = set(self._convertSympy(sol) for sol in solSetSyms)
+            self._database.setInference(var, solSet)
+
+    # solveDict: map of relation to dict of solutions; inferDict: the resulting "answer" dict;
+    # usedRelations: used to ignore relations higher in the recursion stack
+    def _recursiveSolve(self, solveDict, inferDict=None, usedRelations=None):
+        if inferDict is None:
+            # this will be the "result"
+            inferDict = dict()
+        if usedRelations is None:
+            usedRelations = set()
+        
+        resultDict = dict()
+        for relation in solveDict:
+            if relation in usedRelations:
+                continue
+            
+            solutions = solveDict[relation]
+            usedRelations.add(relation)
+            for var in solutions:
+                solutionList = solutions[var]
+                if var not in inferDict:
+                    inferDict[var] = set()
+                # TODO: dict.update exists, is there one for set?
+                for sol in solutionList:
+                    inferDict[var].add(sol)
+                
+                newResultDict = self._recursiveSolve(solveDict, inferDict, usedRelations)
+                for newVar in newResultDict:
+                    resultDict[newVar] = newResultDict[newVar]
+                currSols = inferDict[var]
+                subSols = set()
+                for subSol in currSols:
+                    for subVar in resultDict:
+                        subSol = subSol.subs(subVar, resultDict[subVar])
+                    subSols.add(subSol)
+                resultDict[var] = subSols
+        return resultDict
 
 
 class InterpreterParser:
@@ -501,7 +577,8 @@ class InterpreterParser:
                         raise IndexError("Interpreter -> evaluateOperationList(opList) given bad opList")
                 if not issubclass(rightExpr.cls, Expressable):
                     raise RuntimeError("tried to evaluate operation list with a non-expressable (right-hand)")
-                newExpr = Represent(Expression, operStr, operFn, leftExpr, rightExpr)
+                leftRight = (leftExpr, rightExpr)
+                newExpr = Represent(Expression, operStr, operFn, leftRight)
                 opList.insert(0, newExpr)
             resultExpr = opList[0]
             return resultExpr
@@ -529,7 +606,7 @@ class InterpreterParser:
                 opList = opListPiece.obj
                 expr = evaluateOperationList(opList)
                 negOper = lambda x: -x
-                newExpr = Represent(Expression, '-', negOper, expr)
+                newExpr = Represent(Expression, '-', negOper, [expr])
                 newOpList = [newExpr]
                 piece = opListPiece.update(newOpList, tokens, [])
             elif branch == "ev":
@@ -798,29 +875,6 @@ class StackPieceTracer:
 
 
 class InterpreterDatabase:
-    @property
-    def _validDefinitionKeys(self):
-        return (
-            Identifier,
-        )
-    @property
-    def _validDefinitionVals(self):
-        return (
-            Numeric,
-            Template,
-        )
-    @property
-    def _validInferenceKeys(self):
-        return (
-            Identifier,
-            Variable,
-        )
-    @property
-    def _validInferenceVals(self):
-        return (
-            Expressable,
-        )
-
     def __init__(self):
         self._assertEqDictKeys()
         
@@ -831,25 +885,33 @@ class InterpreterDatabase:
             return self._settingDefinition
         def inferences(key, value):
             return self._settingInference
+        def relations(key, value):
+            return isinstance(key, Relation)
 
+        # defs retains definition order; dict retains all data (including inferred)
+        self._defs = list()
         self._dict = FilteredDict(
             definitions,
             inferences,
+            relations,
         )
 
     # working with definitions...
-    def define(self, identifier, value):
-        self._checkKeysVals([identifier], [value], "definitions")
-        
-        self._settingDefinition = True
-        self._dict[identifier] = value
-        self._settingDefinition = False
+    def setDefinition(self, identifier, values):
+        if not isinstance(identifier, (Identifier, Variable)):
+            raise TypeError("setDefinition() can only set definitions for an Identifier() or Variable()")
+        if not isinstance(values, (Template, set)):
+            raise TypeError("setDefinition() can only set definitions to a set")
+        if isinstance(values, set):
+            for value in values:
+                if not isinstance(value, Numeric):
+                    raise TypeError("setDefinition() can only take sets of Numeric()s")
 
-    def updateDefinitions(self, identifiers, values):
-        pairs = self._checkKeysVals(identifiers, values, "definitions")
+        if identifier not in self._dict:
+            self._addDef(identifier)
         
         self._settingDefinition = True
-        self._dict.update(pairs)
+        self._dict[identifier] = values
         self._settingDefinition = False
 
     def getDefinition(self, identifier):
@@ -858,19 +920,33 @@ class InterpreterDatabase:
     def isDefined(self, identifier):
         return identifier in self._dict.filter("definitions")
 
+    # working with relations...
+    def defineRelation(self, relation, solutions):
+        if not isinstance(relation, Relation):
+            raise TypeError("defineRelation() only takes a Relation() argument")
+
+        if relation not in self._dict:
+            self._addDef(relation)
+        self._dict[relation] = solutions
+    
+    def getRelationSolutions(self, relation):
+        return self._dict.filter("relations").get(relation)
+
+    def iterateRelations(self):
+        return self._dict.filter("relations").keys()
+
     # working with inferences...
-    def setInference(self, identifier, value):
-        self._checkKeysVals([identifier], [value], "inferences")
+    def setInference(self, identifier, values):
+        if not isinstance(identifier, (Identifier, Variable)):
+            raise TypeError("setInference() can only set inferences for an Identifier() or Variable()")
+        if not isinstance(values, set):
+            raise TypeError("setInference() can only set inferences to Python sets")
+        for value in values:
+            if not isinstance(value, Expressable):
+                raise TypeError("setInference() can only take sets of Expressable()s")
 
         self._settingInference = True
-        self._dict[identifier] = value
-        self._settingInference = False
-
-    def updateInferences(self, identifiers, values):
-        pairs = self._checkKeysVals(identifiers, values, "inferences")
-
-        self._settingInference = True
-        self._dict.update(pairs)
+        self._dict[identifier] = values
         self._settingInference = False
 
     def getInference(self, identifier):
@@ -887,42 +963,24 @@ class InterpreterDatabase:
         return identifier in self._dict
 
     def _assertEqDictKeys(self):
-        validKeyLists = (
-            self._validDefinitionKeys,
-            self._validInferenceKeys,
-        )
         objs = {
             Identifier: ('name',),
             Variable: (Identifier('name'),),
         }
-        for validKeyList in validKeyLists:
-            for idx1 in range(len(validKeyList)):
-                cls1 = validKeyList[idx1]
-                args1 = objs[cls1]
-                newObj1 = cls1(*args1)
-                for idx2 in range(len(validKeyList)):
-                    cls2 = validKeyList[idx2]
-                    args2 = objs[cls2]
-                    newObj2 = cls2(*args2)
-                    # both __eq__ and __hash__ are required to be dictionary keys
-                    assert newObj1 == newObj2, "{} and {} are not equivelant dictionary keys".format(newObj1, newObj2)
-                    assert hash(newObj1) == hash(newObj2), "{} and {} are not same-hash dictionary keys".format(newObj1, newObj2)
+        for cls1 in objs:
+            args1 = objs[cls1]
+            newObj1 = cls1(*args1)
+            for cls2 in objs:
+                args2 = objs[cls2]
+                newObj2 = cls2(*args2)
+                # both __eq__ and __hash__ are required to be dictionary keys
+                assert newObj1 == newObj2, "{} and {} are not equivelant dictionary keys".format(newObj1, newObj2)
+                assert hash(newObj1) == hash(newObj2), "{} and {} are not same-hash dictionary keys".format(newObj1, newObj2)
                     
     def _checkKeysVals(self, keys, values, settingType):
         if settingType not in ("definitions", "inferences"):
-            raise TypeError("Database cannot check keys/vals for {}".format(settingType))
+            raise ValueError("Database cannot check keys/vals for {}".format(settingType))
         
-        try:
-            # this tests both if the values are iterable, and it prevents
-            # consuming generators for the calling function
-            trying = "keys"
-            keys = list(keys)
-            trying = "values"
-            values = list(values)
-        except TypeError as e:
-            if "is not iterable" in str(e):
-                raise TypeError("database tried to mass-insert {} but was not given an iterable".format(trying))
-
         if settingType == "definitions":
             validKeys = self._validDefinitionKeys
             validVals = self._validDefinitionVals
@@ -938,31 +996,13 @@ class InterpreterDatabase:
             if not isinstance(value, validVals):
                 validValNames = ', '.join(repr(key) for key in validVals)
                 raise TypeError("database tried to insert value that was not one of these: {}".format(validValNames))
-        return zip(keys, values)
+        if len(keys) != len(values):
+            raise ValueError("database tried to insert keys/values of different lengths")
 
-    # substitutes known/inferred values into a given object
-    # (defined/inferred are forced-kwargs)
-    def substitute(self, subsable, *args, defined=True, inferred=True):
-        if len(args) != 0:
-            numArgs = len(args) + 1
-            raise TypeError("substitute() takes 1 positional argument but {} were given".format(numArgs))
-        if not isinstance(subsable, StructureBase):
-            raise TypeError("substitute(subsable) -- subsable must be a subclass of StructureBase()")
-        
-        if not isinstance(subsable, Substitutable):
-            return subsable
-        
-        if defined and inferred:
-            substDict = self._dict
-        elif not inferred:
-            substDict = self._dict.filter("defined")
-        elif not defined:
-            substDict = self._dict.filter("inferences")
-        else:
-            raise ValueError("substitute(defined=False, inferred=False) -- one kwarg must be True!")
-
-        substituted = subsable.substitute(substDict)
-        return substituted
+    # this should only be used after obj is checked (using _checkKeysVals())
+    def _addDef(self, obj):
+        pair = (len(self._defs), obj)
+        self._defs.append(pair)
 
 
 # a dictionary in every way, with an added filter() function
