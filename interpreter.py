@@ -962,6 +962,167 @@ class InterpreterDatabase:
     def doesExist(self, identifier):
         return identifier in self._dict
 
+    # substitutes known/inferred values into a given object
+    # (defined/inferred are forced-kwargs)
+    def substitute(self, expr, ignoreVars=None):
+        if not isinstance(expr, Expressable):
+            raise TypeError("substitute(expr) -- expr must be an Expressable()")
+        
+        if isinstance(expr, Numeric):
+            return {expr}
+        elif isinstance(expr, Variable):
+            variables = [expr]
+        elif isinstance(expr, Containable):
+            variables = expr.iterateType(Variable)
+
+        if ignoreVars is None:
+            ignoreVars = set()
+        final = {expr}
+        for var in variables:
+            if var in ignoreVars:
+                continue
+            # ignoreVars.add(var)
+            varSubSet = self._dict[var]
+            assert isinstance(varSubSet, set), "substitute() tried working with non-expression-like"
+            subExprSet = self._substituteUntilNumeric(var, ignoreVars)
+            didAnySubs = False
+            if subExprSet is not None:
+                for subExpr in subExprSet:
+                    if subExpr != var:
+                        didAnySubs = True
+                        break
+            finalWithVarSub = set()
+            for expr in final:
+                if didAnySubs:
+                    for num in subExprSet:
+                        subExpr = expr.substitute({var: num})
+                        finalWithVarSub.add(subExpr)
+                else:
+                    for varSub in varSubSet:
+                        subExpr = expr.substitute({var: varSub})
+                        finalWithVarSub.add(subExpr)
+            final = finalWithVarSub
+
+        return final
+
+    def _substituteUntilNumeric(self, expr, usedVars=None):
+        if usedVars is None:
+            usedVars = set()
+        
+        if isinstance(expr, Numeric):
+            return {expr}
+        
+        if isinstance(expr, Containable):
+            varsInExpr = expr.iterateType(Variable)
+        elif isinstance(expr, Variable):
+            varsInExpr = [expr]
+        finalSubSet = {expr}
+        for var in varsInExpr:
+            # if inferring a variable brings us back to itself,
+            # it has no numeric value (if b = d*e, then d = b/e,
+            # which means b = (b/e)*e; b is repeated here, so we stop)
+            if var in usedVars:
+                return None
+            nextUsedVars = set(usedVars)
+            nextUsedVars.add(var)
+            
+            # there is an 'OR' relationship between different solutions;
+            # if a = {b*c, 2, -2}, then we know a = {-2, 2} and can infer b and c
+            asManyNumsAsPossible_exprSet = set()
+            varSubSet = self._dict[var]
+            for subExpr in varSubSet:
+                if isinstance(subExpr, Numeric):
+                    asManyNumsAsPossible_exprSet.add(subExpr)
+            
+            # if a variable doesn't contain numeric solutions,
+            # substitute as much as possible for each expression
+            subsContainNums = len(asManyNumsAsPossible_exprSet) > 0
+            if not subsContainNums:
+                # (numSet is still empty set)
+                for subExpr in varSubSet:
+                    subExprWithNumsSet = self._substituteUntilNumeric(subExpr, nextUsedVars)
+                    if subExprWithNumsSet is not None:
+                        for subExprWithNums in subExprWithNumsSet:
+                            asManyNumsAsPossible_exprSet.add(subExprWithNums)
+                    else:
+                        asManyNumsAsPossible_exprSet.add(subExpr)
+                noSubsMade = varSubSet == asManyNumsAsPossible_exprSet
+                if noSubsMade:
+                    continue # to next var, to avoid overcomplication
+                    # ex. a = b + c, b = d*e;
+                    # sub(a) should not return {d*e + c}
+            
+            noSubsWillBeMade = len(asManyNumsAsPossible_exprSet) == 0
+            if noSubsWillBeMade:
+                continue # to avoid setting finalSubSet to empty set
+            anySubsMade = True
+            nextSubIteration = set()
+            for partiallySubExpr in finalSubSet:
+                for asManyNumsAsPossible_expr in asManyNumsAsPossible_exprSet:
+                    moreSubExpr = partiallySubExpr.substitute({var: asManyNumsAsPossible_expr})
+                    nextSubIteration.add(moreSubExpr)
+                finalSubSet = nextSubIteration
+        if len(finalSubSet) == 0:
+            # this error is evidence that a child substitute call was handled incorrectly
+            raise RuntimeError("substituteUntilNumeric() -- Can't return empty sets")
+        return finalSubSet
+
+    # TODO: not sure if this is needed...
+    def _dictCombos(self):
+        dictCombo = dict()
+        # first loop initializes
+        for defVar in self._dict.filter("definitions"):
+            defSym = sympy.Symbol(str(defVar))
+            defSubSet = self._dict[defVar]
+            for defSub in defSubSet:
+                defSubSym = str(defSub)
+                dictCombo[defSym] = defSubSym
+                break
+        for infVar in self._dict.filter("inferences"):
+            infSym = sympy.Symbol(str(infVar))
+            infSubSet = self._dict[infVar]    
+            for infSub in infSubSet:
+                infSubSym = str(infSub)
+                dictCombo[infSym] = infSubSym
+                break
+        # second loop goes through all permutations
+        defLen = len(self._dict.filter("definitions"))
+        infLen = len(self._dict.filter("inferences"))
+        if defLen > 0:
+            if infLen > 0:
+                for defVar in self._dict.filter("definitions"):
+                    defSym = sympy.Symbol(str(defVar))
+                    defSubSet = self._dict[defVar]
+                    for infVar in self._dict.filter("inferences"):
+                        infSym = sympy.Symbol(str(infVar))
+                        infSubSet = self._dict[infVar]
+                        for defSub in defSubSet:
+                            defSubSym = str(defSub)
+                            dictCombo[defSym] = defSubSym
+                            for infSub in infSubSet:
+                                infSubSym = str(infSub)
+                                dictCombo[infSym] = infSubSym
+                                yield dictCombo
+            elif infLen == 0:
+                for defVar in self._dict.filter("definitions"):
+                    defSym = sympy.Symbol(str(defVar))
+                    defSubSet = self._dict[defVar]
+                    for defSub in defSubSet:
+                        defSubSym = str(defSub)
+                        dictCombo[defSym] = defSubSym
+                        yield dictCombo
+        elif defLen == 0:
+            if infLen > 0:
+                for infVar in self._dict.filter("inferences"):
+                    infSym = sympy.Symbol(str(infVar))
+                    infSubSet = self._dict[infVar]
+                    for infSub in infSubSet:
+                        infSubSym = str(infSub)
+                        dictCombo[infSym] = infSubSym
+                        yield dictCombo
+            elif infLen == 0:
+                return # aint nothin to substitute
+
     def _assertEqDictKeys(self):
         objs = {
             Identifier: ('name',),
