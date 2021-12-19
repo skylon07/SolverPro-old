@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod, abstractproperty
 from math import log10
 import string
-from typing import Type
 
-import sympy # for type checking
+import sympy
 
 
 # abstract class that gives a blueprint for repr strings for objects
@@ -54,7 +53,7 @@ class Substitutable(Hashable, ABC):
 # something that "contains" other types
 class Containable(Substitutable, ABC):
     def iterateType(self, instanceType):
-        if type(instanceType) is not type:
+        if not isinstance(instanceType, type):
             raise TypeError("iterateType() can only test against types (class identifiers, builtins, etc)")
 
         iterable  = self._allOfType(instanceType)
@@ -134,9 +133,10 @@ class Factory(Containable, ABC):
 class FactoryRecipe(Containable, ABC):
     # subclasses must define __init__ to call this one
     @abstractmethod
-    def __init__(self, factoryInstance, *params):
+    def __init__(self, factoryInstance, params):
         if not isinstance(factoryInstance, Factory):
             raise TypeError("FactoryRecipe() must be given a Factory() as first argument")
+        params = tuple(params)
         if len(params) != len(factoryInstance.parameters):
             raise ValueError("FactoryRecipe() received the wrong number of parameters")
         
@@ -198,9 +198,6 @@ class Expressable(Symbolable, ABC):
     def __unaryOperate(self, operFn, operRep):
         if isinstance(self, Numeric):
             return Numeric(operFn(self.value))
-        # elif isinstance(self, SolutionSet):
-        #     mapping = (operFn(expr) for expr in self)
-        #     return SolutionSet(mapping)
         return Expression(operRep, operFn, self)
     
     def __binaryOperate(self, other, operFn, operRep):
@@ -211,22 +208,8 @@ class Expressable(Symbolable, ABC):
             newVal = operFn(self.value, other.value)
             return Numeric(newVal)
         
-        # elif isinstance(self, SolutionSet):
-        #     if isinstance(other, SolutionSet):
-        #         mapping = (
-        #             operFn(selfVal, otherVal)
-        #             for selfVal in self
-        #             for otherVal in other
-        #         )
-        #     else:
-        #         mapping = (operFn(value, other) for value in self)
-        #     return SolutionSet(mapping)
-        # elif isinstance(other, SolutionSet):
-        #     # set "other" to "self" and perform above operations
-        #     return other.__binaryOperate(self, operFn)
-        
         else:
-            return Expression(operRep, operFn, self, other)
+            return Expression(operRep, operFn, [self, other])
 
     # python overloading of operation functions
     def __neg__(self):
@@ -266,13 +249,6 @@ class StructureBase(Displayable, Hashable, ABC):
     @abstractmethod
     def __str__(self):
         return # an equivelantly UNIQUE str (unique unless equal)
-
-
-# base class for sets of substitutables
-class StructureSet(StructureBase, Containable, Expressable, ABC):
-    @abstractmethod
-    def __iter__(self):
-        yield # all elements of the set
 
 
 class Identifier(Substitutable, StructureBase):
@@ -386,13 +362,13 @@ class Variable(Expressable, Substitutable, StructureBase):
 
 
 class TemplateCall(Expressable, FactoryRecipe, StructureBase):
-    def __init__(self, callId, templateInstance, *params):
+    def __init__(self, callId, templateInstance, params):
         if not isinstance(callId, Identifier):
             raise TypeError("TemplateCall() can only use Identifier()s as an identifier")
         if not isinstance(templateInstance, Template):
             raise TypeError("TemplateCall() can only be used with Template() instances")
         
-        super().__init__(templateInstance, *params)
+        super().__init__(templateInstance, params)
         self._callId = callId
 
     @property
@@ -404,8 +380,8 @@ class TemplateCall(Expressable, FactoryRecipe, StructureBase):
         return "TemplateCall"
 
     def __str__(self):
-        paramsStrs = (str(param) for param in self.params)
-        return "{}({})".format(self._callId, ','.join(paramsStrs))
+        paramStrs = (str(param) for param in self.params)
+        return "{}({})".format(self._callId, ','.join(paramStrs))
 
     def _selfAsSymbol(self):
         raise RuntimeError("Interpreter should have evaluated this out before symbol-ing an expression")
@@ -430,8 +406,9 @@ class TemplateCall(Expressable, FactoryRecipe, StructureBase):
         return TemplateCall(self.template, evalParams).evaluate()
 
 
+# TODO: make a distinction between expression with/without templates
 class Expression(Expressable, Containable, StructureBase):
-    def __init__(self, operRep, operFn, *expressables):
+    def __init__(self, operRep, operFn, expressables):
         if type(operRep) is not str:
             raise TypeError("Expression() must be given a string representation of its operFn")
         if not callable(operFn):
@@ -578,13 +555,27 @@ class Relation(Symbolable, Containable, StructureBase):
     def __str__(self):
         return "{} = {}".format(self._leftExpr, self._rightExpr)
 
-    @property
-    def left(self):
-        return self._leftExpr
+    def solve(self, varOrId):
+        if not isinstance(varOrId, (Identifier, Variable)):
+            raise TypeError("Relation.solve() take a variable or id argument")
 
-    @property
-    def right(self):
-        return self._rightExpr
+        leftSym = self._leftExpr.asSymbol()
+        rightSym = self._rightExpr.asSymbol()
+        eqSym = leftSym - rightSym
+        varSym = varOrId.asSymbol()
+        solutions = sympy.solve(eqSym, varSym)
+        # some assumptions I made after (a little) testing
+        assert type(solutions) is list, "solutions are given in list format"
+        for solution in solutions:
+            assert isinstance(solution, sympy.Expr), "solutions are all sympy.Expr instances"
+        return solutions
+
+    def solveAll(self):
+        solutions = dict()
+        for var in self.iterateType(Variable):
+            if var not in solutions:
+                solutions[var] = self.solve(var)
+        return solutions
     
     # returns symbol that is assumed equal to zero
     def _selfAsSymbol(self):
@@ -615,7 +606,6 @@ class Relation(Symbolable, Containable, StructureBase):
         elif isinstance(self._rightExpr, instanceType):
             return True
         return False
-        
 
     def _allOfType(self, instanceType):
         if isinstance(self._leftExpr, Containable):
@@ -688,29 +678,33 @@ if __name__ == "__main__":
         Variable(Identifier('myVar'))
     ))
     print(repr(
-        TemplateCall(Template([], Numeric(3.141592)))
+        TemplateCall(Identifier("id"), Template([], Numeric(3.141592)), [])
     ))
     print(repr(
         Expression(
             '-',
             lambda x: -x,
-            Variable(Identifier('a')),
+            [Variable(Identifier('a'))],
         )
     ))
     print(repr(
         Expression(
             '*',
             lambda x, y: x * y,
-            Variable(Identifier('a')),
-            Variable(Identifier('b')),
+            [
+                Variable(Identifier('a')),
+                Variable(Identifier('b')),
+            ],
         )
     ))
     print(repr(
         Expression(
             '-',
             lambda x, y: x - y,
-            Variable(Identifier('a')),
-            Variable(Identifier('b')),
+            [
+                Variable(Identifier('a')),
+                Variable(Identifier('b')),
+            ],
         )
     ))
     print(repr(
