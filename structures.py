@@ -178,7 +178,7 @@ class FactoryRecipe(Containable, ABC):
                 for instance in param.iterateType(instanceType):
                     yield instance
             elif isinstance(param, instanceType):
-                yield instance
+                yield param
 
 
 # represents anything that can be converted to a sympy object (or list of such)
