@@ -15,6 +15,14 @@ class Interpreter:
 
         self._parser = InterpreterParser()
         self._database = InterpreterDatabase()
+        self._initializeBuiltins()
+
+    # TODO: error when trying to redefine builtins
+    def _initializeBuiltins(self):
+        self._database.setDefinition(Identifier('sqrt'), Template(
+            [Identifier('x')],
+            SqrtExpression(Variable(Identifier('x'))),
+        ))
 
     # treats the string as user input
     def executeLine(self, string):
@@ -328,11 +336,14 @@ class Interpreter:
         self._print("(Internal error) {}: {}".format(type(e).__name__, e))
         return False
 
-    # TODO: remove if not used
     def _convertSympy(self, sympyExpr):
-        parseResult = self._parser.evaluateLine(str(sympyExpr))
+        exprStr = str(sympyExpr)
+        exprStr = exprStr.replace('**', '^')
+        parseResult = self._parser.evaluateLine(exprStr)
         exprRep = parseResult["expression"].obj
         expr = self._evalRep(exprRep)
+        # needed to process sympy sqrt()
+        expr = self._evalTemplates(expr)
         return expr
 
     def _updateInferences(self):
@@ -515,7 +526,7 @@ class InterpreterParser:
             elif branch == "nu":
                 piece = popStack("numbers")
             elif branch == "fu PAO tes PAC":
-                self._throwBranchNotImplemented("template evaluations")
+                # self._throwBranchNotImplemented("template evaluations")
                 paramsPiece = popStack("expressions")
                 namePiece = popStack("identifiers")
                 exprParams = paramsPiece.obj
@@ -524,7 +535,7 @@ class InterpreterParser:
                 piece = paramsPiece.update(templateResult, tokens, namePiece.traces)
                 piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
             elif branch == "fu PAO PAC":
-                self._throwBranchNotImplemented("template evaluations")
+                # self._throwBranchNotImplemented("template evaluations")
                 namePiece = popStack("identifiers")
                 exprParams = []
                 nameId = namePiece.obj
@@ -1000,6 +1011,8 @@ class InterpreterDatabase:
                 else:
                     for varSub in varSubSet:
                         subExpr = expr.substitute({var: varSub})
+                        # TODO: simplify subExpr
+                        #       (say a + b = 4; a + b -> 4 - b + b)
                         finalWithVarSub.add(subExpr)
             final = finalWithVarSub
 
@@ -1055,7 +1068,6 @@ class InterpreterDatabase:
             noSubsWillBeMade = len(asManyNumsAsPossible_exprSet) == 0
             if noSubsWillBeMade:
                 continue # to avoid setting finalSubSet to empty set
-            anySubsMade = True
             nextSubIteration = set()
             for partiallySubExpr in finalSubSet:
                 for asManyNumsAsPossible_expr in asManyNumsAsPossible_exprSet:

@@ -408,6 +408,7 @@ class TemplateCall(Expressable, FactoryRecipe, StructureBase):
 
 
 # TODO: make a distinction between expression with/without templates
+# TODO: make factory functions (add, sub, sqrt) to generate Expressables
 class Expression(Expressable, Containable, StructureBase):
     def __init__(self, operRep, operFn, expressables):
         if type(operRep) is not str:
@@ -537,6 +538,47 @@ class Expression(Expressable, Containable, StructureBase):
 
         # (this number includes keyword arguments)
         return fn.__code__.co_argcount
+
+
+class SqrtExpression(Expression):
+    def __init__(self, expressable):
+        sqrtOper = lambda x: x ** 0.5
+        operRepThatWontBeUsed = "(SQUARE_ROOT_REPR_OVERRIDES_THIS)"
+        super().__init__(operRepThatWontBeUsed, sqrtOper, [expressable])
+        
+        self._sqrtOper = sqrtOper
+        self._sqrtExpr = expressable
+
+    @property
+    def _reprName(self):
+        return "SqrtExpression"
+
+    def __str__(self):
+        return "√({})".format(self._sqrtExpr)
+
+    def _selfAsSymbol(self):
+        exprSym = self._sqrtExpr.asSymbol()
+        return sympy.sqrt(exprSym)
+
+    def _substituteSelf(self, substDict):
+        if isinstance(self._sqrtExpr, Substitutable):
+            subExpr = self._sqrtExpr.substitute(substDict)
+            if isinstance(subExpr, Numeric):
+                num = subExpr.asSymbol()
+                return Numeric(num ** 0.5)
+            return SqrtExpression(subExpr)
+        else:
+            return self
+
+    def evaluateRecipes(self):
+        if isinstance(self._sqrtExpr, Containable):
+            evalExpr = self._sqrtExpr.evaluateRecipes()
+            if isinstance(evalExpr, Numeric):
+                num = evalExpr.asSymbol()
+                return Numeric(num ** 0.5)
+            return SqrtExpression(evalExpr)
+        else:
+            return self
 
 
 class Relation(Symbolable, Containable, StructureBase):
@@ -722,4 +764,7 @@ if __name__ == "__main__":
             Variable(Identifier('left')),
             Variable(Identifier('right')),
         ))
+    ))
+    print(repr(
+        SqrtExpression(Numeric(4))
     ))
