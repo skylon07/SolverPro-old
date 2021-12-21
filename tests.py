@@ -1669,6 +1669,17 @@ class TestSuites:
             "4",
             "evaluates the template alias when the relation is instantiated, not when the relation is checked (aka result here should not be 2)",
         )
+        resetState()
+        testLineOnInterpreter(
+            "a = b",
+            None,
+            "can create one-on-one relations",
+        )
+        testLineOnInterpreter(
+            "a - a + a",
+            "b",
+            "can simplify expressions",
+        )
         Tester.stopIfFailed()
 
         # ensure interpreter catches contradictions
