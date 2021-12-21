@@ -544,6 +544,7 @@ class Expression(Expressable, Containable, StructureBase):
         return fn.__code__.co_argcount
 
 
+# TODO: (remove when unused)
 class SqrtExpression(Expression):
     def __init__(self, expressable):
         sqrtOper = lambda x: x ** 0.5

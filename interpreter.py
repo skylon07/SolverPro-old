@@ -21,6 +21,7 @@ class Interpreter:
     def _initializeBuiltins(self):
         self._database.setDefinition(Identifier('sqrt'), Template(
             [Identifier('x')],
+            # TODO: shouldn't this really just be an Expression()?
             SqrtExpression(Variable(Identifier('x'))),
         ))
 
@@ -347,47 +348,24 @@ class Interpreter:
         return expr
 
     def _updateInferences(self):
-        solutions = {rel: self._database.getRelationSolutions(rel) for rel in self._database.iterateRelations()}
-        finalSolutionDict = self._recursiveSolve(solutions)
-        for var in finalSolutionDict:
-            solSetSyms = finalSolutionDict[var]
-            solSet = set(self._convertSympy(sol) for sol in solSetSyms)
+        combinedSolutions = self._combineSolutions(self._database.iterateRelations())
+        # TODO: there should be a more efficient update method instead of
+        #       (re)setting all variables (that won't work when a relation is removed)
+        for var in combinedSolutions:
+            solSet = combinedSolutions[var]
             self._database.setInference(var, solSet)
 
-    # solveDict: map of relation to dict of solutions; inferDict: the resulting "answer" dict;
-    # usedRelations: used to ignore relations higher in the recursion stack
-    def _recursiveSolve(self, solveDict, inferDict=None, usedRelations=None):
-        if inferDict is None:
-            # this will be the "result"
-            inferDict = dict()
-        if usedRelations is None:
-            usedRelations = set()
-        
+    def _combineSolutions(self, relations):
         resultDict = dict()
-        for relation in solveDict:
-            if relation in usedRelations:
-                continue
-            
-            solutions = solveDict[relation]
-            usedRelations.add(relation)
-            for var in solutions:
-                solutionList = solutions[var]
-                if var not in inferDict:
-                    inferDict[var] = set()
-                # TODO: dict.update exists, is there one for set?
-                for sol in solutionList:
-                    inferDict[var].add(sol)
-                
-                newResultDict = self._recursiveSolve(solveDict, inferDict, usedRelations)
-                for newVar in newResultDict:
-                    resultDict[newVar] = newResultDict[newVar]
-                currSols = inferDict[var]
-                subSols = set()
-                for subSol in currSols:
-                    for subVar in resultDict:
-                        subSol = subSol.subs(subVar, resultDict[subVar])
-                    subSols.add(subSol)
-                resultDict[var] = subSols
+        for relation in relations:
+            allSolutionsAsSyms = relation.solveAll()
+            for var in allSolutionsAsSyms:
+                if var not in resultDict:
+                    resultDict[var] = set()
+                solutionsAsSyms = allSolutionsAsSyms[var]
+                for solutionSym in solutionsAsSyms:
+                    solution = self._convertSympy(solutionSym)
+                    resultDict[var].add(solution)
         return resultDict
 
 
