@@ -129,7 +129,6 @@ class Factory(Containable, ABC):
         raise RuntimeError("Factory() tried to evaluate recipes before substituting")
 
 
-
 class FactoryRecipe(Containable, ABC):
     # TODO: could (should) probably abstract __ranInit to decorators
     #       "requiredCall" and "ensuredCall"
@@ -395,7 +394,7 @@ class TemplateCall(Expressable, FactoryRecipe, StructureBase):
                 else param
             for param in self.params
         ]
-        return TemplateCall(self.template, subParams)
+        return TemplateCall(self._callId, self.template, subParams)
 
     def evaluateRecipes(self):
         evalParams = [
@@ -405,7 +404,7 @@ class TemplateCall(Expressable, FactoryRecipe, StructureBase):
             for param in self.params
         ]
         # evaluate self for parent container
-        return TemplateCall(self.template, evalParams).evaluate()
+        return TemplateCall(self._callId, self.template, evalParams).evaluate()
 
 
 # TODO: make a distinction between expression with/without templates
