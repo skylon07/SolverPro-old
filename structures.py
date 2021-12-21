@@ -457,15 +457,19 @@ class Expression(Expressable, Containable, StructureBase):
         leftStr = str(leftExpr)
         rightStr = str(rightExpr)
         if isinstance(leftExpr, Expression):
-            precedenceLeft = opInfo[leftExpr._operStr][0]
-            if precedenceSelf > precedenceLeft:
-                # preserve order of operations
-                leftStr = '({})'.format(leftStr)
+            leftIsBinary = len(leftExpr._exprs) == 2
+            if leftIsBinary:
+                precedenceLeft = opInfo[leftExpr._operStr][0]
+                if precedenceSelf > precedenceLeft:
+                    # preserve order of operations
+                    leftStr = '({})'.format(leftStr)
         if isinstance(rightExpr, Expression):
-            precedenceRight = opInfo[rightExpr._operStr][0]
-            if precedenceSelf > precedenceRight:
-                # preserve order of operations
-                rightStr = '({})'.format(rightStr)
+            rightIsBinary = len(rightExpr._exprs) == 2
+            if rightIsBinary:
+                precedenceRight = opInfo[rightExpr._operStr][0]
+                if precedenceSelf > precedenceRight:
+                    # preserve order of operations
+                    rightStr = '({})'.format(rightStr)
         
         if precedenceSelf == 1:
             # a + b   a - b
