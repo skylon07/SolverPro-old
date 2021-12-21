@@ -131,6 +131,8 @@ class Factory(Containable, ABC):
 
 
 class FactoryRecipe(Containable, ABC):
+    # TODO: could (should) probably abstract __ranInit to decorators
+    #       "requiredCall" and "ensuredCall"
     # subclasses must define __init__ to call this one
     @abstractmethod
     def __init__(self, factoryInstance, params):
