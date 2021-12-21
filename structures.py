@@ -198,7 +198,7 @@ class Expressable(Symbolable, ABC):
     def __unaryOperate(self, operFn, operRep):
         if isinstance(self, Numeric):
             return Numeric(operFn(self.value))
-        return Expression(operRep, operFn, self)
+        return Expression(operRep, operFn, [self])
     
     def __binaryOperate(self, other, operFn, operRep):
         if not isinstance(other, Expressable):
