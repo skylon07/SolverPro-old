@@ -9,7 +9,7 @@ parser = Parser()
 from interpreter import Interpreter
 def printIndented(*args):
     # first arg is left alone (for traceback errors)
-    joinedArgs = ('\n' + INDENT).join(args)
+    joinedArgs = ('\n' + INDENT).join((str(arg) for arg in args))
     print(joinedArgs)
 interpreter = Interpreter(printIndented)
 

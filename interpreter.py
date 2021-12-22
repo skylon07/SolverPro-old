@@ -15,7 +15,15 @@ class Interpreter:
 
         self._parser = InterpreterParser()
         self._database = InterpreterDatabase()
+        self._initializeSympy()
         self._initializeBuiltins()
+
+    # this helps cut out the initial lag Sympy seems to have...
+    def _initializeSympy(self):
+        a = sympy.Symbol('a')
+        b = sympy.Symbol('b')
+        return a + b * a ** b
+
 
     # TODO: error when trying to redefine builtins
     def _initializeBuiltins(self):
