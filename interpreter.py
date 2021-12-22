@@ -322,8 +322,9 @@ class Interpreter:
 
     # I/O helper functions
     def _print(self, *args):
-        args = (str(arg) for arg in args)
-        self._outputFn(INDENT, *args, sep='')
+        args = [str(arg) for arg in args]
+        args[0] = INDENT + args[0]
+        self._outputFn(*args)
 
     def _handleError(self, e):
         parserErrors = (

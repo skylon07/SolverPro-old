@@ -7,7 +7,11 @@ from parser import Parser
 parser = Parser()
 
 from interpreter import Interpreter
-interpreter = Interpreter(print)
+def printIndented(*args):
+    # first arg is left alone (for traceback errors)
+    joinedArgs = ('\n' + INDENT).join(args)
+    print(joinedArgs)
+interpreter = Interpreter(printIndented)
 
 if __name__ == "__main__":
     while True:
