@@ -6,31 +6,18 @@ Hint: The errors are sorted in alphabetical order.
       You can also find them quickly by using Ctrl+F (Windows) or Command+F (Mac)
 
 
-        InvalidExpressionError
-"The variable ... cannot be evaluated in an expression"
-"The variables ... cannot be evaluated in an expression"
-    # TODO
-
-
         InterpreterNotImplementedError
-"SolverPro cannot process ... (yet)"
-    This means that you tried to use a feature that has not been finished, however it will be added
-    sometime in the future.
-
-
-        NotATemplateError
-"... is not defined as a template and cannot be evaluated as one"
-"... are not defined as templates and cannot be evaluated as such"
-    # TODO
+    "SolverPro cannot process ... (yet)"
+This means that you tried to use a feature that has not been finished, however it will be added
+sometime in the future.
 
 
         UndefinedIdentifierError
-"An undefined identifier was given: ..."
-"Undefined identifiers were given: ..."
-    # TODO
-
-
-        UnusedArgumentsWarning
-"Variable ... was not used in its template definition"
-"Variables ... were not used in their template definition"
-    # TODO
+    "An undefined identifier was given: ..."
+    "Undefined identifiers were given: ..."
+This error occurs in many scenarios. The most common scenario might be that you've tried to make an
+alias to something that doesn't exist.
+    |> a := 4
+    |> a_plus_b := a + b    # b is not defined yet!
+        UndefinedIdentifierError
+    |> b := 5               # must be set earlier to avoid error

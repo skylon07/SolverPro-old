@@ -301,7 +301,7 @@ class Interpreter:
                     modTrace["end"] = endToken.placementEnd
                     badTraces.append(modTrace)
         if len(badTraces) > 0:
-            raise TemplateCallMismatchError(badTraces)
+            raise TemplateMismatchError(badTraces)
 
     # warns when a template's arguments are not used in its definition
     def _ensureTemplateUses_REP(self, paramNamesPiece, rightHandPiece):
