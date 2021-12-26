@@ -1,0 +1,44 @@
+        InvalidExpressionError
+    "The variable ... cannot be evaluated in an expression"
+    "The variables ... cannot be evaluated in an expression"
+This error occurs when an identifier represents some kind of data that doesn't make sense to put in
+an expression. For example:
+    |> block := { width := 2, length := 3, height := 4 }
+    |> wheel := { radius := 3 }
+    |> block + wheel                # adding objects doesn't make sense
+        InvalidExpressionError
+    |> wheel.radius + block.length  # adding properties does, because they're numerics
+        6
+In this example, objects are used. However, this error could also happen in the case of unevaluated
+templates ('4 + template' instead of '4 + template(x)')
+
+
+        NotATemplateError
+    "... is not defined as a template and cannot be evaluated as one"
+    "... are not defined as templates and cannot be evaluated as such"
+When you see this error, it is because you attempted to evaluate an identifier like a template when
+it was not a template.
+    |> notATemplate := 5
+    |> notATemplate()
+        NotATemplateError
+    |> alsoNotATemplate := { length := 4, width := 5 }
+    |> alsoNotATemplate(5, notATemplate)
+        NotATemplateError
+
+
+        UnusedArgumentsWarning
+    "Variable ... was not used in its template definition"
+    "Variables ... were not used in their template definition"
+Like all warnings, this is not actually signaling a failed operation. Instead, it is displayed to
+inform people that a template was created successfully, but it did not use all the variables that
+the template was defined with.
+    |> add3(a, b, c) := a + b   # c is not used here; was this a mistake?
+        UnusedArgumentsWarning
+    |> add3(3, 4, 6)            # works, but it seems weird that you need '6' for c...
+        7
+
+The main reason for the creation of this warning was to notify people of a possible mistake in the
+template's definition. Since it is required for templates to evaluate all their defined variables
+(see "TemplateMismatchError"), it seems likely that any unused variables in the template definition
+were mistakenly forgotten. If for any reason they were intentionally forgotten, the warning can
+just be ignored.

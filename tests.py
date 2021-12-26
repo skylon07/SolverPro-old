@@ -616,6 +616,30 @@ class TestSuites:
             [lexer.types.E_NUMBER, lexer.types.E_NUMBER, lexer.types.NUMBER, lexer.types.IDENTIFIER, lexer.types.PLUS, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.IDENTIFIER, lexer.types.DASH, lexer.types.NUMBER, lexer.types.E_NUMBER, lexer.types.NUMBER, lexer.types.EOL],
             "can process scientific numbers with 'E' (little e cases)"
         )
+
+        results = lexer.process("1 2 3. 4.0 5.12 6.")
+        Tester.assertItersEqual(
+            results,
+            [T("1"), T("2"), T("3."), T("4.0"), T("5.12"), T("6."), EOL()],
+            "can process numbers with no period, single period and no 'rest', or single period with 'rest'",
+        )
+        Tester.assertItersEqual(
+            mapTokenType(results),
+            [lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.NUMBER, lexer.types.EOL],
+            "can process numbers with no period, single period and no 'rest', or single period with 'rest'",
+        )
+
+        results = lexer.process(".E+4 .1e5 4.E-7")
+        Tester.assertItersEqual(
+            results,
+            [T('.'), T("E"), T("+"), T("4"), T(".1e5"), T("4.E-7"), EOL()],
+            "can process E-numbers with different period combinations",
+        )
+        Tester.assertItersEqual(
+            mapTokenType(results),
+            [lexer.types.PERIOD, lexer.types.IDENTIFIER, lexer.types.PLUS, lexer.types.NUMBER, lexer.types.E_NUMBER, lexer.types.E_NUMBER, lexer.types.EOL],
+            "can process E-numbers with different period combinations",
+        )
         Tester.stopIfFailed()
 
         # test token error data
@@ -707,8 +731,8 @@ class TestSuites:
             resetOnDict()
 
         # ensure parser has error types
-        Tester.assertIs(type(parser.ParseError), type, "ensure parser has error types (ParseError)")
-        Tester.assertIs(type(parser.EOLError), type, "ensure parser has error types (EOLError)")
+        Tester.assertIs(isinstance(parser.ParseError, type), True, "ensure parser has error types (ParseError)")
+        Tester.assertIs(isinstance(parser.EOLError, type), True, "ensure parser has error types (EOLError)")
         Tester.stopIfFailed()
 
         # test bottom productions
@@ -1306,7 +1330,7 @@ class TestSuites:
     def Interpreter(cls):
         state = dict()
         def fakePrint(*args, **kwargs):
-            argsStrs = map(lambda arg: str(arg), args)
+            argsStrs = map(str, args)
             sep = kwargs.get('sep')
             sep = sep if sep is not None else ' '
             end = kwargs.get('end')
@@ -1380,17 +1404,17 @@ class TestSuites:
         
         testLineOnInterpreter(
             "someUndefinedVal",
-            (ISP + "^^^^^^^^^^^^^^^^", "rror", "ndefined"),
+            (ISP + "^^^^^^^^^^^^^^^^\n", "rror", "ndefined"),
             "errors when trying to access undefined values",
         )
         testLineOnInterpreter(
             "a := 4 + b",
-            (ISP + "         ^", "rror", "ndefined"),
+            (ISP + "         ^\n", "rror", "ndefined"),
             "errors when trying to access undefined values",
         )
         testLineOnInterpreter(
             "a := b + cc",
-            (ISP + "     ^   ^^", "rror", "ndefined"),
+            (ISP + "     ^   ^^\n", "rror", "ndefined"),
             "errors when trying to access undefined values (printing arrows for all undefined values)",
         )
         resetState()
@@ -1450,6 +1474,25 @@ class TestSuites:
         resetState()
         Tester.stopIfFailed()
 
+        # test comments
+        testLineOnInterpreter(
+            "val := 2 # comment",
+            None,
+            "can set values with comments",
+        )
+        testLineOnInterpreter(
+            "val # comment",
+            "2",
+            "can print stored values with comments",
+        )
+        testLineOnInterpreter(
+            "val * 7 # comment",
+            "14",
+            "can evaluate expressions with comments",
+        )
+        resetState()
+        Tester.stopIfFailed()
+
         # test template aliases (creation only)
         testLineOnInterpreter(
             "alias() := 4",
@@ -1505,22 +1548,27 @@ class TestSuites:
         testLineOnInterpreter(
             "alias",
             "(x, y) -> 4 + 5",
-            "overwriting myTemplate (previously an alias for 'alias') does not change 'alias'"
+            "overwriting myTemplate (previously an alias for 'alias') does not change 'alias'",
         )
         testLineOnInterpreter(
             "myTemplate",
             "() -> sqrt(global)",
-            "does not replace 'sqrt(' in instances of referencing definitions"
+            "does not replace 'sqrt(' in instances of referencing definitions",
         )
         testLineOnInterpreter(
             "4 + myTemplate",
-            ("rror", "xpression", "ariable"),
-            "errors when trying to operate on template reference"
+            (ISP + "    ^^^^^^^^^^\n", "rror", "xpression", "ariable"),
+            "errors when trying to operate on template reference",
+        )
+        testLineOnInterpreter(
+            "myTemplate ^ 2",
+            (ISP + "^^^^^^^^^^\n", "rror", "xpression", "ariable"),
+            "errors when trying to operate on template reference (template first)",
         )
         testLineOnInterpreter(
             "-myTemplate",
-            ("rror", "xpression", "ariable"),
-            "errors when trying to negate a template reference"
+            (ISP + " ^^^^^^^^^^\n", "rror", "xpression", "ariable"),
+            "errors when trying to negate a template reference",
         )
         resetState()
         Tester.stopIfFailed()
@@ -1529,7 +1577,7 @@ class TestSuites:
         testLineOnInterpreter(
             "a = b + c",
             None,
-            "can create basic relations"
+            "can create basic relations",
         )
         testLineOnInterpreter(
             "b = d * e",
@@ -1544,7 +1592,7 @@ class TestSuites:
         testLineOnInterpreter(
             "c",
             "a - b",
-            "can print relations based on solutions for variables (again, in simplest form)"
+            "can print relations based on solutions for variables (again, in simplest form)",
         )
         testLineOnInterpreter(
             "b",
@@ -1567,23 +1615,23 @@ class TestSuites:
         testLineOnInterpreter(
             "b",
             "2",
-            "prints a single solution for variables in multiple (non-contradictory) relations"
+            "prints a single solution for variables in multiple (non-contradictory) relations",
         )
         resetState()
         testLineOnInterpreter(
             "b^2 = a",
             None,
-            "can relate variables with exponentiation"
+            "can relate variables with exponentiation",
         )
         testLineOnInterpreter(
             "a",
             "b^2",
-            "correctly replaces '**' with '^'"
+            "correctly replaces '**' with '^'",
         )
         testLineOnInterpreter(
             "b",
             ("√(a)", "-√(a)"),
-            "replaces 'sqrt(' (given by sympy) with '√('"
+            "replaces 'sqrt(' (given by sympy) with '√('",
         )
         testLineOnInterpreter(
             "a := 4",
@@ -1593,12 +1641,12 @@ class TestSuites:
         testLineOnInterpreter(
             "b",
             ("-2", "or", "2"),
-            "can print multiple (complete) solutions for a variable"
+            "can print multiple (complete) solutions for a variable",
         )
         testLineOnInterpreter(
             "-b + 4",
             ("2", "or", "6"),
-            "processes all possible values when considering variables"
+            "processes all possible values when considering variables",
         )
         resetState()
         testLineOnInterpreter(
@@ -1619,7 +1667,18 @@ class TestSuites:
         testLineOnInterpreter(
             "a + b",
             "4",
-            "evaluates the template alias when the relation is instantiated, not when the relation is checked (aka result here should not be 2)"
+            "evaluates the template alias when the relation is instantiated, not when the relation is checked (aka result here should not be 2)",
+        )
+        resetState()
+        testLineOnInterpreter(
+            "a = b",
+            None,
+            "can create one-on-one relations",
+        )
+        testLineOnInterpreter(
+            "a - a + a",
+            "b",
+            "can simplify expressions",
         )
         Tester.stopIfFailed()
 
@@ -1666,6 +1725,25 @@ class TestSuites:
             "2 + 2 = 10",
             ("ontradiction"),
             "can detect blatant numerical contradictions"
+        )
+        resetState()
+        Tester.stopIfFailed()
+
+        # test multi-value assignments
+        testLineOnInterpreter(
+            "a := [1, 2]",
+            None,
+            "can assign variable to a set of values",
+        )
+        testLineOnInterpreter(
+            "a",
+            ("1", "or", "2"),
+            "can print variables assigned with multiple values",
+        )
+        testLineOnInterpreter(
+            "a + a",
+            ("2", "or", "4"), # not 3!
+            "can evaluate expressions using variables with multiple values",
         )
         resetState()
         Tester.stopIfFailed()
@@ -1729,7 +1807,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "obj.force",
-            (ISP + "    ^^^^^", "rror", "ndefined"),
+            (ISP + "    ^^^^^\n", "rror", "ndefined"),
             "errors when trying to access undefined object properties",
         )
         testLineOnInterpreter(
@@ -1970,7 +2048,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "obj1(5)",
-            (ISP + "^^^^", "rror", "valuate", "lias"),
+            (ISP + "^^^^^^^\n", "rror", "valuate", "lias"),
             "errors when trying to evaluate a non-template alias as a template alias",
         )
         testLineOnInterpreter(
@@ -1980,12 +2058,12 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "add(4, 5, 6)",
-            (ISP + "        ^^^", "rror", "rguments"),
+            (ISP + "        ^^^\n", "rror", "rguments"),
             "errors when template alias is given too many arguments",
         )
         testLineOnInterpreter(
             "add(4)",
-            (ISP + "     ^", "rror", "rguments"),
+            (ISP + "     ^\n", "rror", "rguments"),
             "errors when template alias is not given enough arguments",
         )
         testLineOnInterpreter(
@@ -1995,15 +2073,75 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "4 + objtemp()",
-            (ISP + "    ^^^^^^^^^", "rror", "not", "xpression"),
+            (ISP + "    ^^^^^^^^^\n", "rror", "not", "xpression"),
             "Templates that do not return expressions error when used in expressions",
         )
         testLineOnInterpreter(
             "objtemp() * 4 + objtemp()",
-            (ISP + "^^^^^^^^^       ^^^^^^^^^", "rror", "not", "xpression"),
+            (ISP + "^^^^^^^^^       ^^^^^^^^^\n", "rror", "not", "xpression"),
             "Templates that do not return expressions error when used in expressions (and the interpreter highlights all of them)",
         )
+        testLineOnInterpreter(
+            "metaTemp() := 1 + objTemp()",
+            None,
+            "Can create templates that would be invalid if created immediately (objTemp could be redefined)",
+        )
+        testLineOnInterpreter(
+            "metaTemp()",
+            (ISP + "^^^^^^^^^^\n", "rror", "not", "xpression"),
+            "Templates that return invalid expressions error",
+        )
+        testLineOnInterpreter(
+            "metaTemp() := 1 + metaTemp()",
+            (ISP + "                  ^^^^^^^^^^\n", "rror", "ecursive"),
+            "Errors when attempting to make recursive template definitions",
+        )
+        testLineOnInterpreter(
+            "metaTemp2() := 1 + metaTemp()",
+            None,
+            "Doesn't error (yet) when making a non-recursive template call",
+        )
+        testLineOnInterpreter(
+            "metaTemp() := 2 + metaTemp2()",
+            (ISP + "                  ^^^^^^^^^^\n", "rror", "ecursive"),
+            "Errors when attempting to make recursive template definitions (two-deep)",
+        )
         resetState()
+        testLineOnInterpreter(
+            "setVars(val) := [a, b, c] := val",
+            None,
+            "Can create template aliases that define aliases",
+        )
+        testLineOnInterpreter(
+            "setVars(4)",
+            None,
+            "Can use template aliases to define aliases to numbers",
+        )
+        testLineOnInterpreter(
+            "a + b + c",
+            "12",
+            "Correctly evaluates aliases from template alias (numbers)",
+        )
+        testLineOnInterpreter(
+            "setVars({ val := 6 })",
+            None,
+            "Can use template aliases to define aliases to objects"
+        )
+        testLineOnInterpreter(
+            "b",
+            "{val=6}",
+            "Correctly evaluates aliases from template alias (objects)"
+        )
+        testLineOnInterpreter(
+            "a.val := 4",
+            None,
+            "Can use objects made from a template alias (that makes aliases)",
+        )
+        testLineOnInterpreter(
+            "b",
+            "{val=4}",
+            "Simultaneous definitions made from a template alias (that makes aliases) work correctly with objects"
+        )
         Tester.stopIfFailed()
 
         # test definitions/inferences with units
@@ -2185,7 +2323,7 @@ class TestSuites:
         Tester.stopIfFailed()
         testLineOnInterpreter(
             "!forget",
-            (ISP + "^^^^^^^", "rror", "equired"),
+            (ISP + "^^^^^^^\n", "rror", "equired"),
             "errors when trying to forget with no arguments",
         )
         testLineOnInterpreter(
@@ -2231,7 +2369,7 @@ class TestSuites:
         )
         testLineOnInterpreter(
             "b",
-            (ISP + "^", "rror", "ndefined"),
+            (ISP + "^\n", "rror", "ndefined"),
             "resetting removes all variables"
         )
         testLineOnInterpreter(
@@ -2437,7 +2575,7 @@ class Tester:
             if type(errorType) is str:
                 if errorType in str(e):
                     return True
-            elif type(errorType) is type:
+            elif isinstance(errorType, type):
                 if isinstance(e, errorType):
                     return True
             elif isinstance(errorType, Exception):

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod, abstractproperty
 import string
 
-from engine import immutable
+from immutable import immutable
 
 class Lexer():
     class types(dict):
@@ -98,7 +98,7 @@ class Lexer():
     def process(self, lexString, withEOL=True):
         return tuple(self.processGen(lexString, withEOL))
     
-    def processGen(self, lexString, withEOL):
+    def processGen(self, lexString, withEOL=True):
         machines = [
             forgetMachine,
             listMachine,
@@ -106,8 +106,6 @@ class Lexer():
             evalMachine,
             saveMachine,
             colonEqualsMachine,
-            numberMachine,
-            eNumberMachine,
             periodMachine,
             commaMachine,
             commentMachine,
@@ -127,7 +125,9 @@ class Lexer():
             carrotMachine,
             eolMachine,
             # INTENTIONALLY at the bottom to give lowest-priority
-            identifierMachine,
+            identifierMachine, # yields to other keywords
+            numberMachine, # yields to PERIOD for single period
+            eNumberMachine, # (just here since numberMachine is here)
         ]
 
         placeIdx = 0
@@ -408,19 +408,12 @@ class NumberMachine(LexerMachine):
             self.numMatched += 1
             return self.state3(inp)
 
-    # required digit after a period
-    @LexerMachine.stateFunctionRequired
+    # optional digits after period
+    @LexerMachine.stateFunction
     def state3(self, inp, char):
         if char in string.digits:
             self.numMatched += 1
-            return self.state4(inp)
-
-    # optional digits after period
-    @LexerMachine.stateFunction
-    def state4(self, inp, char):
-        if char in string.digits:
-            self.numMatched += 1
-            return self.state4(inp)
+            return self.state3(inp)
 
 numberMachine = NumberMachine()
 
@@ -440,56 +433,59 @@ class ENumberMachine(LexerMachine):
             self.numMatched += 1
             return self.state3(inp)
 
-    # required extra digits before required E or optional period
-    @LexerMachine.stateFunctionRequired
+    # optional extra digits before required E or optional period
+    @LexerMachine.stateFunction
     def state2(self, inp, char):
         if char in string.digits:
             self.numMatched += 1
             return self.state2(inp)
         elif char == '.':
             self.numMatched += 1
-            return self.state3(inp)
-        elif char in 'Ee':
-            self.numMatched += 1
-            return self.state5(inp)
+            return self.state4(inp)
+        return self.state5(inp)
 
-    # required digit after a period
+    # required digit after a period (with no digits yet)
     @LexerMachine.stateFunctionRequired
     def state3(self, inp, char):
         if char in string.digits:
             self.numMatched += 1
             return self.state4(inp)
 
-    # required digits after period before required E
-    @LexerMachine.stateFunctionRequired
+    # optional digits after a period before required E
+    @LexerMachine.stateFunction
     def state4(self, inp, char):
         if char in string.digits:
             self.numMatched += 1
             return self.state4(inp)
-        elif char in 'Ee':
+        return self.state5(inp)
+
+    # required E character
+    @LexerMachine.stateFunctionRequired
+    def state5(self, inp, char):
+        if char in 'Ee':
             self.numMatched += 1
-            return self.state5(inp)
+            return self.state6(inp)
 
     # optional plus/dash after E
     @LexerMachine.stateFunction
-    def state5(self, inp, char):
+    def state6(self, inp, char):
         if char in '+-':
             self.numMatched += 1
-        return self.state6(inp)
+        return self.state7(inp)
 
     # required digit after E (and possible dash)
     @LexerMachine.stateFunctionRequired
-    def state6(self, inp, char):
-        if char in string.digits:
-            self.numMatched += 1
-            return self.state7(inp)
-
-    # optional digits after E
-    @LexerMachine.stateFunction
     def state7(self, inp, char):
         if char in string.digits:
             self.numMatched += 1
-            return self.state7(inp)
+            return self.state8(inp)
+
+    # optional digits after E
+    @LexerMachine.stateFunction
+    def state8(self, inp, char):
+        if char in string.digits:
+            self.numMatched += 1
+            return self.state8(inp)
 
 eNumberMachine = ENumberMachine()
 

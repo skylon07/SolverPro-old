@@ -2,26 +2,31 @@ Why does SolverPro have/do <something>?
 What makes SolverPro useful?
 
 
-Example 1: Why does SolverPro have units?
+    Example 1: Why does SolverPro separate relations (things with '=')
+        and aliases (things with ':=')?
 
-Problem:
-A block has 12N of force applied to it and weighs 4kg.
-How fast is the block accelerating?
+Behind the scenes, SolverPro keeps a database of "defined" values and "inferred" values. When using
+':=' to set values, this tells the solver to "make a definition". When using '=' to set values,
+this tells the solver to "make inferences" on all variables that aren't defined by substituting the
+ones that are.
+    |> a := 4       # actually define a = 4
+    |> b + a = c    # infer b and c given a = 4
+    |> b
+        c - 4
+    |> c
+        4 + b
+    |> d = 2        # infer d from the equation 'd = 2'; NOT a definition
 
-We know the "force relationship" applies to the block...
-    |> unit: N = kg * m / s^2
-    |> object: block { force<N> = mass<kg> * acc<m/s^2> }
-
-"A block has 12N of force ... and weighs 4kg"
-    |> block.force = 12
-    |> block.mass = 4
-
-"How fast is the block accelerating?"
-    |> block.acc
-        3 m/s^2
-It printed the correct units!
-
-But more than that, it can also check for math errors!
-    |> object: block2 { acc = pos<m> / time<s> }
-    |> block2.acc = block1.acc
-        TODO(use correct error name/msg) Error! Units mismatched: m/s <--> m/s^2
+If you are still wondering why there is a differentiation between '=' and ':=', let's look at
+one more example... (Each line could be simplified to b = 2)
+    |> b = 2            # looks like a "definition"
+    |> 2 = b            # still kind of looks like a "definition"
+    |> 4 = b^2          # hm... is this a "definition" or an "inference"?
+    |> 8 = b^2 + 2*b    # okay, this is definitely NOT a "definition"
+The only way SolverPro could potentially distinguish "inferences" from "definitions" (when only
+using '=') is to detect if a relation only contains one variable. But, as shown above, deciding
+when to draw the line can get messy. Because it's not really clear when a "definition" becomes an
+"inference", the next-best option is to force all relations to be treated as "inferences" and
+provide ':=' as a means for making "definitions". On a related note, this is why the
+"SingleVariableRelationWarning" will be added; to help people know that using things like 'b = 2'
+is discouraged.

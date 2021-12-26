@@ -7,17 +7,15 @@ from parser import Parser
 parser = Parser()
 
 from interpreter import Interpreter
-interpreter = Interpreter(print)
+def printIndented(*args):
+    # first arg is left alone (for traceback errors)
+    joinedArgs = ('\n' + INDENT).join((str(arg) for arg in args))
+    print(joinedArgs)
+interpreter = Interpreter(printIndented)
 
 if __name__ == "__main__":
     # TODO: add help command
     print("=== SolverPro v{} ===".format(VERSION))
     while True:
         userInp = input(USER_INPUT).replace('\\n', '\n')
-        def runLine():
-            try:
-                return interpreter.evaluateLine(userInp)
-            except Exception as e:
-                interpreter._handleError(e)
-        print(INDENT + "interpretation:\n" + INDENT * 2 + str(runLine()))
         interpreter.executeLine(userInp)

@@ -1,3 +1,4 @@
+UNUSED NOTES        
         Note 1: All symbols are needed for systems of equations
     |> a = 2 * b + c
     |> 4 * b = a + c
@@ -31,7 +32,14 @@ This means that for every relation, we must attempt to solve for
     every variable present in the relation.
 
 
-        Note 5: python syntax needs to be substituted
+        Note 6: solveset() (apparently) can't work with exponents
+    |> b^2 = a
+    |> b
+        (solveset() would give a ConditionalSet(b, b^2 = a); not useful)
+
+
+USED NOTES
+            Note 5: python syntax needs to be substituted
 '**' is not a valid operator; strings returned need this to be replaced.
 Builtins might also need to be implemented; sympy returns things like "sqrt(b)"
 
