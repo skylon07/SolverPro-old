@@ -983,7 +983,6 @@ class InterpreterDatabase:
             results = self._substituteOnce(exprSym)
         return results
 
-    # TODO: not sure if this is needed...
     def _substituteUntilNumeric(self, exprSym, usedVars=None):
         if isinstance(exprSym, sympy.Number):
             return {exprSym}
