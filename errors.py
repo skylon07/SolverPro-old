@@ -95,11 +95,12 @@ class NotATemplateError(InterpreterTracebackError):
     def _generateMessage(self, callTraces):
         plural = len(callTraces) > 1
         badTemplateNames = (trace["obj"].nameId for trace in callTraces)
-        return "{} {} not defined as {} template{} and cannot be evaluated as such".format(
+        return "{} {} not defined as {}template{} and cannot be evaluated as {}".format(
             ','.join(badTemplateNames),
             "are" if plural else "is",
-            "a" if not plural else "",
+            "a " if not plural else "",
             "s" if plural else "",
+            "such" if plural else "one",
         )
 
 
