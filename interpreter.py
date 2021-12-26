@@ -63,6 +63,8 @@ class Interpreter:
             elif result["type"] == "alias":
                 isTemplate = result["templateParams"].obj is not None
                 if isTemplate:
+                    raise InterpreterNotImplementedError("template definitions")
+
                     idsPiece = result["aliasNames"]
                     paramsPiece = result["templateParams"]
                     rightHandPiece = result["rightHand"]
@@ -513,7 +515,6 @@ class InterpreterParser:
             elif branch == "nu":
                 piece = popStack("numbers")
             elif branch == "fu PAO tes PAC":
-                self._throwBranchNotImplemented("template evaluations")
                 paramsPiece = popStack("expressions")
                 namePiece = popStack("identifiers")
                 exprParams = paramsPiece.obj
@@ -522,7 +523,6 @@ class InterpreterParser:
                 piece = paramsPiece.update(templateResult, tokens, namePiece.traces)
                 piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
             elif branch == "fu PAO PAC":
-                self._throwBranchNotImplemented("template evaluations")
                 namePiece = popStack("identifiers")
                 exprParams = []
                 nameId = namePiece.obj
