@@ -1680,6 +1680,7 @@ class TestSuites:
             "b",
             "can simplify expressions",
         )
+        resetState()
         Tester.stopIfFailed()
 
         # ensure interpreter catches contradictions
@@ -2142,6 +2143,7 @@ class TestSuites:
             "{val=4}",
             "Simultaneous definitions made from a template alias (that makes aliases) work correctly with objects"
         )
+        resetState()
         Tester.stopIfFailed()
 
         # test definitions/inferences with units
