@@ -104,9 +104,9 @@ class NotATemplateError(InterpreterTracebackError):
         )
 
 
-class TemplateCallMismatchError(InterpreterTracebackError):
+class TemplateMismatchError(InterpreterTracebackError):
     def _generateMessage(self, badTraces):
-        raise NotImplementedError("TemplateCallMismatchError()")
+        raise NotImplementedError("TemplateMismatchError()")
 
 
 class UnusedArgumentsWarning(InterpreterTracebackWarning):
