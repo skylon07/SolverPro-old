@@ -123,3 +123,9 @@ class UnusedArgumentsWarning(InterpreterTracebackWarning):
 
 class TemplateEvaluationError(InterpreterTracebackError):
     pass # TODO
+
+
+# TODO: modify docs/examples.txt after this has been implememted
+#       ("will be added" -> "was added")
+class SingleVariableRelationWarning(InterpreterTracebackWarning):
+    pass # TODO

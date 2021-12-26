@@ -1,11 +1,36 @@
-Please note that when the program errors, it does not process ANY of the last input.
+Please note that when the program errors, it does (or should) not process ANY of the last input.
 This means if you see any error, the last line might as well never have been entered.
+(If you see an "Internal Error", please log it at https://github.com/skylon07/SolverPro/issues/new)
 
-MissingParameter
-    "object:" command requires an object name
-        This occurs when an object name is not specified when creating a new object
-        |> object:
-    
-    "unit:" command requires a unit name
-        This occurs when a unit name is not specified when defining a new unit
-        |> unit:
+Hint: The errors are sorted in alphabetical order.
+      You can also find them quickly by using Ctrl+F (Windows) or Command+F (Mac)
+
+
+        InvalidExpressionError
+"The variable ... cannot be evaluated in an expression"
+"The variables ... cannot be evaluated in an expression"
+    # TODO
+
+
+        InterpreterNotImplementedError
+"SolverPro cannot process ... (yet)"
+    This means that you tried to use a feature that has not been finished, however it will be added
+    sometime in the future.
+
+
+        NotATemplateError
+"... is not defined as a template and cannot be evaluated as one"
+"... are not defined as templates and cannot be evaluated as such"
+    # TODO
+
+
+        UndefinedIdentifierError
+"An undefined identifier was given: ..."
+"Undefined identifiers were given: ..."
+    # TODO
+
+
+        UnusedArgumentsWarning
+"Variable ... was not used in its template definition"
+"Variables ... were not used in their template definition"
+    # TODO
