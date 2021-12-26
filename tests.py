@@ -2107,6 +2107,41 @@ class TestSuites:
             "Errors when attempting to make recursive template definitions (two-deep)",
         )
         resetState()
+        testLineOnInterpreter(
+            "setVars(val) := [a, b, c] := val",
+            None,
+            "Can create template aliases that define aliases",
+        )
+        testLineOnInterpreter(
+            "setVars(4)",
+            None,
+            "Can use template aliases to define aliases to numbers",
+        )
+        testLineOnInterpreter(
+            "a + b + c",
+            "12",
+            "Correctly evaluates aliases from template alias (numbers)",
+        )
+        testLineOnInterpreter(
+            "setVars({ val := 6 })",
+            None,
+            "Can use template aliases to define aliases to objects"
+        )
+        testLineOnInterpreter(
+            "b",
+            "{val=6}",
+            "Correctly evaluates aliases from template alias (objects)"
+        )
+        testLineOnInterpreter(
+            "a.val := 4",
+            None,
+            "Can use objects made from a template alias (that makes aliases)",
+        )
+        testLineOnInterpreter(
+            "b",
+            "{val=4}",
+            "Simultaneous definitions made from a template alias (that makes aliases) work correctly with objects"
+        )
         Tester.stopIfFailed()
 
         # test definitions/inferences with units
