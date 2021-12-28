@@ -5,14 +5,16 @@ SolverPro is a simple command-line application that provides tools for organizin
 Installation should be as easy as a download and a click (maybe a blink too, if you include looking for the right OS). If you run into any issues, please [log them here](#logging-issues).
 
 ### Mac
-Latest Mac version (installer): <a href="https://raw.githubusercontent.com/skylon07/SolverPro/main/dist/latest/SolverPro.pkg" download>Download</a>
+**IF YOU CAN'T RUN THE DOWNLOADER**, try right-clicking the file and clicking the "Open" option, then the "Open" button. (If you're worried about viruses, you can open this script in a text editor by adding '.txt' to the end of the filename, to verify it isn't evil. ;)
 
-Latest Mac version (distributable): <a href="https://raw.githubusercontent.com/skylon07/SolverPro/main/dist/latest/SolverPro.dmg" download>Download</a>
+If you would rather download the app directly, a "distributable" link is provided below. However, because Apple makes it a headache to sign apps, you will have to run `xattr -d com.apple.quarantine path/to/SolverPro.app`. Too technical? There's a "fixErrors" script that will run this command for you. Just make sure not to move the files after downloading, and run it with the right-click-trick mentioned above. (Again, you can verify that's all the script does by opening it in any text editor.)
+
+Latest Mac version (downloader): [Download](https://github.com/skylon07/SolverPro/raw/main/dist/0.1.0/SolverPro_download_mac.tgz)
+
+Latest Mac version (distributable): [Download](https://github.com/skylon07/SolverPro/raw/main/dist/0.1.0/SolverPro_mac.tgz)
 
 ### Windows
-Latest Windows version (installer): <a href="https://raw.githubusercontent.com/skylon07/SolverPro/main/dist/latest/SolverPro_install.exe" download>Download</a>
-
-Latest Windows version (distributable): <a href="https://raw.githubusercontent.com/skylon07/SolverPro/main/dist/latest/SolverPro.exe" download>Download</a>
+Latest Windows version (distributable): [Download]()
 
 ### Manual Compilation
 If trying the above doesn't work (or you just want to compile the program yourself), first [download the repository](https://github.com/skylon07/SolverPro/archive/refs/heads/main.zip). Running "main.py" (`cd path/to/SolverPro-main/ && python3 main.py`) will do the trick, however you can also use `pyinstaller` to create a standalone application for your specific computer configuration. To do this, either [install pyinstaller yourself](https://www.pyinstaller.org/) or use `pipenv install` (cd-ed in SolverPro-main) and run `pyinstaller --onefile main.py`. This will generate the bundled application in a "dist" folder.
