@@ -12,5 +12,7 @@
 # hide mac src (breaks for git on windows)
 dist-versions/*/SolverPro_mac/
 
-# hide because its big...
-dist-versions/*/build
+# pyinstaller build files
+dist-versions/*/build/
+dist-versions/*/dist/
+dist-versions/*/*.spec
