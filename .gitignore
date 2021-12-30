@@ -5,5 +5,9 @@
 **/.DS_Store
 **/*.pyc
 **/__pycache__
+
 # speaking of .vscode...
 .vscode
+
+# hide mac src (breaks for git on windows)
+dist-versions/*/SolverPro_mac/
