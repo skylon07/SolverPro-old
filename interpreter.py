@@ -4,7 +4,7 @@ from constants import INDENT
 from errors import *
 
 from lexer import Lexer
-from parser import Parser
+from solverparser import Parser
 from structures import *
 
 

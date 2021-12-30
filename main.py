@@ -3,7 +3,7 @@ from constants import *
 from lexer import Lexer
 lexer = Lexer()
 
-from parser import Parser
+from solverparser import Parser
 parser = Parser()
 
 from interpreter import Interpreter
