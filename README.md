@@ -9,12 +9,12 @@ Installation should be as easy as a download and a click (maybe a blink too, if 
 
 If you would rather download the app directly, a "distributable" link is provided below. However, because Apple makes it a headache to sign apps, you will have to run `xattr -d com.apple.quarantine path/to/SolverPro.app`. Too technical? There's a "fixErrors" script that will run this command for you. Just make sure not to move the files after downloading, and run it with the right-click-trick mentioned above. (Again, you can verify that's all the script does by opening it in any text editor.)
 
-Latest Mac version (downloader): [Download](https://github.com/skylon07/SolverPro/raw/main/dist-versions/0.1.0/SolverPro_download_mac.tgz)
+Latest: Version 0.1.0 (downloader): [Download](https://github.com/skylon07/SolverPro/raw/main/dist-versions/0.1.0/SolverPro_download_mac.tgz)
 
-Latest Mac version (distributable): [Download](https://github.com/skylon07/SolverPro/raw/main/dist-versions/0.1.0/SolverPro_mac.tgz)
+Latest: Version 0.1.0 (distributable): [Download](https://github.com/skylon07/SolverPro/raw/main/dist-versions/0.1.0/SolverPro_mac.tgz)
 
 ### Windows
-Latest Windows version (distributable): [Download]()
+Latest: Version 0.1.0 (distributable): [Download](https://github.com/skylon07/SolverPro/raw/main/dist-versions/0.1.0/SolverPro.exe)
 
 ### Manual Compilation
 If trying the above doesn't work (or you just want to compile the program yourself), first [download the repository](https://github.com/skylon07/SolverPro/archive/refs/heads/main.zip). Running "main.py" (`cd path/to/SolverPro-main/ && python3 main.py`) will do the trick, however you can also use `pyinstaller` to create a standalone application for your specific computer configuration. To do this, either [install pyinstaller yourself](https://www.pyinstaller.org/) or use `pipenv install` (cd-ed in SolverPro-main) and run `pyinstaller --onefile main.py`. This will generate the bundled application in a "dist" folder.
