@@ -11,3 +11,6 @@
 
 # hide mac src (breaks for git on windows)
 dist-versions/*/SolverPro_mac/
+
+# hide because its big...
+dist-versions/*/build
