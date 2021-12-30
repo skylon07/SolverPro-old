@@ -37,4 +37,4 @@ exe = EXE(pyz,
           disable_windowed_traceback=False,
           target_arch=None,
           codesign_identity=None,
-          entitlements_file=None , icon='/Users/skylon07/Desktop/1200px-Python-logo-notext.svg.png')
+          entitlements_file=None )
