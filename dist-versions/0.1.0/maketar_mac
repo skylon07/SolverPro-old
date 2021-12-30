@@ -1,2 +1,0 @@
-tar -czf SolverPro_mac.tgz SolverPro.app SolverPro_fixErrors
-tar -czf SolverPro_download_mac.tgz SolverPro_download_mac
