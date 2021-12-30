@@ -1,6 +1,0 @@
-cd ~/Downloads
-curl -LO https://github.com/skylon07/SolverPro/raw/main/dist/0.1.0/SolverPro_mac.tgz
-tar -xf SolverPro_mac.tgz
-
-rm SolverPro_fixErrors
-rm SolverPro_mac.tgz

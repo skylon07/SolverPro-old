@@ -1,1 +1,0 @@
-pyinstaller -cF ../../main.py

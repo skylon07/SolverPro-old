@@ -10,9 +10,9 @@
 .vscode
 
 # hide mac src (breaks for git on windows)
-dist-versions/*/SolverPro_mac/
+dist-versions/*/mac/SolverPro_mac/
 
 # pyinstaller build files
-dist-versions/*/build/
-dist-versions/*/dist/
-dist-versions/*/*.spec
+dist-versions/*/*/build/
+dist-versions/*/*/dist/
+dist-versions/*/*/*.spec
