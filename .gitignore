@@ -14,6 +14,6 @@ build-scripts/*/*
 # ... but keep scripts
 !build-scripts/mac/maketar.sh
 !build-scripts/mac/run_pyinstaller.sh
-!build-scripts/mac/SolverPro_download
+!build-scripts/mac/SolverPro_downloader_mac
 !build-scripts/mac/SolverPro_fixErrors
 !build-scripts/win/run_pyinstaller.bat

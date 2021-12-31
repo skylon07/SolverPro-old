@@ -9,7 +9,7 @@ Installation should be as easy as a download and a click (maybe a blink too, if 
 
 If you would rather download the app directly, a "distributable" link is provided below. However, because Apple makes it a headache to sign apps, you will have to run `xattr -d com.apple.quarantine path/to/SolverPro.app`. Too technical? There's a "fixErrors" script that will run this command for you. Just make sure not to move the files after downloading, and run it with the right-click-trick mentioned above. (Again, you can verify that's all the script does by opening it in any text editor.)
 
-Latest: Version 0.1.0 (downloader): [Download](https://github.com/skylon07/SolverPro/releases/download/v0.1.0/SolverPro_download.tgz)
+Latest: Version 0.1.0 (downloader): [Download](https://github.com/skylon07/SolverPro/releases/download/v0.1.0/SolverPro_downloader_mac.tgz)
 
 Latest: Version 0.1.0 (app): [Download](https://github.com/skylon07/SolverPro/releases/download/v0.1.0/SolverPro.tgz)
 
