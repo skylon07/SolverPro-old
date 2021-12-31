@@ -25,13 +25,13 @@ Warning: This method is pretty in-depth and not for the faint of heart. If you'r
 After that, running "main.py" (`cd path/to/SolverPro-main/ && python3 main.py`) will do the trick (make sure you have python v3 installed). If you want to build your own installation, however, you can use `pyinstaller` to create a standalone application for your specific computer configuration. To do this, either [install pyinstaller yourself](https://www.pyinstaller.org/) or use `pipenv install` (make sure to `cd` to SolverPro-main) and run `pyinstaller --cF main.py`. This will generate the bundled application in a "dist" folder.
 
 ## Help
-There are many files provided to aid in understanding SolverPro and how it works. All of these files are located in a folder named "docs". If you want to:
+There are many files provided to aid in understanding SolverPro and how it works. All of these files are located in [the "docs" folder](https://github.com/skylon07/SolverPro/tree/main/docs). If you want to:
 
 * See a list of features, open "features.txt"
 * See some examples, especially for design decisions, open "examples.txt"
-* Find why you're getting an error, open "why am I getting this error.txt"
+* Find out why you're getting an error, open "why am I getting this error.txt"
 
-And if you're feeling *really* crazy, you can also explore the "dev-notes" folder too.
+And if you're feeling *really* crazy, you can also explore [the "dev-notes" folder](https://github.com/skylon07/SolverPro/tree/main/docs/dev-notes) too.
 
 If you have any other questions, feel free to [post an issue here](#logging-issues). Who knows, it might just end up in the docs!
 
