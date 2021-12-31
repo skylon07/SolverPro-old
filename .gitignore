@@ -9,13 +9,10 @@
 # speaking of .vscode...
 .vscode
 
-# hide mac src (breaks for git on windows)
-dist-scripts/mac/SolverPro_mac/
-
 # pyinstaller build files
-dist-scripts/*/*
+build-scripts/*/*
 # ... but keep scripts
-!dist-scripts/mac/maketar.sh
-!dist-scripts/mac/run_pyinstaller.sh
-!dist-scripts/mac/SolverPro_download
-!dist-scripts/win/run_pyinstaller.bat
+!build-scripts/mac/maketar.sh
+!build-scripts/mac/run_pyinstaller.sh
+!build-scripts/mac/SolverPro_download
+!build-scripts/win/run_pyinstaller.bat
