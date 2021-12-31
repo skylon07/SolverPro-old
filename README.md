@@ -14,7 +14,7 @@ Latest: Version 0.1.0 (downloader): [Download](https://github.com/skylon07/Solve
 Latest: Version 0.1.0 (app): [Download](https://github.com/skylon07/SolverPro/releases/download/v0.1.0/SolverPro.tgz)
 
 ### Windows
-Latest: Version 0.1.0 (distributable): [Download](https://github.com/skylon07/SolverPro/releases/download/v0.1.0/SolverPro.exe)
+Latest: Version 0.1.0 (exe): [Download](https://github.com/skylon07/SolverPro/releases/download/v0.1.0/SolverPro.exe)
 
 ### Manual Compilation
 Warning: This method is pretty in-depth and not for the faint of heart. If you're sure you want to do this, then first download the source code for the latest stable version:
