@@ -4,6 +4,7 @@ Run the "run_pyinstaller" script
 
 For Mac, also run "maketar"
     (remember to set VERSION in the downloader script)
+    (make sure you have a copy of the SolverPro.app wrapper)
 
 NOTES:
     - For Mac, executables only retain their 'chmod +x' attribute when using tarballs
