@@ -5,24 +5,24 @@ What kind of things can SolverPro do?
         VARIABLES AND RELATIONS
 Declare variables
     |> myVar := 3
-    |> myVar = 3
+    |> myVar = 3    # discouraged, but works
 
 Define variable relationships
     |> force = mass * acceleration
 
 Print variables
-    |> a = 3
-    |> b = 4
+    |> a := 3
+    |> b := 4
     |> a^2 + b^2 = c^2
     |> c
-        5
+        -5 or 5
 
 Use scientific notation
-    |> big = 3E10
-    |> big2 = 30000000000
+    |> big := 3E10
+    |> big2 := 30000000000
     |> big2
         3E10
-    |> small = 5E-10
-    |> small2 = 0.0000000005
+    |> small := 5E-10
+    |> small2 := 0.0000000005
     |> small2
         5E-10
