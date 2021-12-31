@@ -1,0 +1,11 @@
+Run the "run_pyinstaller" script
+    (all OSes should have identical scripts;
+    the only difference should be the file extension.)
+
+For Mac, also run "maketar"
+    (remember to set VERSION in the downloader script)
+
+NOTES:
+    - For Mac, executables only retain their 'chmod +x' attribute when using tarballs
+    - Only changes to scripts should be published (with the exception of mac downloader);
+        Not binaries or other distributables that could be handled by a GitHub release
