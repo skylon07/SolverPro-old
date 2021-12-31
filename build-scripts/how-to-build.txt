@@ -7,5 +7,6 @@ For Mac, also run "maketar"
 
 NOTES:
     - For Mac, executables only retain their 'chmod +x' attribute when using tarballs
+        (Important to keep downloader/fixer scripts recognized as scripts, and not text files)
     - Only changes to scripts should be published (with the exception of mac downloader);
         Not binaries or other distributables that could be handled by a GitHub release
