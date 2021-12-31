@@ -11,7 +11,7 @@ Latest: Version 0.1.0 (app): [Download](https://github.com/skylon07/SolverPro/re
 
 **IF YOU CAN'T RUN THE DOWNLOADER**, try right-clicking the file and clicking the "Open" option, then the "Open" button. (If you're worried about viruses, you can open this script in a text editor by adding '.txt' to the end of the filename, to verify it isn't evil. ;)
 
-If you would rather download the app directly, a "distributable" link is provided below. However, because Apple makes it a headache to sign apps, you will have to run `xattr -d com.apple.quarantine path/to/SolverPro.app` to "fix" the app. Too technical? There's a "fixErrors" script that will run this command for you. Just make sure **not to move the files after downloading**, and run it with the right-click-trick mentioned above. (Again, you can verify that's all the script does by opening it in any text editor.)
+If you would rather download the app directly, use the "app" download link instead. Something to note, however; Because Apple makes it a headache to sign apps, you will have to run `xattr -d com.apple.quarantine path/to/SolverPro.app` to "fix" the app. Too technical? There's a "fixErrors" script that will run this command for you. Just make sure **not to move the files after downloading**, and run it with the right-click-trick mentioned above. (Again, you can verify that's all the script does by opening it in any text editor.)
 
 ### Windows
 Latest: Version 0.1.0 (exe): [Download](https://github.com/skylon07/SolverPro/releases/download/v0.1.0/SolverPro.exe)
