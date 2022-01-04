@@ -364,7 +364,8 @@ class Interpreter:
         #       (re)setting all variables (that won't work when a relation is removed)
         for var in combinedSolutions:
             solSet = combinedSolutions[var]
-            self._database.setInference(var, solSet)
+            if not self._database.isDefined(var):
+                self._database.setInference(var, solSet)
 
     def _combineSolutions(self, relations):
         resultDict = dict()
