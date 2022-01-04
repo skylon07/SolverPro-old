@@ -43,6 +43,16 @@ If you have any other questions, feel free to [post an issue here](#logging-issu
 If you have a problem with SolverPro, a bug report, or even a question, [this is where you should do it](https://github.com/skylon07/SolverPro/issues/new). However, before posting, please make sure your issue isn't already listed below (and if you've done this kind of thing before, please [search current issues](https://github.com/skylon07/SolverPro/issues?q=is%3Aissue) too).
 
 ### Known issues
+* Making relations overrides defined variables (fixed; will be in v0.1.1)
+
+	```
+	|> a := 4
+	|> a + b = 6
+	|> b
+		6 - a
+		(Expected 2)
+	```
+
 * Systems of equations don't give numeric values
 
 	```
