@@ -1,75 +1,82 @@
-__requiredLockedFor = dict()
-__requiredCallsPerClass = dict()
-__requiredCallsLeftPerObj = dict()
+class Requireable:
+    __requiredCallsPerClassId = dict()
 
-def _getClassId(cls):
-    return cls.__qualname__
+    @staticmethod
+    def __classIdFromClass(cls):
+        clsId = cls.__qualname__
+        return clsId
 
-def _getClassIdForMethod(clsFn):
-    callPath = clsFn.__qualname__
-    clsId = ".".join(callPath.split(".")[:-1])
-    return clsId
+    @staticmethod
+    def __classIdFromMethod(clsFn):
+        callPath = clsFn.__qualname__
+        clsId = ".".join(callPath.split(".")[:-1])
+        return clsId
 
-def _getObjId(obj):
-    return id(obj)
+    @staticmethod
+    def __getRequiredCallsFor(clsId):
+        reqsPerId = Requireable.__requiredCallsPerClassId
+        if clsId not in reqsPerId:
+            reqsPerId[clsId] = set()
+        return reqsPerId[clsId]
 
-def _getClassIdFromObj(obj):
-    return _getClassId(obj.__class__)
+    @staticmethod
+    def __markIsRequiredFor(clsFn, clsId):
+        callsSet = Requireable.__getRequiredCallsFor(clsId)
+        callsSet.add(clsFn)
 
-def _getClassCallsSet(clsId):
-    mustCallSet = __requiredCallsPerClass.get(clsId)
-    if mustCallSet is None:
-        mustCallSet = __requiredCallsPerClass[clsId] = set()
-    return mustCallSet
+    def __new__(cls, *args, **kwargs):
+        selfObj = super(Requireable, cls).__new__(cls, *args, **kwargs)
+        selfObj.__copyRequiredCalls()
+        return selfObj
 
-def _getObjCallsSet(obj):
-    objId = _getObjId(obj)
-    mustCallSet = __requiredCallsLeftPerObj.get(objId)
-    if mustCallSet is None:
-        classId = _getClassIdFromObj(obj)
-        baseSet = _getClassCallsSet(classId)
-        mustCallSet = __requiredCallsLeftPerObj[objId] = set(baseSet)
-    return mustCallSet
+    def __copyRequiredCalls(selfObj):
+        selfObj.__requiredCalls = set()
+        for currCls in selfObj.__class__.__mro__:
+            currClsId = selfObj.__classIdFromClass(currCls)
+            currReqFns = selfObj.__getRequiredCallsFor(currClsId)
+            selfObj.__requiredCalls.update(currReqFns)
+            currCls = super(currCls, selfObj)
+
+    def __markRequiredCalled(selfObj, clsFn):
+        selfObj.__requiredCalls.remove(clsFn)
+
+    def __checkRequiredFnsCalledBefore(selfObj, clsFn):
+        if len(selfObj.__requiredCalls) > 0:
+            fnCalled = clsFn.__name__
+            fnsNotCalled = "', '".join(fn.__name__ for fn in selfObj.__requiredCalls)
+            raise RuntimeError("Ensured function '{}' was called before required functions '{}'".format(fnCalled, fnsNotCalled))
+
 
 def _markIsRequired(clsFn):
-    clsId = _getClassIdForMethod(clsFn)
-    if __requiredLockedFor.get(clsId):
-        raise RuntimeError("Tried to mark a method as required after creating instances of the same class")
-    
-    mustCallSet = _getClassCallsSet(clsId)
-    mustCallSet.add(clsFn)
+    clsId = Requireable._Requireable__classIdFromMethod(clsFn)
+    Requireable._Requireable__markIsRequiredFor(clsFn, clsId)
 
-def _markRequiredCalled(obj, clsFn):
-    clsId = _getClassIdFromObj(obj)
-    __requiredLockedFor[clsId] = True
+def _markRequiredCalled(selfObj, clsFn):
+    selfObj._Requireable__markRequiredCalled(clsFn)
 
-    mustCallSet = _getObjCallsSet(obj)
-    mustCallSet.remove(clsFn)
-
-class Requireable:
-    pass # TODO
+def _checkRequiredFnsCalledBefore(selfObj, clsFn):
+    selfObj._Requireable__checkRequiredFnsCalledBefore(clsFn)
 
 # decorator that marks a function as "required" for ensured calls
 def requiredCall(clsFn):
-    # TODO: is there a way to ensure self is defined/ignore if it isn't?
     _markIsRequired(clsFn)
+    # TODO: is there a way to ensure self is defined/ignore if it isn't?
     def trackedFn(self, *args, **kwargs):
-        _markRequiredCalled(self, clsFn)
+        if isinstance(self, Requireable):
+            _markRequiredCalled(self, clsFn)
         return clsFn(self, *args, **kwargs)
     return trackedFn
 
 # decorator that checks all required functions have been called
 def ensuredCall(clsFn):
     def ensuredFn(self, *args, **kwargs):
-        mustCallSet = _getObjCallsSet(self)
-        if len(mustCallSet) > 0:
-            mustCallNames = ", ".join(fn.__name__ for fn in mustCallSet)
-            raise RuntimeError("Required functions were not called: {}".format(mustCallNames))
+        if isinstance(self, Requireable):
+            _checkRequiredFnsCalledBefore(self, clsFn)
         return clsFn(self, *args, **kwargs)
     return ensuredFn
 
 if __name__ == "__main__":
-    class A:
+    class A(Requireable):
         @requiredCall
         def __init__(self):
             pass
@@ -82,8 +89,11 @@ if __name__ == "__main__":
         def fn(self):
             pass
 
-    class B(A):
+    class C:
+        pass
+    class B(A, C):
         def __init__(self):
-            pass
+            super().__init__()
     b = B()
+    b.runBefore()
     b.fn()
