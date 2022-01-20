@@ -664,6 +664,7 @@ class TestSuites:
 
             PARSER_ON_DICT["onRelation"] = []
             PARSER_ON_DICT["onExpression"] = []
+            PARSER_ON_DICT["onExpressions"] = []
 
             PARSER_ON_DICT["onEvaluation"] = []
             PARSER_ON_DICT["onTemplateArguments"] = []
@@ -1217,10 +1218,21 @@ class TestSuites:
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("4 + 5", withEOL=False)
         testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "ex")], "expression (single operator)")
+        lineStr = "a := [1, 2, 3]"
+        tokens = lexer.process(lineStr)
+        rightTokens = lexer.process("[1, 2, 3]", withEOL=False)
+        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "BRO exs BRC")], "single variable list assignment")
+        lineStr = "[a, b, c] := [-1,4,x,-y]"
+        tokens = lexer.process(lineStr)
+        rightTokens = lexer.process("[-1,4,x,-y]", withEOL=False)
+        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "BRO exs BRC")], "multi variable list assignment")
 
         lineStr = "obj := () {}"
         tokens = lexer.process(lineStr)
         testInspectErrors(tokens, lineStr, parser.ParseError, "an empty inheriting list")
+        lineStr = "[a, b, c] := []"
+        tokens = lexer.process(lineStr)
+        testInspectErrors(tokens, lineStr, parser.ParseError, "no values in value list")
 
         lineStr = "template() := a = b"
         tokens = lexer.process(lineStr)

@@ -13,6 +13,8 @@ from errors import TracebackError
 #         FIRST: <NA>
 # expression -> operationlow
 #         FIRST: <NA>
+# expressions -> expression | expression COMMA expressions
+#         FIRST: <NA>
 
 # evaluation -> value | PAREN_OPEN expression PAREN_CLOSE |
 #     BRACKET_OPEN expression BRACKET_CLOSE
@@ -69,9 +71,11 @@ from errors import TracebackError
 # leftalias -> fullidentifier | BRACKET_OPEN identifiers BRACKET_CLOSE
 #         FIRST: IDENTIFIER
 #                BRACKET_OPEN
-# rightalias -> inherits objectdeclaration | objectdeclaration | expression
+# rightalias -> inherits objectdeclaration | objectdeclaration |
+#               expression | BRACKET_OPEN expressions BRACKET_CLOSE
 #         FIRST: PAREN_OPEN
 #                BRACE_OPEN
+#                BRACKET_OPEN
 # leftaliastemp -> fullidentifier PAREN_OPEN PAREN_CLOSE |
 #     fullidentifier PAREN_OPEN identifiers PAREN_CLOSE
 #         FIRST: IDENTIFIER [PERIOD|_] PAREN_OPEN PAREN_CLOSE
@@ -159,6 +163,9 @@ class Parser:
 
     def onExpression(self, fn):
         self._addOnFunction("onExpression", fn)
+
+    def onExpressions(self, fn):
+        self._addOnFunction("onExpressions", fn)
 
     def onEvaluation(self, fn):
         self._addOnFunction("onEvaluation", fn)
@@ -248,6 +255,7 @@ def production(productionFn):
         "start": "onStart",
         "relation": "onRelation",
         "expression": "onExpression",
+        "expressions": "onExpressions",
         "evaluation": "onEvaluation",
         "templatearguments": "onTemplateArguments",
         "value": "onValue",
@@ -381,6 +389,21 @@ class ParserMatcher:
     def expression(self):
         self.operationlow()
         return "opl"
+
+    @production
+    def expressions(self):
+        # all branches
+        self.expression()
+
+        # branch ex CO exs
+        moreTokens = self.moreTokens() # no more tokens is a valid branch!
+        if moreTokens and self.currToken.type == Lexer.types.COMMA:
+            self.match(Lexer.types.COMMA)
+            self.expressions()
+            return "ex CO exs"
+        
+        # (end of default branch ex)
+        return "ex"
 
     @production
     def evaluation(self):
@@ -696,6 +719,13 @@ class ParserMatcher:
         if self.currToken.type == Lexer.types.BRACE_OPEN:
             self.objectdeclaration()
             return "ob"
+
+        # branch BRO exs BRC
+        if self.currToken.type == Lexer.types.BRACKET_OPEN:
+            self.match(Lexer.types.BRACKET_OPEN)
+            self.expressions()
+            self.match(Lexer.types.BRACKET_CLOSE)
+            return "BRO exs BRC"
 
         # default branch ex
         self.expression()
