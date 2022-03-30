@@ -227,7 +227,7 @@ class ParserMatcher:
             self.match(Lexer.types.EOL)
             return "EOL"
 
-        # branch co EOL
+        # branch command EOL
         commandFirsts = [
             Lexer.types.FORGET,
             Lexer.types.LIST,
@@ -238,7 +238,7 @@ class ParserMatcher:
         if self.currToken.type in commandFirsts:
             self.command()
             self.match(Lexer.types.EOL)
-            return "co EOL"
+            return "command EOL"
 
         # distinguish relations, aliases, and expressions
         idx = self.numParsed
@@ -254,72 +254,72 @@ class ParserMatcher:
                 break
             idx += 1
 
-        # branch re EOL
+        # branch relation EOL
         if isRelation:
             self.relation()
             self.match(Lexer.types.EOL)
-            return "re EOL"
-        # branch al EOL
+            return "relation EOL"
+        # branch alias EOL
         elif isAlias:
             self.alias()
             self.match(Lexer.types.EOL)
-            return "al EOL"
+            return "alias EOL"
         
-        # default branch ex EOL
+        # default branch expression EOL
         self.expression()
         self.match(Lexer.types.EOL)
-        return "ex EOL"
+        return "expression EOL"
             
     @production
     def relation(self):
         self.expression()
         self.match(Lexer.types.EQUALS)
         self.expression()
-        return "ex EQ ex"
+        return "expression EQUALS expression"
 
     @production
     def expression(self):
         self.operationlow()
-        return "opl"
+        return "operationlow"
 
     @production
     def expressions(self):
         # all branches
         self.expression()
 
-        # branch ex CO exs
+        # branch expression COMMA expressions
         moreTokens = self.moreTokens() # no more tokens is a valid branch!
         if moreTokens and self.currToken.type == Lexer.types.COMMA:
             self.match(Lexer.types.COMMA)
             self.expressions()
-            return "ex CO exs"
+            return "expression COMMA expressions"
         
-        # (end of default branch ex)
-        return "ex"
+        # (end of default branch expression)
+        return "expression"
 
     @production
     def evaluation(self):
-        # branch PAO ex PAC
+        # branch PAREN_OPEN expression PAREN_CLOSE
         if self.currToken.type == Lexer.types.PAREN_OPEN:
             self.match(Lexer.types.PAREN_OPEN)
             self.expression()
             self.match(Lexer.types.PAREN_CLOSE)
-            return "PAO ex PAC"
+            return "PAREN_OPEN expression PAREN_CLOSE"
 
-        # branch BRO ex BRC
+        # branch BRACKET_OPEN expression BRACKET_CLOSE
         if self.currToken.type == Lexer.types.BRACKET_OPEN:
             self.match(Lexer.types.BRACKET_OPEN)
             self.expression()
             self.match(Lexer.types.BRACKET_CLOSE)
-            return "BRO ex BRC"
+            return "BRACKET_OPEN expression BRACKET_CLOSE"
             
-        # default branch va
+        # default branch value
         self.value()
-        return "va"
+        return "value"
 
     @production
     def value(self):
-        # branches nu/nu un
+        # branches number/number unit
         numberFirsts = [
             Lexer.types.NUMBER,
             Lexer.types.E_NUMBER,
@@ -328,58 +328,60 @@ class ParserMatcher:
             # both branches
             self.number()
 
-            # branch nu un
+            # branch number unit
             unitFirsts = [
                 Lexer.types.CARROT_LEFT,
             ]
             moreTokens = self.moreTokens() # (no more tokens is a valid branch!)
             if moreTokens and self.currToken.type in unitFirsts:
                 self.unit()
-                return "nu un"
+                return "number unit"
 
-            # (end of branch nu)
-            return "nu"
+            # (end of branch number)
+            return "number"
         
-        # branches fu/fu un/fu PAO PAC/fu PAO exs PAC
+        # branches fullidentifier/fullidentifier unit/fullidentifier PAREN_OPEN PAREN_CLOSE/
+        #     fullidentifier PAREN_OPEN expressions PAREN_CLOSE
         self.fullidentifier()
 
-        # branch fu un
+        # branch fullidentifier unit
         unitFirsts = [
             Lexer.types.CARROT_LEFT,
         ]
         moreTokens = self.moreTokens() # no more tokens is a valid branch!
         if moreTokens and self.currToken.type in unitFirsts:
             self.unit()
-            return "fu un"
+            return "fullidentifier unit"
 
-        # branch fu PAO PAC/fu PAO exs PAC
+        # branch fullidentifier PAREN_OPEN PAREN_CLOSE/
+        #     fullidentifier PAREN_OPEN expressions PAREN_CLOSE
         # (would make more sense for these branches to be in
         # evaluable, but it is easier to implement here)
         elif moreTokens and self.currToken.type == Lexer.types.PAREN_OPEN:
             self.match(Lexer.types.PAREN_OPEN)
-            # branch fu PAO PAC
+            # branch fullidentifier PAREN_OPEN PAREN_CLOSE
             if self.currToken.type == Lexer.types.PAREN_CLOSE:
                 self.match(Lexer.types.PAREN_CLOSE)
-                return "fu PAO PAC"
-            # branch fu PAO exs PAC
+                return "fullidentifier PAREN_OPEN PAREN_CLOSE"
+            # branch fullidentifier PAREN_OPEN expressions PAREN_CLOSE
             self.expressions()
             self.match(Lexer.types.PAREN_CLOSE)
-            return "fu PAO exs PAC"
+            return "fullidentifier PAREN_OPEN expressions PAREN_CLOSE"
 
-        # (end of default branch fu)
-        return "fu"
+        # (end of default branch fullidentifier)
+        return "fullidentifier"
 
     @production
     def fullidentifier(self):
         self.identifier()
-        return "id"
+        return "identifier"
 
     @production
     def identifier(self):
         # all branches
         self.match(Lexer.types.IDENTIFIER)
 
-        # branch ID PE id
+        # branch IDENTIFIER PERIOD identifier
         propertyFirsts = [
             Lexer.types.PERIOD,
         ]
@@ -387,37 +389,37 @@ class ParserMatcher:
         if moreTokens and self.currToken.type in propertyFirsts:
             self.match(Lexer.types.PERIOD)
             self.identifier()
-            return "ID PE id"
+            return "IDENTIFIER PERIOD identifier"
 
-        # (end of default branch ID)
-        return "ID"
+        # (end of default branch IDENTIFIER)
+        return "IDENTIFIER"
 
     @production
     def identifiers(self):
         # all branches
         self.fullidentifier()
 
-        # branch fu CO ids
+        # branch fullidentifier COMMA identifiers
         moreTokens = self.moreTokens() # no more tokens is a valid branch!
         if moreTokens and self.currToken.type == Lexer.types.COMMA:
             self.match(Lexer.types.COMMA)
             self.identifiers()
-            return "fu CO ids"
+            return "fullidentifier COMMA identifiers"
         
-        # (end of default branch fu)
-        return "fu"
+        # (end of default branch fullidentifier)
+        return "fullidentifier"
 
     @production
     def number(self):
-        # branch EN
+        # branch ENUMBER
         if self.currToken.type == Lexer.types.E_NUMBER:
             self.match(Lexer.types.E_NUMBER)
-            return "EN"
+            return "ENUMBER"
 
-        # branch NU
+        # branch NUMBER
         if self.currToken.type == Lexer.types.NUMBER:
             self.match(Lexer.types.NUMBER)
-            return "NU"
+            return "NUMBER"
 
         self._throwParseError((
             "a number",
@@ -429,14 +431,14 @@ class ParserMatcher:
         self.match(Lexer.types.CARROT_LEFT)
         self.expression()
         self.match(Lexer.types.CARROT_RIGHT)
-        return "CAL ex CAR"
+        return "CARROT_LEFT expression CARROT_RIGHT"
     
     @production
     def operationlow(self):
         # all branches
         self.operationmid()
 
-        # branch opm opl opl
+        # branch operationmid operatorlow operationlow
         operatorFirsts = [
             Lexer.types.PLUS,
             Lexer.types.DASH,
@@ -445,17 +447,17 @@ class ParserMatcher:
         if moreTokens and self.currToken.type in operatorFirsts:
             self.operatorlow()
             self.operationlow()
-            return "opm opl opl"
+            return "operationmid operatorlow operationlow"
 
-        # (end of default branch opm)
-        return "opm"
+        # (end of default branch operationmid)
+        return "operationmid"
 
     @production
     def operationmid(self):
         # all branches
         self.operationhigh()
 
-        # branch oph opm opm
+        # branch operationhigh operatormid operationmid
         operatorFirsts = [
             Lexer.types.STAR,
             Lexer.types.SLASH,
@@ -464,17 +466,17 @@ class ParserMatcher:
         if moreTokens and self.currToken.type in operatorFirsts:
             self.operatormid()
             self.operationmid()
-            return "oph opm opm"
+            return "operationhigh operatormid operationmid"
 
-        # (end of default branch oph)
-        return "oph"
+        # (end of default branch operationhigh)
+        return "operationhigh"
     
     @production
     def operationhigh(self):
         # all branches
         self.operationmax()
 
-        # branch opx oph oph
+        # branch operationmax operatorhigh operationhigh
         operatorFirsts = [
             Lexer.types.CARROT,
         ]
@@ -482,37 +484,37 @@ class ParserMatcher:
         if moreTokens and self.currToken.type in operatorFirsts:
             self.operatorhigh()
             self.operationhigh()
-            return "opx oph oph"
+            return "operationmax operatorhigh operationhigh"
 
-        # (end of default branch opx)
-        return "opx"
+        # (end of default branch operationmax)
+        return "operationmax"
 
     @production
     def operationmax(self):
-        # branch DA ev
+        # branch DASH operationmax
         negativeFirsts = [
             Lexer.types.DASH,
         ]
         if self.currToken.type in negativeFirsts:
             self.match(Lexer.types.DASH)
             self.operationmax()
-            return "DA opx"
+            return "DASH operationmax"
 
-        # default branch ev
+        # default branch evaluation
         self.evaluation()
-        return "ev"
+        return "evaluation"
 
     @production
     def operatorlow(self):
-        # branch DA
+        # branch DASH
         if self.currToken.type == Lexer.types.DASH:
             self.match(Lexer.types.DASH)
-            return "DA"
+            return "DASH"
         
-        # branch PL
+        # branch PLUS
         if self.currToken.type == Lexer.types.PLUS:
             self.match(Lexer.types.PLUS)
-            return "PL"
+            return "PLUS"
 
         self._throwParseError((
             "an operator + - * / ^",
@@ -520,15 +522,15 @@ class ParserMatcher:
 
     @production
     def operatormid(self):
-        # branch SL
+        # branch SLASH
         if self.currToken.type == Lexer.types.SLASH:
             self.match(Lexer.types.SLASH)
-            return "SL"
+            return "SLASH"
 
-        # branch ST
+        # branch STAR
         if self.currToken.type == Lexer.types.STAR:
             self.match(Lexer.types.STAR)
-            return "ST"
+            return "STAR"
 
         self._throwParseError((
             "an operator + - * / ^",
@@ -538,7 +540,7 @@ class ParserMatcher:
     def operatorhigh(self):
         if self.currToken.type == Lexer.types.CARROT:
             self.match(Lexer.types.CARROT)
-            return "CA"
+            return "CARROT"
 
         self._throwParseError((
             "an operator + - * / ^",
@@ -558,55 +560,55 @@ class ParserMatcher:
                 break
             idx += 1
         
-        # branch let CO rit
+        # branch leftaliastemp COLON_EQUALS rightaliastemp
         if isTemplate:
             self.leftaliastemp()
             self.match(Lexer.types.COLON_EQUALS)
             self.rightaliastemp()
-            return "let CO rit"
+            return "leftaliastemp COLON_EQUALS rightaliastemp"
 
-        # default branch le CO ri
+        # default branch leftalias COLON_EQUALS rightalias
         self.leftalias()
         self.match(Lexer.types.COLON_EQUALS)
         self.rightalias()
-        return "le CO ri"
+        return "leftalias COLON_EQUALS rightalias"
 
     @production
     def leftalias(self):
-        # branch BRO ids BRC
+        # branch BRACKET_OPEN identifiers BRACKET_CLOSE
         if self.currToken.type == Lexer.types.BRACKET_OPEN:
             self.match(Lexer.types.BRACKET_OPEN)
             self.identifiers()
             self.match(Lexer.types.BRACKET_CLOSE)
-            return "BRO ids BRC"
+            return "BRACKET_OPEN identifiers BRACKET_CLOSE"
 
-        # default branch fu
+        # default branch fullidentifier
         self.fullidentifier()
-        return "fu"
+        return "fullidentifier"
 
     @production
     def rightalias(self):
-        # branch ins ob
+        # branch inherits objectdeclaration
         if self.currToken.type == Lexer.types.PAREN_OPEN:
             self.inherits()
             self.objectdeclaration()
-            return "ins ob"
+            return "inherits objectdeclaration"
 
-        # branch ob
+        # branch objectdeclaration
         if self.currToken.type == Lexer.types.BRACE_OPEN:
             self.objectdeclaration()
-            return "ob"
+            return "objectdeclaration"
 
-        # branch BRO exs BRC
+        # branch BRACKET_OPEN expressions BACKET_CLOSE
         if self.currToken.type == Lexer.types.BRACKET_OPEN:
             self.match(Lexer.types.BRACKET_OPEN)
             self.expressions()
             self.match(Lexer.types.BRACKET_CLOSE)
-            return "BRO exs BRC"
+            return "BRACKET_OPEN expressions BRACKET_CLOSE"
 
-        # default branch ex
+        # default branch expression
         self.expression()
-        return "ex"
+        return "expression"
 
     @production
     def leftaliastemp(self):
@@ -614,16 +616,16 @@ class ParserMatcher:
         self.fullidentifier()
         self.match(Lexer.types.PAREN_OPEN)
 
-        # branch fu PAO PAC
+        # branch fullidentifier PAREN_OPEN PAREN_CLOSE
         if self.currToken.type == Lexer.types.PAREN_CLOSE:
             self.match(Lexer.types.PAREN_CLOSE)
-            return "fu PAO PAC"
+            return "fullidentifier PAREN_OPEN PAREN_CLOSE"
 
-        # branch fu PAO ids PAC
+        # branch fullidentifier PAREN_OPEN identifiers PAREN_CLOSE
         if self.currToken.type == Lexer.types.IDENTIFIER:
             self.identifiers()
             self.match(Lexer.types.PAREN_CLOSE)
-            return "fu PAO ids PAC"
+            return "fullidentifier PAREN_OPEN identifiers PAREN_CLOSE"
 
         self._throwParseError((
             "a list of identifiers",
@@ -632,7 +634,7 @@ class ParserMatcher:
 
     @production
     def rightaliastemp(self):
-        # branch co
+        # branch command
         commandFirsts = [
             Lexer.types.FORGET,
             Lexer.types.LIST,
@@ -642,12 +644,12 @@ class ParserMatcher:
         ]
         if self.currToken.type in commandFirsts:
             self.command()
-            return "co"
+            return "command"
 
-        # branch ob
+        # branch objectdeclaration
         if self.currToken.type == Lexer.types.BRACE_OPEN:
             self.objectdeclaration()
-            return "ob"
+            return "objectdeclaration"
 
         # distinguish expressions from relations
         idx = self.numParsed
@@ -659,36 +661,36 @@ class ParserMatcher:
                 break
             idx += 1
 
-        # branch re
+        # branch relation
         if isRelation:
             self.relation()
-            return "re"
+            return "relation"
 
         # default branch expression
         self.expression()
-        return "ex"
+        return "expression"
 
     @production
     def inherits(self):
         self.match(Lexer.types.PAREN_OPEN)
         self.identifiers()
         self.match(Lexer.types.PAREN_CLOSE)
-        return "PAO ids PAC"
+        return "PAREN_OPEN identifiers PAREN_CLOSE"
 
     @production
     def objectdeclaration(self):
         # all branches
         self.match(Lexer.types.BRACE_OPEN)
 
-        # branch BRO BRC
+        # branch BRACE_OPEN BRACE_CLOSE
         if self.currToken.type == Lexer.types.BRACE_CLOSE:
             self.match(Lexer.types.BRACE_CLOSE)
-            return "BRO BRC"
+            return "BRACE_OPEN BRACE_CLOSE"
 
-        # default branch BRO obs BRC
+        # default branch BRACE_OPEN objectparameters BRACE_CLOSE
         self.objectparameters()
         self.match(Lexer.types.BRACE_CLOSE)
-        return "BRO obs BRC"
+        return "BRACE_OPEN objectparameters BRACE_CLOSE"
 
     @production
     def objectparameters(self):
@@ -708,10 +710,10 @@ class ParserMatcher:
                 break
             idx += 1
 
-        # branch re
+        # branch relation
         if isRelation:
             self.relation()
-        # branch al
+        # branch alias
         elif isAlias:
             self.alias()
         else:
@@ -720,28 +722,28 @@ class ParserMatcher:
                 "an alias",
             ))
 
-        # branch ... CO obs
+        # branch ... COMMA objectparameters
         moreTokens = self.moreTokens() # (no more tokens is a valid branch!)
         if moreTokens and self.currToken.type == Lexer.types.COMMA:
             self.match(Lexer.types.COMMA)
             self.objectparameters()
-            # (end of branch re CO obs)
+            # (end of branch relation COMMA objectparameters)
             if isRelation:
-                return "re CO obs"
-            # (end of branch al CO obs)
+                return "relation COMMA objectparameters"
+            # (end of branch alias COMMA objectparameters)
             elif isAlias:
-                return "al CO obs"
+                return "alias COMMA objectparameters"
             else:
                 self._throwParseError((
                     "this should never happen", # or
                     "the universe will blow up"
                 ))
-        # (end of branch re)
+        # (end of branch relation)
         if isRelation:
-            return "re"
-        # (end of branch al)
+            return "relation"
+        # (end of branch alias)
         elif isAlias:
-            return "al"
+            return "alias"
         else:
             self._throwParseError((
                 "this should never happen", # or
@@ -753,25 +755,25 @@ class ParserMatcher:
     def command(self):
         returnType = None
 
-        # branch FO
+        # branch FORGET
         if self.currToken.type == Lexer.types.FORGET:
-            returnType = "FO"
+            returnType = "FORGET"
 
-        # branch LI
+        # branch LIST
         if self.currToken.type == Lexer.types.LIST:
-            returnType = "LI"
+            returnType = "LIST"
 
-        # branch RE
+        # branch RESET
         if self.currToken.type == Lexer.types.RESET:
-            returnType = "RE"
+            returnType = "RESET"
 
-        # branch EV
+        # branch EVAL
         if self.currToken.type == Lexer.types.EVAL:
-            returnType = "EV"
+            returnType = "EVAL"
 
-        # branch SA
+        # branch SAVE
         if self.currToken.type == Lexer.types.SAVE:
-            returnType = "SA"
+            returnType = "SAVE"
 
         if returnType is None:
             self._throwParseError((

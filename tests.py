@@ -740,31 +740,31 @@ class TestSuites:
         lineStr = "myVar"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("myVar", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onFullIdentifier", [(expTokens, "id")], "single identifier")
+        testInspectPerforms(tokens, lineStr, "onFullIdentifier", [(expTokens, "identifier")], "single identifier")
         lineStr = "myVar.myProp"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("myVar.myProp", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onFullIdentifier", [(expTokens, "id")], "two-id single-property identifier")
+        testInspectPerforms(tokens, lineStr, "onFullIdentifier", [(expTokens, "identifier")], "two-id single-property identifier")
         lineStr = "myVar.myObj.myProp"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("myVar.myObj.myProp", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onFullIdentifier", [(expTokens, "id")], "three-id two-property identifier")
+        testInspectPerforms(tokens, lineStr, "onFullIdentifier", [(expTokens, "identifier")], "three-id two-property identifier")
 
         lineStr = "myVar"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("myVar", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onIdentifier", [(expTokens, "ID")], "single identifier")
+        testInspectPerforms(tokens, lineStr, "onIdentifier", [(expTokens, "IDENTIFIER")], "single identifier")
         lineStr = "myVar.myProp"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("myVar.myProp", withEOL=False)
         propTokens = lexer.process("myProp", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onIdentifier", [(propTokens, "ID"), (expTokens, "ID PE id")], "two-id single-property identifier")
+        testInspectPerforms(tokens, lineStr, "onIdentifier", [(propTokens, "IDENTIFIER"), (expTokens, "IDENTIFIER PERIOD identifier")], "two-id single-property identifier")
         lineStr = "myVar.myObj.myProp"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("myVar.myObj.myProp", withEOL=False)
         objTokens = lexer.process("myObj.myProp", withEOL=False)
         propTokens = lexer.process("myProp", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onIdentifier", [(propTokens, "ID"), (objTokens, "ID PE id"), (expTokens, "ID PE id")], "three-id two-property identifier")
+        testInspectPerforms(tokens, lineStr, "onIdentifier", [(propTokens, "IDENTIFIER"), (objTokens, "IDENTIFIER PERIOD identifier"), (expTokens, "IDENTIFIER PERIOD identifier")], "three-id two-property identifier")
         
         lineStr = "myVar..myProp"
         tokens = lexer.process(lineStr)
@@ -779,82 +779,82 @@ class TestSuites:
         lineStr = "45"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("45", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onNumber", [(expTokens, "NU")], "single number")
+        testInspectPerforms(tokens, lineStr, "onNumber", [(expTokens, "NUMBER")], "single number")
         lineStr = "5.6"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("5.6", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onNumber", [(expTokens, "NU")], "single decimal number")
+        testInspectPerforms(tokens, lineStr, "onNumber", [(expTokens, "NUMBER")], "single decimal number")
         lineStr = "2e10"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("2e10", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onNumber", [(expTokens, "EN")], "single E-number")
+        testInspectPerforms(tokens, lineStr, "onNumber", [(expTokens, "ENUMBER")], "single E-number")
         lineStr = "4.7E-16"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("4.7E-16", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onNumber", [(expTokens, "EN")], "single E-number with decimal")
+        testInspectPerforms(tokens, lineStr, "onNumber", [(expTokens, "ENUMBER")], "single E-number with decimal")
 
         lineStr = "a + b"
         tokens = lexer.process(lineStr)
         opTokens = lexer.process("+", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperatorLow", [(opTokens, "PL")], "add operator")
+        testInspectPerforms(tokens, lineStr, "onOperatorLow", [(opTokens, "PLUS")], "add operator")
         lineStr = "a - b"
         tokens = lexer.process(lineStr)
         opTokens = lexer.process("-", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperatorLow", [(opTokens, "DA")], "subtract operator")
+        testInspectPerforms(tokens, lineStr, "onOperatorLow", [(opTokens, "DASH")], "subtract operator")
         lineStr = "a * b"
         tokens = lexer.process(lineStr)
         opTokens = lexer.process("*", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperatorMid", [(opTokens, "ST")], "multiply operator")
+        testInspectPerforms(tokens, lineStr, "onOperatorMid", [(opTokens, "STAR")], "multiply operator")
         lineStr = "a / b"
         tokens = lexer.process(lineStr)
         opTokens = lexer.process("/", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperatorMid", [(opTokens, "SL")], "divide operator")
+        testInspectPerforms(tokens, lineStr, "onOperatorMid", [(opTokens, "SLASH")], "divide operator")
         lineStr = "a ^ b"
         tokens = lexer.process(lineStr)
         opTokens = lexer.process("^", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperatorHigh", [(opTokens, "CA")], "exponentiate operator")
+        testInspectPerforms(tokens, lineStr, "onOperatorHigh", [(opTokens, "CARROT")], "exponentiate operator")
 
         lineStr = "!forget"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!forget", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "FO")], "!forget command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "FORGET")], "!forget command")
         lineStr = "!list"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!list", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "LI")], "!list command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "LIST")], "!list command")
         lineStr = "!reset"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!reset", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "RE")], "!reset command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "RESET")], "!reset command")
         lineStr = "!eval"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!eval", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "EV")], "!eval command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "EVAL")], "!eval command")
         lineStr = "!save"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!save", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "SA")], "!save command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "SAVE")], "!save command")
         
         lineStr = "!forget arg1 arg2 arg3"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!forget arg1 arg2 arg3", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "FO")], "!forget command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "FORGET")], "!forget command")
         lineStr = "!list arg1 arg2 arg3"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!list arg1 arg2 arg3", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "LI")], "!list command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "LIST")], "!list command")
         lineStr = "!reset arg1 arg2 arg3"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!reset arg1 arg2 arg3", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "RE")], "!reset command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "RESET")], "!reset command")
         lineStr = "!eval arg1 arg2 arg3"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!eval arg1 arg2 arg3", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "EV")], "!eval command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "EVAL")], "!eval command")
         lineStr = "!save arg1 arg2 arg3"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!save arg1 arg2 arg3", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "SA")], "!save command")
+        testInspectPerforms(tokens, lineStr, "onCommand", [(expTokens, "SAVE")], "!save command")
         Tester.stopIfFailed()
 
         # test middle productions
@@ -864,49 +864,49 @@ class TestSuites:
         lineStr = "myIdentifier"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("myIdentifier", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "fu")], "single identifier")
+        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "fullidentifier")], "single identifier")
         lineStr = "myIdentifier.myProperty"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("myIdentifier.myProperty", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "fu")], "two-id single-property identifier")
+        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "fullidentifier")], "two-id single-property identifier")
         lineStr = "14"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("14", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "nu")], "single number")
+        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "number")], "single number")
         lineStr = "21.20"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("21.20", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "nu")], "single decimal number")
+        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "number")], "single decimal number")
         lineStr = "45e-2"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("45e-2", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "nu")], "single E-number")
+        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "number")], "single E-number")
         lineStr = "0.00123E+45"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("0.00123E+45", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "nu")], "single E-number with decimal")
+        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "number")], "single E-number with decimal")
 
         lineStr = "[myId1]:={}"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("myId1", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onIdentifiers", [(expTokens, "fu")], "single identifier")
+        testInspectPerforms(tokens, lineStr, "onIdentifiers", [(expTokens, "fullidentifier")], "single identifier")
         lineStr = "[myId1,myId2]:={}"
         tokens = lexer.process(lineStr)
         tokens2 = lexer.process("myId1,myId2", withEOL=False)
         tokens1 = lexer.process("myId2", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onIdentifiers", [(tokens1, "fu"), (tokens2, "fu CO ids")], "two identifiers")
+        testInspectPerforms(tokens, lineStr, "onIdentifiers", [(tokens1, "fullidentifier"), (tokens2, "fullidentifier COMMA identifiers")], "two identifiers")
         lineStr = "[ myId1, myId2, myId3 ] := { }"
         tokens = lexer.process(lineStr)
         tokens3 = lexer.process("myId1, myId2, myId3", withEOL=False)
         tokens2 = lexer.process("myId2, myId3", withEOL=False)
         tokens1 = lexer.process("myId3", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onIdentifiers", [(tokens1, "fu"), (tokens2, "fu CO ids"), (tokens3, "fu CO ids")], "three identifiers")
+        testInspectPerforms(tokens, lineStr, "onIdentifiers", [(tokens1, "fullidentifier"), (tokens2, "fullidentifier COMMA identifiers"), (tokens3, "fullidentifier COMMA identifiers")], "three identifiers")
         lineStr = "[ myId1.prop1.prop2, myId2.prop, myId3 ] := { }"
         tokens = lexer.process(lineStr)
         tokens3 = lexer.process("myId1.prop1.prop2, myId2.prop, myId3", withEOL=False)
         tokens2 = lexer.process("myId2.prop, myId3", withEOL=False)
         tokens1 = lexer.process("myId3", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onIdentifiers", [(tokens1, "fu"), (tokens2, "fu CO ids"), (tokens3, "fu CO ids")], "three identifiers with variable-length properties")
+        testInspectPerforms(tokens, lineStr, "onIdentifiers", [(tokens1, "fullidentifier"), (tokens2, "fullidentifier COMMA identifiers"), (tokens3, "fullidentifier COMMA identifiers")], "three identifiers with variable-length properties")
 
         lineStr = "[myId1, 2, myId3] := {}"
         tokens = lexer.process(lineStr)
@@ -918,15 +918,15 @@ class TestSuites:
         lineStr = "objName := {}"
         tokens = lexer.process(lineStr)
         nameTokens = lexer.process("objName", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onLeftAlias", [(nameTokens, "fu")], "single identifier")
+        testInspectPerforms(tokens, lineStr, "onLeftAlias", [(nameTokens, "fullidentifier")], "single identifier")
         lineStr = "[obj1, obj2, obj3] := {}"
         tokens = lexer.process(lineStr)
         nameTokens = lexer.process("[obj1, obj2, obj3]", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onLeftAlias", [(nameTokens, "BRO ids BRC")], "multiple identifiers")
+        testInspectPerforms(tokens, lineStr, "onLeftAlias", [(nameTokens, "BRACKET_OPEN identifiers BRACKET_CLOSE")], "multiple identifiers")
         lineStr = "[onlyOneObj] := {}"
         tokens = lexer.process(lineStr)
         nameTokens = lexer.process("[onlyOneObj]", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onLeftAlias", [(nameTokens, "BRO ids BRC")], "single identifier in list of identifiers")
+        testInspectPerforms(tokens, lineStr, "onLeftAlias", [(nameTokens, "BRACKET_OPEN identifiers BRACKET_CLOSE")], "single identifier in list of identifiers")
 
         lineStr = "[] := {}"
         tokens = lexer.process(lineStr)
@@ -938,19 +938,19 @@ class TestSuites:
         lineStr = "template() := {}"
         tokens = lexer.process(lineStr)
         templateTokens = lexer.process("template()", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onLeftAliasTemp", [(templateTokens, "fu PAO PAC")], "template alias with no arguments")
+        testInspectPerforms(tokens, lineStr, "onLeftAliasTemp", [(templateTokens, "fullidentifier PAREN_OPEN PAREN_CLOSE")], "template alias with no arguments")
         lineStr = "template(arg1) := {}"
         tokens = lexer.process(lineStr)
         templateTokens = lexer.process("template(arg1)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onLeftAliasTemp", [(templateTokens, "fu PAO ids PAC")], "template alias with one argument")
+        testInspectPerforms(tokens, lineStr, "onLeftAliasTemp", [(templateTokens, "fullidentifier PAREN_OPEN identifiers PAREN_CLOSE")], "template alias with one argument")
         lineStr = "template(arg1, arg2) := {}"
         tokens = lexer.process(lineStr)
         templateTokens = lexer.process("template(arg1, arg2)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onLeftAliasTemp", [(templateTokens, "fu PAO ids PAC")], "template alias with two arguments")
+        testInspectPerforms(tokens, lineStr, "onLeftAliasTemp", [(templateTokens, "fullidentifier PAREN_OPEN identifiers PAREN_CLOSE")], "template alias with two arguments")
         lineStr = "template(arg1, arg2, arg3) := {}"
         tokens = lexer.process(lineStr)
         templateTokens = lexer.process("template(arg1, arg2, arg3)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onLeftAliasTemp", [(templateTokens, "fu PAO ids PAC")], "template alias with three arguments")
+        testInspectPerforms(tokens, lineStr, "onLeftAliasTemp", [(templateTokens, "fullidentifier PAREN_OPEN identifiers PAREN_CLOSE")], "template alias with three arguments")
 
         lineStr = "template(() := {}"
         tokens = lexer.process(lineStr)
@@ -959,15 +959,15 @@ class TestSuites:
         lineStr = "objName := (merge1) {}"
         tokens = lexer.process(lineStr)
         mergeTokens = lexer.process("(merge1)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onInherits", [(mergeTokens, "PAO ids PAC")], "inherit statement with one parent")
+        testInspectPerforms(tokens, lineStr, "onInherits", [(mergeTokens, "PAREN_OPEN identifiers PAREN_CLOSE")], "inherit statement with one parent")
         lineStr = "objName := (merge1, merge2) {}"
         tokens = lexer.process(lineStr)
         mergeTokens = lexer.process("(merge1, merge2)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onInherits", [(mergeTokens, "PAO ids PAC")], "inherit statement with two parents")
+        testInspectPerforms(tokens, lineStr, "onInherits", [(mergeTokens, "PAREN_OPEN identifiers PAREN_CLOSE")], "inherit statement with two parents")
         lineStr = "objName := (merge1, merge2, merge3) {}"
         tokens = lexer.process(lineStr)
         mergeTokens = lexer.process("(merge1, merge2, merge3)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onInherits", [(mergeTokens, "PAO ids PAC")], "inherit statement with three parents")
+        testInspectPerforms(tokens, lineStr, "onInherits", [(mergeTokens, "PAREN_OPEN identifiers PAREN_CLOSE")], "inherit statement with three parents")
 
         lineStr = "objName := (merge1, (merge2) {}"
         tokens = lexer.process(lineStr)
@@ -981,19 +981,19 @@ class TestSuites:
         lineStr = "a + b = c + d"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a + b = c + d", withEOL=True) # start uses EOL
-        testInspectPerforms(tokens, lineStr, "onStart", [(expTokens, "re EOL")], "start -> relation")
+        testInspectPerforms(tokens, lineStr, "onStart", [(expTokens, "relation EOL")], "start -> relation")
         lineStr = "a + b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a + b", withEOL=True) # start uses EOL
-        testInspectPerforms(tokens, lineStr, "onStart", [(expTokens, "ex EOL")], "start -> expression")
+        testInspectPerforms(tokens, lineStr, "onStart", [(expTokens, "expression EOL")], "start -> expression")
         lineStr = "someAlias := {}"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("someAlias := {}", withEOL=True) # start uses EOL
-        testInspectPerforms(tokens, lineStr, "onStart", [(expTokens, "al EOL")], "start -> alias")
+        testInspectPerforms(tokens, lineStr, "onStart", [(expTokens, "alias EOL")], "start -> alias")
         lineStr = "!forget all the things"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("!forget all the things", withEOL=True) # start uses EOL
-        testInspectPerforms(tokens, lineStr, "onStart", [(expTokens, "co EOL")], "start -> command")
+        testInspectPerforms(tokens, lineStr, "onStart", [(expTokens, "command EOL")], "start -> command")
         lineStr = ""
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("", withEOL=True) # start uses EOL
@@ -1002,11 +1002,11 @@ class TestSuites:
         lineStr = "a = b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a = b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRelation", [(expTokens, "ex EQ ex")], "simple two-var relationship")
+        testInspectPerforms(tokens, lineStr, "onRelation", [(expTokens, "expression EQUALS expression")], "simple two-var relationship")
         lineStr = "a + b = c + d"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a + b = c + d", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRelation", [(expTokens, "ex EQ ex")], "simple four-var relationship")
+        testInspectPerforms(tokens, lineStr, "onRelation", [(expTokens, "expression EQUALS expression")], "simple four-var relationship")
         
         lineStr = "a = b = c"
         tokens = lexer.process(lineStr)
@@ -1015,19 +1015,19 @@ class TestSuites:
         lineStr = "a + b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a + b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpression", [(expTokens, "opl")], "simple two-var expression")
+        testInspectPerforms(tokens, lineStr, "onExpression", [(expTokens, "operationlow")], "simple two-var expression")
         lineStr = "a - b + c * d / e ^ f - g + h / a * j / l + 4 - 5 ^ 7"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a - b + c * d / e ^ f - g + h / a * j / l + 4 - 5 ^ 7", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpression", [(expTokens, "opl")], "multi-var multi-operation expression")
+        testInspectPerforms(tokens, lineStr, "onExpression", [(expTokens, "operationlow")], "multi-var multi-operation expression")
         lineStr = "a + -b * -c / -d - -e"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a + -b * -c / -d - -e", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpression", [(expTokens, "opl")], "can process negatives correctly")
+        testInspectPerforms(tokens, lineStr, "onExpression", [(expTokens, "operationlow")], "can process negatives correctly")
         lineStr = "--a - --b + - --- -c"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("--a - --b + - --- -c", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpression", [(expTokens, "opl")], "can process repeating negatives correctly")
+        testInspectPerforms(tokens, lineStr, "onExpression", [(expTokens, "operationlow")], "can process repeating negatives correctly")
         
         lineStr = "a - + b"
         tokens = lexer.process(lineStr)
@@ -1039,192 +1039,192 @@ class TestSuites:
         lineStr = "a"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onEvaluation", [(expTokens, "va")], "single variable evaluation")
+        testInspectPerforms(tokens, lineStr, "onEvaluation", [(expTokens, "value")], "single variable evaluation")
         lineStr = "5"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("5", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onEvaluation", [(expTokens, "va")], "single number evaluation")
+        testInspectPerforms(tokens, lineStr, "onEvaluation", [(expTokens, "value")], "single number evaluation")
         lineStr = "2E+8"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("2E+8", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onEvaluation", [(expTokens, "va")], "single E-number evaluation")
+        testInspectPerforms(tokens, lineStr, "onEvaluation", [(expTokens, "value")], "single E-number evaluation")
         lineStr = "(expression)"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("(expression)", withEOL=False)
         inner = lexer.process("expression", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onEvaluation", [(inner, "va"), (expTokens, "PAO ex PAC")], "evaluation on a pair of parenthesis")
+        testInspectPerforms(tokens, lineStr, "onEvaluation", [(inner, "value"), (expTokens, "PAREN_OPEN expression PAREN_CLOSE")], "evaluation on a pair of parenthesis")
         lineStr = "[45]"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("[45]", withEOL=False)
         inner = lexer.process("45", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onEvaluation", [(inner, "va"), (expTokens, "BRO ex BRC")], "evaluation on a pair of brackets")
+        testInspectPerforms(tokens, lineStr, "onEvaluation", [(inner, "value"), (expTokens, "BRACKET_OPEN expression BRACKET_CLOSE")], "evaluation on a pair of brackets")
         lineStr = "a * (b + c)"
         tokens = lexer.process(lineStr)
         eval1 = lexer.process("a", withEOL=False)
         eval2 = lexer.process("b", withEOL=False)
         eval3 = lexer.process("c", withEOL=False)
         eval4 = lexer.process("(b + c)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onEvaluation", [(eval1, "va"), (eval2, "va"), (eval3, "va"), (eval4, "PAO ex PAC")], "(low-key order-ops test)")
+        testInspectPerforms(tokens, lineStr, "onEvaluation", [(eval1, "value"), (eval2, "value"), (eval3, "value"), (eval4, "PAREN_OPEN expression PAREN_CLOSE")], "(low-key order-ops test)")
 
         lineStr = "a(b)"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens, "ex")], "can process a single argument")
+        testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens, "expression")], "can process a single argument")
         lineStr = "a(b, c)"
         tokens = lexer.process(lineStr)
         expTokens1 = lexer.process("c", withEOL=False)
         expTokens2 = lexer.process("b, c", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens1, "ex"), (expTokens2, "ex CO exs")], "can process multiple singular arguments")
+        testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens1, "expression"), (expTokens2, "expression COMMA expressions")], "can process multiple singular arguments")
         lineStr = "a(b + c, d * e - f)"
         tokens = lexer.process(lineStr)
         expTokens1 = lexer.process("d * e - f", withEOL=False)
         expTokens2 = lexer.process("b + c, d * e - f", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens1, "ex"), (expTokens2, "ex CO exs")], "can process multiple complex arguments")
+        testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens1, "expression"), (expTokens2, "expression COMMA expressions")], "can process multiple complex arguments")
 
         lineStr = "var<unit>"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("var<unit>", withEOL=False)
         unitTokens = lexer.process("unit", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(unitTokens, "fu"), (expTokens, "fu un")], "identifier with units")
+        testInspectPerforms(tokens, lineStr, "onValue", [(unitTokens, "fullidentifier"), (expTokens, "fullidentifier unit")], "identifier with units")
         lineStr = "50<unit>"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("50<unit>", withEOL=False)
         unitTokens = lexer.process("unit", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(unitTokens, "fu"), (expTokens, "nu un")], "number with units")
+        testInspectPerforms(tokens, lineStr, "onValue", [(unitTokens, "fullidentifier"), (expTokens, "number unit")], "number with units")
         lineStr = ".8e-6<unit>"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process(".8e-6<unit>", withEOL=False)
         unitTokens = lexer.process("unit", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(unitTokens, "fu"), (expTokens, "nu un")], "E-number with units")
+        testInspectPerforms(tokens, lineStr, "onValue", [(unitTokens, "fullidentifier"), (expTokens, "number unit")], "E-number with units")
         lineStr = "a(b, c)"
         tokens = lexer.process(lineStr)
         eval1 = lexer.process("b", withEOL=False)
         eval2 = lexer.process("c", withEOL=False)
         eval3 = lexer.process("a(b, c)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fu"), (eval2, "fu"), (eval3, "fu PAO exs PAC")], "can evaluate template arguments (single identifiers)")
+        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fullidentifier"), (eval2, "fullidentifier"), (eval3, "fullidentifier PAREN_OPEN expressions PAREN_CLOSE")], "can evaluate template arguments (single identifiers)")
         lineStr = "a(b + c, d)"
         tokens = lexer.process(lineStr)
         eval1 = lexer.process("b", withEOL=False)
         eval2 = lexer.process("c", withEOL=False)
         eval3 = lexer.process("d", withEOL=False)
         eval4 = lexer.process("a(b + c, d)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fu"), (eval2, "fu"), (eval3, "fu"), (eval4, "fu PAO exs PAC")], "can evaluate template arguments (with expressions)")
+        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fullidentifier"), (eval2, "fullidentifier"), (eval3, "fullidentifier"), (eval4, "fullidentifier PAREN_OPEN expressions PAREN_CLOSE")], "can evaluate template arguments (with expressions)")
         lineStr = "a()"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a()", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "fu PAO PAC")], "can evaluate templates (with no arguments)")
+        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "fullidentifier PAREN_OPEN PAREN_CLOSE")], "can evaluate templates (with no arguments)")
 
         lineStr = "var<unit>"
         tokens = lexer.process(lineStr)
         unitTokens = lexer.process("<unit>", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onUnit", [(unitTokens, "CAL ex CAR")], "identifier with units")
+        testInspectPerforms(tokens, lineStr, "onUnit", [(unitTokens, "CARROT_LEFT expression CARROT_RIGHT")], "identifier with units")
         lineStr = "50<unit>"
         tokens = lexer.process(lineStr)
         unitTokens = lexer.process("<unit>", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onUnit", [(unitTokens, "CAL ex CAR")], "number with units")
+        testInspectPerforms(tokens, lineStr, "onUnit", [(unitTokens, "CARROT_LEFT expression CARROT_RIGHT")], "number with units")
         lineStr = ".8e-6<unit>"
         tokens = lexer.process(lineStr)
         unitTokens = lexer.process("<unit>", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onUnit", [(unitTokens, "CAL ex CAR")], "E-number with units")
+        testInspectPerforms(tokens, lineStr, "onUnit", [(unitTokens, "CARROT_LEFT expression CARROT_RIGHT")], "E-number with units")
 
         lineStr = "a + b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a + b", withEOL=False)
         varTokens = lexer.process("b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationLow", [(varTokens, "opm"), (expTokens, "opm opl opl")], "addition")
+        testInspectPerforms(tokens, lineStr, "onOperationLow", [(varTokens, "operationmid"), (expTokens, "operationmid operatorlow operationlow")], "addition")
         lineStr = "a - b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a - b", withEOL=False)
         varTokens = lexer.process("b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationLow", [(varTokens, "opm"), (expTokens, "opm opl opl")], "subtraction")
+        testInspectPerforms(tokens, lineStr, "onOperationLow", [(varTokens, "operationmid"), (expTokens, "operationmid operatorlow operationlow")], "subtraction")
         lineStr = "a * b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a * b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "opm")], "multiplication")
+        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "operationmid")], "multiplication")
         lineStr = "a / b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a / b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "opm")], "division")
+        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "operationmid")], "division")
         lineStr = "a ^ b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a ^ b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "opm")], "exponentiation")
+        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "operationmid")], "exponentiation")
         lineStr = "-a"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("-a", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "opm")], "negation")
+        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "operationmid")], "negation")
         lineStr = "a"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "opm")], "regular variable")
+        testInspectPerforms(tokens, lineStr, "onOperationLow", [(expTokens, "operationmid")], "regular variable")
 
         lineStr = "a * b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a * b", withEOL=False)
         varTokens = lexer.process("b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationMid", [(varTokens, "oph"), (expTokens, "oph opm opm")], "multiplication")
+        testInspectPerforms(tokens, lineStr, "onOperationMid", [(varTokens, "operationhigh"), (expTokens, "operationhigh operatormid operationmid")], "multiplication")
         lineStr = "a / b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a / b", withEOL=False)
         varTokens = lexer.process("b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationMid", [(varTokens, "oph"), (expTokens, "oph opm opm")], "division")
+        testInspectPerforms(tokens, lineStr, "onOperationMid", [(varTokens, "operationhigh"), (expTokens, "operationhigh operatormid operationmid")], "division")
         lineStr = "a ^ b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a ^ b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationMid", [(expTokens, "oph")], "exponentiation")
+        testInspectPerforms(tokens, lineStr, "onOperationMid", [(expTokens, "operationhigh")], "exponentiation")
         lineStr = "-a"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("-a", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationMid", [(expTokens, "oph")], "negation")
+        testInspectPerforms(tokens, lineStr, "onOperationMid", [(expTokens, "operationhigh")], "negation")
         lineStr = "a"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationMid", [(expTokens, "oph")], "regular variable")
+        testInspectPerforms(tokens, lineStr, "onOperationMid", [(expTokens, "operationhigh")], "regular variable")
 
         lineStr = "a ^ b"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a ^ b", withEOL=False)
         varTokens = lexer.process("b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationHigh", [(varTokens, "opx"), (expTokens, "opx oph oph")], "exponentiation")
+        testInspectPerforms(tokens, lineStr, "onOperationHigh", [(varTokens, "operationmax"), (expTokens, "operationmax operatorhigh operationhigh")], "exponentiation")
         lineStr = "-a"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("-a", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationHigh", [(expTokens, "opx")], "negation")
+        testInspectPerforms(tokens, lineStr, "onOperationHigh", [(expTokens, "operationmax")], "negation")
         lineStr = "a"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationHigh", [(expTokens, "opx")], "regular variable")
+        testInspectPerforms(tokens, lineStr, "onOperationHigh", [(expTokens, "operationmax")], "regular variable")
 
         lineStr = "a"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("a", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationMax", [(expTokens, "ev")], "regular variable")
+        testInspectPerforms(tokens, lineStr, "onOperationMax", [(expTokens, "evaluation")], "regular variable")
         lineStr = "-a"
         tokens = lexer.process(lineStr)
         expTokens = lexer.process("-a", withEOL=False)
         insideTokens = lexer.process("a", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onOperationMax", [(insideTokens, "ev"), (expTokens, "DA opx")], "negation")
+        testInspectPerforms(tokens, lineStr, "onOperationMax", [(insideTokens, "evaluation"), (expTokens, "DASH operationmax")], "negation")
 
         lineStr = "obj := {}"
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("{}", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "ob")], "object declaration - only (empty object)")
+        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "objectdeclaration")], "object declaration - only (empty object)")
         lineStr = "obj := (merge1) {}"
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("(merge1) {}", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "ins ob")], "object declaration - merge syntax (empty object)")
+        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "inherits objectdeclaration")], "object declaration - merge syntax (empty object)")
         lineStr = "val := 4 + 5"
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("4 + 5", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "ex")], "expression (single operator)")
+        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "expression")], "expression (single operator)")
         lineStr = "a := [1, 2, 3]"
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("[1, 2, 3]", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "BRO exs BRC")], "single variable list assignment")
+        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "BRACKET_OPEN expressions BRACKET_CLOSE")], "single variable list assignment")
         lineStr = "[a, b, c] := [-1,4,x,-y]"
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("[-1,4,x,-y]", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "BRO exs BRC")], "multi variable list assignment")
+        testInspectPerforms(tokens, lineStr, "onRightAlias", [(rightTokens, "BRACKET_OPEN expressions BRACKET_CLOSE")], "multi variable list assignment")
 
         lineStr = "obj := () {}"
         tokens = lexer.process(lineStr)
@@ -1236,56 +1236,56 @@ class TestSuites:
         lineStr = "template() := a = b"
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("a = b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRightAliasTemp", [(rightTokens, "re")], "relation declaration")
+        testInspectPerforms(tokens, lineStr, "onRightAliasTemp", [(rightTokens, "relation")], "relation declaration")
         lineStr = "template() := a + b + c"
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("a + b + c", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRightAliasTemp", [(rightTokens, "ex")], "multiple-operation expression")
+        testInspectPerforms(tokens, lineStr, "onRightAliasTemp", [(rightTokens, "expression")], "multiple-operation expression")
         lineStr = "template() := !list things"
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("!list things", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRightAliasTemp", [(rightTokens, "co")], "command declaration")
+        testInspectPerforms(tokens, lineStr, "onRightAliasTemp", [(rightTokens, "command")], "command declaration")
         lineStr = "template() := {a = b, c = d}"
         tokens = lexer.process(lineStr)
         rightTokens = lexer.process("{a = b, c = d}", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onRightAliasTemp", [(rightTokens, "ob")], "multiple-expression object declaration")
+        testInspectPerforms(tokens, lineStr, "onRightAliasTemp", [(rightTokens, "objectdeclaration")], "multiple-expression object declaration")
         
         lineStr = "obj := {}"
         tokens = lexer.process(lineStr)
         objTokens = lexer.process("{}", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onObjectDeclaration", [(objTokens, "BRO BRC")], "empty object declaration")
+        testInspectPerforms(tokens, lineStr, "onObjectDeclaration", [(objTokens, "BRACE_OPEN BRACE_CLOSE")], "empty object declaration")
         lineStr = "obj := {a = b}"
         tokens = lexer.process(lineStr)
         objTokens = lexer.process("{a = b}", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onObjectDeclaration", [(objTokens, "BRO obs BRC")], "single expression")
+        testInspectPerforms(tokens, lineStr, "onObjectDeclaration", [(objTokens, "BRACE_OPEN objectparameters BRACE_CLOSE")], "single expression")
         lineStr = "obj := {a = b, c = d}"
         tokens = lexer.process(lineStr)
         objTokens = lexer.process("{a = b, c = d}", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onObjectDeclaration", [(objTokens, "BRO obs BRC")], "two expressions")
+        testInspectPerforms(tokens, lineStr, "onObjectDeclaration", [(objTokens, "BRACE_OPEN objectparameters BRACE_CLOSE")], "two expressions")
         lineStr = "obj := {a := 4, b = a + 1}"
         tokens = lexer.process(lineStr)
         objTokens = lexer.process("{a := 4, b = a + 1}", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onObjectDeclaration", [(objTokens, "BRO obs BRC")], "alias and expression")
+        testInspectPerforms(tokens, lineStr, "onObjectDeclaration", [(objTokens, "BRACE_OPEN objectparameters BRACE_CLOSE")], "alias and expression")
         
         lineStr = "obj := {a = b, b = c}"
         tokens = lexer.process(lineStr)
         rel2 = lexer.process("a = b, b = c", withEOL=False)
         rel1 = lexer.process("b = c", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onObjectParameters", [(rel1, "re"), (rel2, "re CO obs")], "can process lists of relations (two)")
+        testInspectPerforms(tokens, lineStr, "onObjectParameters", [(rel1, "relation"), (rel2, "relation COMMA objectparameters")], "can process lists of relations (two)")
         lineStr = "obj := {a = a, b = b, c = c, d = d}"
         tokens = lexer.process(lineStr)
         rel4 = lexer.process("a = a, b = b, c = c, d = d", withEOL=False)
         rel3 = lexer.process("b = b, c = c, d = d", withEOL=False)
         rel2 = lexer.process("c = c, d = d", withEOL=False)
         rel1 = lexer.process("d = d", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onObjectParameters", [(rel1, "re"), (rel2, "re CO obs"), (rel3, "re CO obs"), (rel4, "re CO obs")], "can process lists of relations (four)")
+        testInspectPerforms(tokens, lineStr, "onObjectParameters", [(rel1, "relation"), (rel2, "relation COMMA objectparameters"), (rel3, "relation COMMA objectparameters"), (rel4, "relation COMMA objectparameters")], "can process lists of relations (four)")
         lineStr = "obj := {a := 4, b = 5, c := b, d := 7}"
         tokens = lexer.process(lineStr)
         rel4 = lexer.process("a := 4, b = 5, c := b, d := 7", withEOL=False)
         rel3 = lexer.process("b = 5, c := b, d := 7", withEOL=False)
         rel2 = lexer.process("c := b, d := 7", withEOL=False)
         rel1 = lexer.process("d := 7", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onObjectParameters", [(rel1, "al"), (rel2, "al CO obs"), (rel3, "re CO obs"), (rel4, "al CO obs")], "can process lists of relations AND aliases")
+        testInspectPerforms(tokens, lineStr, "onObjectParameters", [(rel1, "alias"), (rel2, "alias COMMA objectparameters"), (rel3, "relation COMMA objectparameters"), (rel4, "alias COMMA objectparameters")], "can process lists of relations AND aliases")
         
         lineStr = "obj := {e = e, a + b, g = h}"
         tokens = lexer.process(lineStr)
