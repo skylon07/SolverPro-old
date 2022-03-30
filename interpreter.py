@@ -515,7 +515,7 @@ class InterpreterParser:
                 piece.update(varRep, tokens, [])
             elif branch == "nu":
                 piece = popStack("numbers")
-            elif branch == "fu PAO tes PAC":
+            elif branch == "fu PAO exs PAC":
                 paramsPiece = popStack("expressions")
                 namePiece = popStack("identifiers")
                 exprParams = paramsPiece.obj
@@ -711,13 +711,13 @@ class InterpreterParser:
             pushStack("aliasRightHands", piece)
         self._parser.onRightAliasTemp(onRightAliasTemp)
 
-        def onTemplateArguments(tokens, branch):
+        def onExpressions(tokens, branch):
             if branch == "ex":
                 piece = popStack("expressions")
                 expr = piece.obj
                 exprs = [expr]
                 piece.update(exprs, tokens, [])
-            elif branch == "ex CO tes":
+            elif branch == "ex CO exs":
                 piece = popStack("expressions")
                 exprs = piece.obj
                 nextPiece = popStack("expressions")
@@ -725,7 +725,7 @@ class InterpreterParser:
                 exprs.insert(0, nextExpr)
                 piece.update(exprs, tokens, nextPiece.traces)
             pushStack("expressions", piece)
-        self._parser.onTemplateArguments(onTemplateArguments)
+        self._parser.onExpressions(onExpressions)
 
         # TODO: finish these features
         def onUnit(tokens, branch):

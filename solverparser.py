@@ -1,111 +1,7 @@
-from typing import Type
 from lexer import Lexer
 from errors import TracebackError
 
-
-# start -> relation EOL | expression EOL | alias EOL | command EOL | EOL
-#         FIRST: [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN] EQUALS
-#                [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN]
-#                         [IDENTIFIER|BRACKET_OPEN|PAREN_OPEN]                 COLON_EQUALS
-#                FORGET | LIST | RESET | EVAL | SAVE
-
-# relation -> expression EQUALS expression
-#         FIRST: <NA>
-# expression -> operationlow
-#         FIRST: <NA>
-# expressions -> expression | expression COMMA expressions
-#         FIRST: <NA>
-
-# evaluation -> value | PAREN_OPEN expression PAREN_CLOSE |
-#     BRACKET_OPEN expression BRACKET_CLOSE
-#         FIRST: IDENTIFIER | NUMBER | E_NUMBER
-#                PAREN_OPEN
-#                BRACKET_OPEN
-# templatearguments -> expression |
-#     expression COMMA templatearguments
-# value -> fullidentifier | fullidentifier unit | number | number unit |
-#     fullidentifier PAREN_OPEN templatearguments PAREN_CLOSE |
-#     fullidentifier PAREN_OPEN PAREN_CLOSE
-#         FIRST: IDENTIFIER [PERIOD|_]
-#                IDENTIFIER [PERIOD|_] CARROT_LEFT
-#                [NUMBER|E_NUMBER]
-#                [NUMBER|E_NUMBER] CARROT_LEFT
-# fullidentifier -> identifier
-# identifier -> IDENTIFIER | IDENTIFIER PERIOD identifier
-#         FIRST: IDENTIFIER
-#                IDENTIFIER PERIOD
-# identifiers -> fullidentifier | fullidentifier COMMA identifiers
-#         FIRST: IDENTIFIER [PERIOD|_]
-#                IDENTIFIER [PERIOD|_] COMMA
-# number -> NUMBER | E_NUMBER
-#         FIRST: NUMBER
-#                E_NUMBER
-# unit -> CARROT_LEFT expression CARROT_RIGHT
-#         FIRST: <NA>
-
-# operationlow -> operationmid operatorlow operationlow | operationmid
-#         FIRST: [______] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN] [PLUS|DASH]
-#                [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN] [STAR|SLASH|CARROT]
-# operationmid -> operationhigh operatormid operationmid | operationhigh
-#         FIRST: [______] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN] [STAR|SLASH]
-#                [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN] CARROT
-# operationhigh -> operationmax operatorhigh operationhigh | operationmax
-#         FIRST: [______] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN] CARROT
-#                [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN]
-# operationmax -> DASH operationmax | evaluation
-#         FIRST: DASH
-#                IDENTIFIER | NUMBER | E_NUMBER | PAREN_OPEN | BRACKET_OPEN
-# operatorlow -> PLUS | DASH
-#         FIRST: PLUS
-#                DASH
-# operatormid -> STAR | SLASH
-#         FIRST: STAR
-#                SLASH
-# operatorhigh -> CARROT
-#         FIRST: <NA>
-
-# alias -> leftalias COLON_EQUALS rightalias |
-#     leftaliastemp COLON_EQUALS rightaliastemp
-#         FIRST: [IDENTIFIER|IDENTIFIER PERIOD|BRACKET_OPEN]
-#                IDENTIFIER [PERIOD|_] PAREN_OPEN
-# leftalias -> fullidentifier | BRACKET_OPEN identifiers BRACKET_CLOSE
-#         FIRST: IDENTIFIER
-#                BRACKET_OPEN
-# rightalias -> inherits objectdeclaration | objectdeclaration |
-#               expression | BRACKET_OPEN expressions BRACKET_CLOSE
-#         FIRST: PAREN_OPEN
-#                BRACE_OPEN
-#                BRACKET_OPEN
-# leftaliastemp -> fullidentifier PAREN_OPEN PAREN_CLOSE |
-#     fullidentifier PAREN_OPEN identifiers PAREN_CLOSE
-#         FIRST: IDENTIFIER [PERIOD|_] PAREN_OPEN PAREN_CLOSE
-#                IDENTIFIER [PERIOD|_] PAREN_OPEN IDENTIFIER
-# rightaliastemp -> relation | expression | command | objectdeclaration
-#         FIRST: [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN] EQUALS
-#                [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN]
-#                FORGET | LIST | RESET | EVAL | SAVE
-#                BRACE_OPEN
-
-# inherits -> PAREN_OPEN identifiers PAREN_CLOSE
-#         FIRST: <NA>
-# objectdeclaration -> BRACE_OPEN objectparameters BRACE_CLOSE | BRACE_OPEN BRACE_CLOSE
-#         FIRST: BRACE_OPEN [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN]
-#                BRACE_OPEN BRACE_CLOSE
-# objectparameters -> relation | alias |
-#     relation COMMA objectparameters |
-#     alias COMMA objectparameters
-#         FIRST: [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN] EQUALS
-#                [DASH|_] [IDENTIFIER|NUMBER|E_NUMBER|PAREN_OPEN|BRACKET_OPEN] EQUALS COMMA
-
-# command -> FORGET <any/none> | LIST <any/none> |
-#     RESET <any/none> | EVAL <any/none> | SAVE <any/none>
-#         FIRST: FORGET
-#                LIST
-#                RESET
-#                EVAL
-#                SAVE
-
-
+# see docs/dev-notes/parsing.puml for a list of productions
 class Parser:
     def __init__(self):
         self.onFunctions = dict()
@@ -169,9 +65,6 @@ class Parser:
 
     def onEvaluation(self, fn):
         self._addOnFunction("onEvaluation", fn)
-        
-    def onTemplateArguments(self, fn):
-        self._addOnFunction("onTemplateArguments", fn)
 
     def onValue(self, fn):
         self._addOnFunction("onValue", fn)
@@ -257,7 +150,6 @@ def production(productionFn):
         "expression": "onExpression",
         "expressions": "onExpressions",
         "evaluation": "onEvaluation",
-        "templatearguments": "onTemplateArguments",
         "value": "onValue",
         "fullidentifier": "onFullIdentifier",
         "identifier": "onIdentifier",
@@ -426,21 +318,6 @@ class ParserMatcher:
         return "va"
 
     @production
-    def templatearguments(self):
-        # all branches
-        self.expression()
-
-        # branch ex CO tes
-        moreTokens = self.moreTokens() # (no more tokens is a valid branch!)
-        if moreTokens and self.currToken.type == Lexer.types.COMMA:
-            self.match(Lexer.types.COMMA)
-            self.templatearguments()
-            return "ex CO tes"
-
-        # (end of default branch ex)
-        return "ex"
-
-    @production
     def value(self):
         # branches nu/nu un
         numberFirsts = [
@@ -463,7 +340,7 @@ class ParserMatcher:
             # (end of branch nu)
             return "nu"
         
-        # branches fu/fu un/fu PAO PAC/fu PAO tes PAC
+        # branches fu/fu un/fu PAO PAC/fu PAO exs PAC
         self.fullidentifier()
 
         # branch fu un
@@ -475,7 +352,7 @@ class ParserMatcher:
             self.unit()
             return "fu un"
 
-        # branch fu PAO PAC/fu PAO tes PAC
+        # branch fu PAO PAC/fu PAO exs PAC
         # (would make more sense for these branches to be in
         # evaluable, but it is easier to implement here)
         elif moreTokens and self.currToken.type == Lexer.types.PAREN_OPEN:
@@ -484,10 +361,10 @@ class ParserMatcher:
             if self.currToken.type == Lexer.types.PAREN_CLOSE:
                 self.match(Lexer.types.PAREN_CLOSE)
                 return "fu PAO PAC"
-            # branch fu PAO tes PAC
-            self.templatearguments()
+            # branch fu PAO exs PAC
+            self.expressions()
             self.match(Lexer.types.PAREN_CLOSE)
-            return "fu PAO tes PAC"
+            return "fu PAO exs PAC"
 
         # (end of default branch fu)
         return "fu"
