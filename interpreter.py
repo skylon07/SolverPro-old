@@ -84,23 +84,25 @@ class InterpreterParser:
         return self._parseResult
 
     def _resetStack(self):
-        self._stacks = {
-            "identifiers": [],
-            "numbers": [],
-            "values": [],
+        self._stacks = InterpreterParser._Stacks()
+        
+    class _Stacks:
+        def __init__(self):
+            self.identifiers = []
+            self.numbers = []
+            self.values = []
             
-            "operations": [],
-            "expressions": [],
+            self.operations = []
+            self.expressions = []
             # these stacks hold operation lists, not single values
-            "operationslow": [],
-            "operationsmid": [],
-            "operationshigh": [],
-            "operationsmax": [],
+            self.operationslow = []
+            self.operationsmid = []
+            self.operationshigh = []
+            self.operationsmax = []
 
-            "aliasNames": [],
-            "templateParams": [],
-            "aliasRightHands": [],
-        }
+            self.aliasNames = []
+            self.templateParams = []
+            self.aliasRightHands = []
 
     def evaluateLine(self, string):
         try:
@@ -123,12 +125,11 @@ class InterpreterParser:
     def _bindToParser(self):
         # this function is only run on initialization; these helper functions
         # aren't too inefficient
-        def pushStack(key, stackPiece):
-            if not isinstance(stackPiece, StackPieceTracer):
-                raise TypeError("Interpreter pushed non-tracer type to stack")
-            return self._stacks[key].append(stackPiece)
-        def popStack(key):
-            return self._stacks[key].pop()
+        def pushStack(stack, stackPiece):
+            assert type(stackPiece) is StackPieceTracer
+            return stack.append(stackPiece)
+        def popStack(stack):
+            return stack.pop()
         def throwBranchNotCaught(branch):
             raise ValueError("Branch '{}' was not considered".format(branch))
         
@@ -139,20 +140,20 @@ class InterpreterParser:
             if branch == "relation EOL":
                 self._parseResult = {
                     "type": "relation",
-                    "rightHandExpr": popStack("expressions"),
-                    "leftHandExpr": popStack("expressions"),
+                    "rightHandExpr": popStack(self._stacks.expressions),
+                    "leftHandExpr": popStack(self._stacks.expressions),
                 }
             elif branch == "alias EOL":
                 self._parseResult = {
                     "type": "alias",
-                    "aliasNames": popStack("aliasNames"),
-                    "templateParams": popStack("templateParams"),
-                    "rightHand": popStack("aliasRightHands"),
+                    "aliasNames": popStack(self._stacks.aliasNames),
+                    "templateParams": popStack(self._stacks.templateParams),
+                    "rightHand": popStack(self._stacks.aliasRightHands),
                 }
             elif branch == "expression EOL":
                 self._parseResult = {
                     "type": "expression",
-                    "expression": popStack("expressions"),
+                    "expression": popStack(self._stacks.expressions),
                 }
             elif branch == "command EOL":
                 self._parseResult = {
@@ -173,7 +174,7 @@ class InterpreterParser:
             else:
                 throwBranchNotCaught(branch)
             piece = StackPieceTracer(value, tokens)
-            pushStack("numbers", piece)
+            pushStack(self._stacks.numbers, piece)
         self._parser.onNumber(onNumber)
 
         def onFullIdentifier(tokens, branch):
@@ -185,45 +186,45 @@ class InterpreterParser:
                 throwBranchNotCaught(branch)
             piece = StackPieceTracer(value, tokens)
             piece.trace(TRACE_TYPES["IDENTIFIER"])
-            pushStack("identifiers", piece)
+            pushStack(self._stacks.identifiers, piece)
         self._parser.onFullIdentifier(onFullIdentifier)
 
         def onIdentifiers(tokens, branch):
             if branch == "fullidentifier":
-                piece = popStack("identifiers")
+                piece = popStack(self._stacks.identifiers)
                 identifier = piece.obj
                 identifiers = [identifier]
                 piece.update(identifiers, tokens, [])
             elif branch == "fullidentifier COMMA identifiers":
-                piece = popStack("identifiers")
+                piece = popStack(self._stacks.identifiers)
                 identifiers = piece.obj
-                nextPiece = popStack("identifiers")
+                nextPiece = popStack(self._stacks.identifiers)
                 nextIdentifier = nextPiece.obj
                 identifiers.insert(0, nextIdentifier)
                 piece.update(identifiers, tokens, nextPiece.traces)
             else:
                 throwBranchNotCaught(branch)
-            pushStack("identifiers", piece)
+            pushStack(self._stacks.identifiers, piece)
         self._parser.onIdentifiers(onIdentifiers)
 
         def onValue(tokens, branch):
             if branch == "fullidentifier":
-                piece = popStack("identifiers")
+                piece = popStack(self._stacks.identifiers)
                 idRep = piece.obj
                 varRep = VariableRepresentation(idRep)
                 piece.update(varRep, tokens, [])
             elif branch == "number":
-                piece = popStack("numbers")
+                piece = popStack(self._stacks.numbers)
             elif branch == "fullidentifier PAREN_OPEN expressions PAREN_CLOSE":
-                paramsPiece = popStack("expressions")
-                namePiece = popStack("identifiers")
+                paramsPiece = popStack(self._stacks.expressions)
+                namePiece = popStack(self._stacks.identifiers)
                 exprParams = paramsPiece.obj
                 nameId = namePiece.obj
                 templateResult = TemplateCallRepresentation(nameId, exprParams)
                 piece = paramsPiece.update(templateResult, tokens, namePiece.traces)
                 piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
             elif branch == "fullidentifier PAREN_OPEN PAREN_CLOSE":
-                namePiece = popStack("identifiers")
+                namePiece = popStack(self._stacks.identifiers)
                 exprParams = []
                 nameId = namePiece.obj
                 templateResult = TemplateCallRepresentation(nameId, exprParams)
@@ -232,7 +233,7 @@ class InterpreterParser:
             else:
                 throwBranchNotCaught(branch)
             piece.trace(TRACE_TYPES["VALUE"])
-            pushStack("values", piece)
+            pushStack(self._stacks.values, piece)
         self._parser.onValue(onValue)
 
         # (specifically binary operators)
@@ -258,7 +259,7 @@ class InterpreterParser:
             piece = StackPieceTracer(operatorRep, tokens)
             # can't use piece.trace() here without reviewing onOperation;
             # that callback ignores this piece's traces
-            pushStack("operations", piece)
+            pushStack(self._stacks.operations, piece)
         self._parser.onOperatorLow(onOperatorANY)
         self._parser.onOperatorMid(onOperatorANY)
         self._parser.onOperatorHigh(onOperatorANY)
@@ -289,22 +290,23 @@ class InterpreterParser:
             isOperatorBranch = None
             isChainBranch = None
             if branch in ("operationmid operatorlow operationlow", "operationmid"):
-                stackName = "operationslow"
-                nextStack = "operationsmid"
+                stack = self._stacks.operationslow
+                nextStack = self._stacks.operationsmid
                 isChainBranch = branch == "operationmid"
                 isOperatorBranch = not isChainBranch
             elif branch in ("operationhigh operatormid operationmid", "operationhigh"):
-                stackName = "operationsmid"
-                nextStack = "operationshigh"
+                stack = self._stacks.operationsmid
+                nextStack = self._stacks.operationshigh
                 isChainBranch = branch == "operationhigh"
                 isOperatorBranch = not isChainBranch
             elif branch in ("operationmax operatorhigh operationhigh", "operationmax"):
-                stackName = "operationshigh"
-                nextStack = "operationsmax"
+                stack = self._stacks.operationshigh
+                nextStack = self._stacks.operationsmax
                 isChainBranch = branch == "operationmax"
                 isOperatorBranch = not isChainBranch
             elif branch in ("DASH operationmax", "evaluation"):
-                stackName = "operationsmax"
+                stack = self._stacks.operationsmax
+                nextStack = self._stacks.expressions
                 isChainBranch = branch == "evaluation"
                 isOperatorBranch = not isChainBranch
             else:
@@ -315,7 +317,7 @@ class InterpreterParser:
             
             # operation-max production
             if branch == "DASH operationmax":
-                opListPiece = popStack("operationsmax")
+                opListPiece = popStack(stack)
                 opList = opListPiece.obj
                 expr = evaluateOperationList(opList)
                 negOperRep = OperatorRepresentation(lambda x: -x, "-")
@@ -324,15 +326,15 @@ class InterpreterParser:
                 piece = opListPiece.update(newOpList, tokens, [])
             # operation-max production
             elif branch == "evaluation":
-                piece = popStack("expressions")
+                piece = popStack(nextStack)
                 expr = piece.obj
                 exprs = [expr]
                 # lower precedence productions expect the stack to contain lists
                 piece.update(exprs, tokens, [])
             # all other productions that use an operator
             elif isOperatorBranch:
-                opListPiece = popStack(stackName)
-                operPiece = popStack("operations")
+                opListPiece = popStack(stack)
+                operPiece = popStack(self._stacks.operations)
                 nextOpListPiece = popStack(nextStack)
                 opList = opListPiece.obj
                 operRep = operPiece.obj
@@ -353,18 +355,18 @@ class InterpreterParser:
                 piece = nextOpListPiece.update(opList, tokens, [])
             else:
                 throwBranchNotCaught(branch)
-            pushStack(stackName, piece)
+            pushStack(stack, piece)
         self._parser.onOperationLow(onOperationANY)
         self._parser.onOperationMid(onOperationANY)
         self._parser.onOperationHigh(onOperationANY)
         self._parser.onOperationMax(onOperationANY)
 
         def onExpression(tokens, branch):
-            opListPiece = popStack("operationslow")
+            opListPiece = popStack(self._stacks.operationslow)
             opList = opListPiece.obj
             expr = evaluateOperationList(opList)
             piece = opListPiece.update(expr, tokens, [])
-            pushStack("expressions", piece)
+            pushStack(self._stacks.expressions, piece)
         self._parser.onExpression(onExpression)
 
         def onEvaluation(tokens, branch):
@@ -373,7 +375,7 @@ class InterpreterParser:
                 "BRACKET_OPEN expression BRACKET_CLOSE",
             )
             if branch == "value":
-                piece = popStack("values")
+                piece = popStack(self._stacks.values)
                 val = piece.obj
                 noOper = OperatorRepresentation(lambda x: x, "$")
                 expr = ExpressionRepresentation(noOper, [val])
@@ -385,53 +387,53 @@ class InterpreterParser:
                 return
             else:
                 throwBranchNotCaught(branch)
-            pushStack("expressions", piece)
+            pushStack(self._stacks.expressions, piece)
         self._parser.onEvaluation(onEvaluation)
 
         def onLeftAliasANY(tokens, branch):
             isTemplateBranch = branch in ("fullidentifier PAREN_OPEN PAREN_CLOSE", "fullidentifier PAREN_OPEN identifiers PAREN_CLOSE")
             if branch == "fullidentifier":
-                idPiece = popStack("identifiers")
+                idPiece = popStack(self._stacks.identifiers)
                 identifier = idPiece.obj
                 identifiers = (identifier,)
                 idsPiece = idPiece.update(identifiers, tokens, [])
                 paramsPiece = StackPieceTracer(None, [])
             elif branch == "BRACKET_OPEN identifiers BRACKET_CLOSE":
-                idsPiece = popStack("identifiers")
+                idsPiece = popStack(self._stacks.identifiers)
                 paramsPiece = StackPieceTracer(None, [])
             elif isTemplateBranch:
                 if branch == "fullidentifier PAREN_OPEN identifierss PAREN_CLOSE":
-                    paramsPiece = popStack("identifiers")
+                    paramsPiece = popStack(self._stacks.identifiers)
                     assert type(paramsPiece.obj) is list
                 elif branch == "fullidentifier PAREN_OPEN PAREN_CLOSE":
                     paramsPiece = StackPieceTracer([], [])
                 else:
                     throwBranchNotCaught(branch)
-                idPiece = popStack("identifiers")
+                idPiece = popStack(self._stacks.identifiers)
                 identifier = idPiece.obj
                 identifiers = (identifier,)
                 idsPiece = idPiece.update(identifiers, tokens, [])
             else:
                 throwBranchNotCaught(branch)
-            pushStack("aliasNames", idsPiece)
-            pushStack("templateParams", paramsPiece)
+            pushStack(self._stacks.aliasNames, idsPiece)
+            pushStack(self._stacks.templateParams, paramsPiece)
         self._parser.onLeftAlias(onLeftAliasANY)
         self._parser.onLeftAliasTemp(onLeftAliasANY)
 
         def onRightAlias(tokens, branch):
             if branch == "expression":
-                rightHandPiece = popStack("expressions")
+                rightHandPiece = popStack(self._stacks.expressions)
             elif branch == "BRACKET_OPEN expressions BRACKET_CLOSE":
                 self._throwBranchNotImplemented("expression lists")
             else:
                 self._throwBranchNotImplemented("alias expressions ({})".format(branch))
                 throwBranchNotCaught(branch)
-            pushStack("aliasRightHands", rightHandPiece)
+            pushStack(self._stacks.aliasRightHands, rightHandPiece)
         self._parser.onRightAlias(onRightAlias)
 
         def onRightAliasTemp(tokens, branch):
             if branch == "expression":
-                piece = popStack("expressions")
+                piece = popStack(self._stacks.expressions)
             elif branch == "relation":
                 self._throwBranchNotImplemented("relations on right-side of alias templates")
             elif branch == "command":
@@ -440,25 +442,25 @@ class InterpreterParser:
                 self._throwBranchNotImplemented("objects on right-side of alias templates")
             else:
                 throwBranchNotCaught(branch)
-            pushStack("aliasRightHands", piece)
+            pushStack(self._stacks.aliasRightHands, piece)
         self._parser.onRightAliasTemp(onRightAliasTemp)
 
         def onExpressions(tokens, branch):
             if branch == "expression":
-                piece = popStack("expressions")
+                piece = popStack(self._stacks.expressions)
                 expr = piece.obj
                 exprs = [expr]
                 piece.update(exprs, tokens, [])
             elif branch == "expression COMMA expressions":
-                piece = popStack("expressions")
+                piece = popStack(self._stacks.expressions)
                 exprs = piece.obj
-                nextPiece = popStack("expressions")
+                nextPiece = popStack(self._stacks.expressions)
                 nextExpr = nextPiece.obj
                 exprs.insert(0, nextExpr)
                 piece.update(exprs, tokens, nextPiece.traces)
             else:
                 throwBranchNotCaught(branch)
-            pushStack("expressions", piece)
+            pushStack(self._stacks.expressions, piece)
         self._parser.onExpressions(onExpressions)
 
         # TODO: finish these features
