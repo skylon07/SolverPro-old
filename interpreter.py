@@ -185,7 +185,7 @@ class InterpreterParser:
             else:
                 throwBranchNotCaught(branch)
             piece = StackPieceTracer(value, tokens)
-            piece.trace(TRACE_TYPES["IDENTIFIER"])
+            piece.trace(StackPieceTracer.types.IDENTIFIER)
             pushStack(self._stacks.identifiers, piece)
         self._parser.onFullIdentifier(onFullIdentifier)
 
@@ -222,17 +222,17 @@ class InterpreterParser:
                 nameId = namePiece.obj
                 templateResult = TemplateCallRepresentation(nameId, exprParams)
                 piece = paramsPiece.update(templateResult, tokens, namePiece.traces)
-                piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
+                piece.trace(StackPieceTracer.types.TEMPLATE_CALL)
             elif branch == "fullidentifier PAREN_OPEN PAREN_CLOSE":
                 namePiece = popStack(self._stacks.identifiers)
                 exprParams = []
                 nameId = namePiece.obj
                 templateResult = TemplateCallRepresentation(nameId, exprParams)
                 piece = namePiece.update(templateResult, tokens, [])
-                piece.trace(TRACE_TYPES["TEMPLATE_CALL"])
+                piece.trace(StackPieceTracer.types.TEMPLATE_CALL)
             else:
                 throwBranchNotCaught(branch)
-            piece.trace(TRACE_TYPES["VALUE"])
+            piece.trace(StackPieceTracer.types.VALUE)
             pushStack(self._stacks.values, piece)
         self._parser.onValue(onValue)
 
@@ -490,14 +490,26 @@ class InterpreterParser:
         raise InterpreterNotImplementedError(featureNamePlural)
 
 
-# TODO: should probably replace with some kind of enum class... (static properties)
-TRACE_TYPES = {
-    "IDENTIFIER": "IDENTIFIER",
-    "TEMPLATE_CALL": "TEMPLATE_CALL",
-    "VALUE": "VALUE",
-}
 # contains an element of the stack as well as some helpful metadata
 class StackPieceTracer:
+    class _Types:
+        @property
+        def IDENTIFIER(self):
+            return "IDENTIFIER"
+
+        @property
+        def TEMPLATE_CALL(self):
+            return "TEMPLATE_CALL"
+
+        @property
+        def VALUE(self):
+            return "VALUE"
+
+        def __iter__(self):
+            return ["IDENTIFIER", "TEMPLATE_CALL", "VALUE"]
+    
+    types = _Types()
+
     __traceId_DO_NOT_MODIFY = 0
     @classmethod
     def _getUniqueTraceId(cls):
@@ -525,7 +537,7 @@ class StackPieceTracer:
         return self
 
     def trace(self, traceType):
-        assert traceType in TRACE_TYPES
+        assert traceType in StackPieceTracer.types
         traceStart = self._tokens[0].placementStart
         traceEnd = self._tokens[-1].placementEnd
         trace = {
