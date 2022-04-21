@@ -103,6 +103,22 @@ class InterpreterParser:
             self.aliasNames = []
             self.templateParams = []
             self.aliasRightHands = []
+        
+        def __iter__(self):
+            return iter([
+                self.identifiers,
+                self.numbers,
+                self.values,
+                self.operations,
+                self.expressions,
+                self.operationslow,
+                self.operationsmid,
+                self.operationshigh,
+                self.operationsmax,
+                self.aliasNames,
+                self.templateParams,
+                self.aliasRightHands,
+            ])
 
     def evaluateLine(self, string):
         try:
