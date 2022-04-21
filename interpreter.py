@@ -493,6 +493,9 @@ class InterpreterParser:
 # contains an element of the stack as well as some helpful metadata
 class StackPieceTracer:
     class _Types:
+        def __iter__(self):
+            return iter({"IDENTIFIER", "TEMPLATE_CALL", "VALUE"})
+        
         @property
         def IDENTIFIER(self):
             return "IDENTIFIER"
@@ -504,9 +507,6 @@ class StackPieceTracer:
         @property
         def VALUE(self):
             return "VALUE"
-
-        def __iter__(self):
-            return ["IDENTIFIER", "TEMPLATE_CALL", "VALUE"]
     
     types = _Types()
 
