@@ -491,8 +491,12 @@ class InterpreterParser:
         self._parser.onObjectDeclaration(onObjectDeclaration)
 
         def onIdentifier(tokens, branch):
+            # TODO: not sure if this function is needed...
+            #       but don't throw out until objects are implemented
             if branch == "IDENTIFIER PERIOD identifier":
                 self._throwBranchNotImplemented("identifiers")
+            elif branch == "IDENTIFIER":
+                pass
             else:
                 throwBranchNotCaught(branch)
         self._parser.onIdentifier(onIdentifier)
