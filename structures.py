@@ -92,25 +92,8 @@ class NumberRepresentation(Representation):
         return "<NumberRep '{}'>".format(self._numStr)
 
     def construct(self):
-        return self._roundFloat(float(self._numStr))
+        return RoundedFloat(self._numStr)
 
-    def _roundFloat(self, rawFloat):
-        # special case for 0 (log10 gives domain error)
-        if rawFloat == 0:
-            return rawFloat
-        # number of digits to most signifigant figure
-        numDigits = int(log10(abs(rawFloat)))
-        if numDigits >= 0:
-            # because log10(1) gives 0; we want 1
-            numDigits += 1
-        # we care about 16 signifigant digits (python uses 16-bit floats);
-        # round() using positive arg will round after decimal;
-        # with negative arg will round before decimal; this is
-        # the opposite of numDigits, therefore we use -numDigits
-        roundTo = 16 - numDigits
-        roundFloat = round(rawFloat, roundTo)
-        return roundFloat
-    
     def _traverseChildren(self, reprType, onReprFn):
         # no children
         pass
@@ -231,11 +214,11 @@ class RoundedFloat(Model):
         if numDigits >= 0:
             # because log10(1) gives 0; we want 1
             numDigits += 1
-        # we care about 16 signifigant digits (python uses 16-bit floats);
+        # we care about 15 signifigant digits (python uses 16-bit floats);
         # round() using positive arg will round after decimal;
         # with negative arg will round before decimal; this is
         # the opposite of numDigits, therefore we use -numDigits
-        roundTo = 16 - numDigits
+        roundTo = 15 - numDigits
         roundFloat = round(rawFloat, roundTo)
         return roundFloat
     
@@ -248,7 +231,81 @@ class RoundedFloat(Model):
     def __str__(self):
         return str(self._val)
 
-    # TODO: algebra functions (add, sub, mult, div, etc)
+    def _convertArithmetic(self, other, opFn):
+        if type(other) is RoundedFloat:
+            return RoundedFloat(self._roundFloat(opFn(self._val, other._val)))
+        elif type(other) in {int, float}:
+            return RoundedFloat(self._roundFloat(opFn(self._val, other)))
+        else:
+            return opFn(self._val, other)
+
+    def __add__(self, other):
+        return self._convertArithmetic(other, lambda s, o: s + o)
+    
+    def __radd__(self, other):
+        return self._convertArithmetic(other, lambda s, o: o + s)
+
+    def __sub__(self, other):
+        return self._convertArithmetic(other, lambda s, o: s - o)
+
+    def __rsub__(self, other):
+        return self._convertArithmetic(other, lambda s, o: o - s)
+
+    def __mul__(self, other):
+        return self._convertArithmetic(other, lambda s, o: s * o)
+
+    def __rmul__(self, other):
+        return self._convertArithmetic(other, lambda s, o: o * s)
+
+    def __truediv__(self, other):
+        return self._convertArithmetic(other, lambda s, o: s / o)
+
+    def __rtruediv__(self, other):
+        return self._convertArithmetic(other, lambda s, o: o / s)
+
+    def __floordiv__(self, other):
+        return self._convertArithmetic(other, lambda s, o: s // o)
+
+    def __rfloordiv__(self, other):
+        return self._convertArithmetic(other, lambda s, o: o // s)
+
+    def __mod__(self, other):
+        return self._convertArithmetic(other, lambda s, o: s % o)
+
+    def __rmod__(self, other):
+        return self._convertArithmetic(other, lambda s, o: o % s)
+
+    def __pow__(self, other):
+        return self._convertArithmetic(other, lambda s, o: s ** o)
+
+    def __rpow__(self, other):
+        return self._convertArithmetic(other, lambda s, o: o ** s)
+
+    def __lt__(self, other):
+        return self._val < other
+
+    def __gt__(self, other):
+        return self._val > other
+
+    def __le__(self, other):
+        return self._val <= other
+
+    def __ge__(self, other):
+        return self._val >= other
+
+    def __eq__(self, other):
+        return self._val == other
+
+    def __ne__(self, other):
+        return self._val != other
+
+    def __neg__(self):
+        return RoundedFloat(-self._val)
+
+    def __pos__(self):
+        return RoundedFloat(+self._val)
+
+
 
 class Identifier(Model):
     def __init__(self, idStr):
