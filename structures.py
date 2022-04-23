@@ -50,6 +50,21 @@ class Representation(Displayable, AbstractClass):
 #       (doesn't it need to be given Represents?)
 
 
+class DummyRepresentation(Representation):
+    def __init__(self, obj):
+        self._obj = obj
+
+    def __repr__(self):
+        return "<DummyRep '{}'>".format(repr(self._obj))
+
+    def construct(self):
+        return self._obj
+
+    def _traverseChildren(self, reprType, onReprFn):
+        # no (Representation) children
+        pass
+
+
 class IdentifierRepresentation(Representation):
     def __init__(self, idStr):
         assert type(idStr) is str
@@ -140,9 +155,27 @@ class OperatorRepresentation(Representation):
 
 
 class ExpressionRepresentation(Representation):
+    _noOper = OperatorRepresentation(lambda x: x, "$")
+
+    @classmethod
+    def wrap(cls, obj):
+        # this assertion is performed to avoid treating unconstructed Representations
+        # as constructed values (otherwise, we might try to add two
+        # NumericRepresentations later... which is impossible)
+        assert not isinstance(obj, Representation), "wrap() is meant for (cached) values that match the return type of some Representation.construct(); use convert() for Representations themselves"
+        argsThatConstructToVal = [DummyRepresentation(obj)]
+        return ExpressionRepresentation(cls._noOper, argsThatConstructToVal)
+
+    @classmethod
+    def convert(cls, rep):
+        assert isinstance(rep, Representation), "convert() is meant to cast Representations into ExpressionRepresentations; use wrap() to provide a raw, pre-constructed value"
+        argsThatConstructToVal = [rep]
+        return ExpressionRepresentation(cls._noOper, argsThatConstructToVal)
+
     def __init__(self, operRep, operArgs):
         assert type(operRep) is OperatorRepresentation
         assert iter(operArgs) is not None
+        assert len(operArgs) == 0 or isinstance(operArgs[0], Representation)
         self._operRep = operRep
         self._operArgs = operArgs
 
@@ -166,6 +199,7 @@ class TemplateCallRepresentation(Representation):
     def __init__(self, templateIdStr, parameters):
         assert type(templateIdStr) is str
         assert iter(parameters) is not None
+        assert len(parameters) == 0 or isinstance(parameters[0], Representation)
         self._templateIdStr = templateIdStr
         self._parameters = parameters
 
