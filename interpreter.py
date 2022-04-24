@@ -11,16 +11,9 @@ from structures import *
 class Interpreter:
     def __init__(self, outputFn):
         self._outputFn = outputFn
-        self._solutions = list()
-
+        
         self._parser = InterpreterParser()
-        self._initializeSympy()
         self._initializeBuiltins()
-
-    # this helps cut out the initial lag Sympy seems to have...
-    def _initializeSympy(self):
-        pass # TODO
-
 
     # TODO: error when trying to redefine builtins
     def _initializeBuiltins(self):
