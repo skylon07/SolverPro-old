@@ -320,6 +320,12 @@ class Identifier(Model):
     def __str__(self):
         return self._idStr
 
+    def __hash__(self):
+        return hash(self._idStr)
+
+    def __eq__(self, other):
+        return type(other) is Identifier and self._idStr == other._idStr
+
     @property
     def idStr(self):
         return self._idStr
