@@ -371,6 +371,36 @@ class TemplateCall(Model):
         return self._params
 
 
+class SubSet(Model):
+    def __init__(self, copyIter=None):
+        if copyIter is not None:
+            self._set = set(copyIter)
+        else:
+            self._set = set()
+
+    def __repr__(self):
+        return "S{}".format(repr(self._set))
+
+    def __contains__(self, item):
+        return item in self._set
+
+    def __iter__(self):
+        return iter(self._set)
+
+    def add(self, expr):
+        self._set.add(expr)
+
+    def addFrom(self, iterable):
+        self._set.update(iterable)
+
+    def remove(self, expr):
+        self._set.remove(expr)
+
+    def removeFrom(self, iterable):
+        self._set.difference_update(iterable)
+        
+
+
 if __name__ == "__main__":
     e = ExpressionRepresentation(OperatorRepresentation(lambda x, y: x + y, "+"), [
         ExpressionRepresentation(OperatorRepresentation(lambda x, y: x + y, "+"), [
