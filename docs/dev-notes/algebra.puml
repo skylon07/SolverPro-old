@@ -1,0 +1,41 @@
+@startuml
+!include styles.puml
+
+card Interpreter {
+    object executeLine {
+        String --> void
+        (Executes command)
+    }
+
+    object _parseCommand {
+        String --> ParseResult
+    }
+
+    object _constructModels {
+        ParseResult --> Model
+        (Errors when representations hold bad data)
+    }
+}
+
+card AlgebraMaster {
+    object addRelation {
+        Relation --> void
+        (Remembers relation)
+    }
+
+    object addDefinition {
+        Variable, Value --> void
+        (Remembers the value in the given variable)
+    }
+
+    object substitute {
+        Expression --> Expression (substituted)
+    }
+}
+
+executeLine --> _parseCommand : 1
+executeLine --> _constructModels : 2
+executeLine ---> addRelation : 3
+executeLine ---> addDefinition : 4
+executeLine ---> substitute : 5
+@enduml

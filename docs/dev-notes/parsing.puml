@@ -1,0 +1,344 @@
+@startuml
+!include styles.puml
+
+' main production
+card start {
+    object start_productions {
+        relation EOL
+        expression EOL
+        alias EOL
+        command EOL
+        EOL
+    }
+
+    object start_firsts {
+        (uncalculated)
+    }
+}
+
+' expression productions
+start -[hidden]-> relation
+card relation {
+    object relation_productions {
+        expression EQUALS expression
+    }
+
+    object relation_firsts {
+        (uncalculated)
+    }
+}
+
+start -[hidden]-> expression
+card expression {
+    object expression_productions {
+        operationlow
+    }
+
+    object expression_firsts {
+        (uncalculated)
+    }
+}
+
+start -[hidden]-> expressions
+card expressions {
+    object expressions_productions {
+        expression
+        expression COMMA expressions
+    }
+
+    object expressions_firsts {
+        (uncalculated)
+    }
+}
+
+' variables/numerics
+expression -[hidden]-> evaluation
+card evaluation {
+    object evaluation_productions {
+        value
+        PAREN_OPEN expression PAREN_CLOSE
+        BRACKET_OPEN expression BRACKET_CLOSE
+    }
+
+    object evaluation_firsts {
+        (uncalculated)
+    }
+}
+
+expression -[hidden]-> value
+card value {
+    object value_productions {
+        fullidentifier
+        fullidentifier unit
+        number
+        number unit
+        fullidentifier PAREN_OPEN expressions PAREN_CLOSE
+        fullidentifier PAREN_OPEN PAREN_CLOSE
+    }
+
+    object value_firsts {
+        (uncalculated)
+    }
+}
+
+expression -[hidden]-> fullidentifier
+card fullidentifier {
+    object fullidentifier_productions {
+        identifier
+    }
+
+    object fullidentifier_firsts {
+        (uncalculated)
+    }
+}
+
+expression -[hidden]-> identifier
+card identifier {
+    object identifier_productions {
+        IDENTIFIER
+        IDENTIFIER PERIOD identifier
+    }
+
+    object identifier_firsts {
+        (uncalculated)
+    }
+}
+
+expression -[hidden]-> identifiers
+card identifiers {
+    object identifiers_productions {
+        fullidentifier
+        fullidentifier COMMA identifiers
+    }
+
+    object identifiers_firsts {
+        (uncalculated)
+    }
+}
+
+expression -[hidden]-> number
+card number {
+    object number_productions {
+        NUMBER
+        E_NUMBER
+    }
+
+    object number_firsts {
+        (uncalculated)
+    }
+}
+
+expression -[hidden]-> unit
+card unit {
+    object unit_productions {
+        CARROT_LEFT expression CARROT_RIGHT
+    }
+
+    object unit_firsts {
+        (uncalculated)
+    }
+}
+
+' math operations
+identifier -[hidden]-> operationlow
+card operationlow {
+    object operationlow_productions {
+        operationmid operatorlow operationlow
+        operationmid
+    }
+
+    object operationlow_firsts {
+        (uncalculated)
+    }
+}
+
+identifier -[hidden]-> operationmid
+card operationmid {
+    object operationmid_productions {
+        operationhigh operatormid operationmid
+        operationhigh
+    }
+
+    object operationmid_firsts {
+        (uncalculated)
+    }
+}
+
+identifier -[hidden]-> operationhigh
+card operationhigh {
+    object operationhigh_productions {
+        operationmax operatorhigh operationhigh
+        operationmax
+    }
+
+    object operationhigh_firsts {
+        (uncalculated)
+    }
+}
+
+identifier -[hidden]-> operationmax
+card operationmax {
+    object operationmax_productions {
+        DASH operationmax
+        evaluation
+    }
+
+    object operationmax_firsts {
+        (uncalculated)
+    }
+}
+
+identifier -[hidden]-> operatorlow
+card operatorlow {
+    object operatorlow_productions {
+        PLUS
+        DASH
+    }
+
+    object operatorlow_firsts {
+        (uncalculated)
+    }
+}
+
+identifier -[hidden]-> operatormid
+card operatormid {
+    object operatormid_productions {
+        STAR
+        SLASH
+    }
+
+    object operatormid_firsts {
+        (uncalculated)
+    }
+}
+
+identifier -[hidden]-> operatorhigh
+card operatorhigh {
+    object operatorhigh_productions {
+        CARROT
+    }
+
+    object operatorhigh_firsts {
+        (uncalculated)
+    }
+}
+
+' aliases/"setting things"
+operationmax -[hidden]-> alias
+card alias {
+    object alias_productions {
+        leftalias COLON_EQUALS rightalias
+        leftaliastemp COLON_EQUALS rightaliastemp
+    }
+
+    object alias_firsts {
+        (uncalculated)
+    }
+}
+
+operationmax -[hidden]-> leftalias
+card leftalias {
+    object leftalias_productions {
+        fullidentifier
+        BRACKET_OPEN identifiers BRACKET_CLOSE
+    }
+
+    object leftalias_firsts {
+        (uncalculated)
+    }
+}
+
+operationmax -[hidden]-> rightalias
+card rightalias {
+    object rightalias_productions {
+        inherits objectdeclaration
+        objectdeclaration
+        expression
+        BRACKET_OPEN expressions BRACKET_CLOSE
+    }
+
+    object rightalias_firsts {
+        (uncalculated)
+    }
+}
+
+operationmax -[hidden]-> leftaliastemp
+card leftaliastemp {
+    object leftaliastemp_productions {
+        fullidentifier PAREN_OPEN identifiers PAREN_CLOSE
+        fullidentifier PAREN_OPEN PAREN_CLOSE
+    }
+
+    object leftaliastemp_firsts {
+        (uncalculated)
+    }
+}
+
+operationmax -[hidden]-> rightaliastemp
+card rightaliastemp {
+    object rightaliastemp_productions {
+        relation
+        expression
+        command
+        objectdeclaration
+    }
+
+    object rightaliastemp_firsts {
+        (uncalculated)
+    }
+}
+
+' objects
+rightalias -[hidden]-> inherits
+card inherits {
+    object inherits_productions {
+        PAREN_OPEN identifiers PAREN_CLOSE
+    }
+
+    object inherits_firsts {
+        (uncalculated)
+    }
+}
+
+rightalias -[hidden]-> objectdeclaration
+card objectdeclaration {
+    object objectdeclaration_productions {
+        BRACE_OPEN objectparameters BRACE_CLOSE
+        BRACE_OPEN BRACE_CLOSE
+    }
+
+    object objectdeclaration_firsts {
+        (uncalculated)
+    }
+}
+
+rightalias -[hidden]-> objectparameters
+card objectparameters {
+    object objectparameters_productions {
+        relation
+        alias
+        relation COMMA objectparameters
+        alias COMMA objectparameters
+    }
+
+    object objectparameters_firsts {
+        (uncalculated)
+    }
+}
+
+' commands
+objectdeclaration -[hidden]-> command
+card command {
+    object command_productions {
+        FORGET (TODO)
+        LIST (TODO)
+        RESET (TODO)
+        EVAL (TODO)
+        SAVE (TODO)
+    }
+
+    object command_firsts {
+        (uncalculated)
+    }
+}
+@enduml

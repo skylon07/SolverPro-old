@@ -1,0 +1,29 @@
+@startuml
+!include styles.puml
+
+Alice -> Bob
+Alice <-- Bob
+class MyClass<WAAA><<WEEE>> {
+    function test
+    property thing
+        * test
+        * test2
+    other
+    + asdf
+    - asdf
+    @ sdf
+    bottom
+    --
+    lineasdf
+    --
+    line2
+}
+class OtherClass <<WEEE>> #ff0000 {
+    
+}
+note top
+NOOOOOTE
+end note
+MyClass <|-- OtherClass #4f6 : [watch]
+Something <|.. Som : test
+@enduml

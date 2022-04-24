@@ -1,0 +1,56 @@
+@startuml
+!include styles.puml
+
+object Commands {
+    ""a + b = c - d""
+    ""square(b) := b ^ 2""
+    ...
+}
+
+card Parsing {
+    object Lexer {
+        Processes **Commands**, then
+        returns tokenized command
+        (aka token list)
+    }
+
+    object Parser {
+        Takes tokenized commands
+        and converts to **Representations**
+        of main **Models**
+    }
+}
+
+object Representations {
+    ""rep1:  ADD   a,     b""
+    ""rep2:  SUB   c,     d""
+    ""rep3:  EQ  $rep1, $rep2""
+    ...
+}
+
+card Interpretation {
+    object Interpreter {
+        Processes **Representations**
+        and creates instances of the
+        main **Models**, then instructs
+        the AlgebraMaster to perform
+        operations on them
+    }
+
+    object AlgebraMaster {
+        Performs operations on main
+        **Models**, using SymPy as a
+        workhorse for algebraic
+        manupulation. It also sends data
+        back to the Interpreter to print.
+    }
+}
+
+Commands -> Lexer
+Lexer -> Parser
+Parser -> Representations
+Representations -> Interpreter
+Interpreter -> AlgebraMaster
+Interpreter <- AlgebraMaster
+
+@enduml
