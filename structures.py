@@ -179,18 +179,19 @@ class ExpressionRepresentation(Representation):
 
 
 class TemplateCallRepresentation(Representation):
-    def __init__(self, templateIdStr, parameters):
-        assert type(templateIdStr) is str
-        assert iter(parameters) is not None
-        assert len(parameters) == 0 or isinstance(parameters[0], Representation)
-        self._templateIdStr = templateIdStr
+    def __init__(self, templateIdRep, parameters):
+        assert type(templateIdRep) is IdentifierRepresentation, "Template ID must be a string"
+        assert iter(parameters) is not None, "Parameters must be iterable"
+        assert len([param for param in parameters if not isinstance(param, Representation)]) == 0, "Parameters must only contain Representation objects"
+        self._templateIdRep = templateIdRep
         self._parameters = parameters
 
     def __repr__(self):
-        return "<TemplateCallRep '{}': ({})>".format(self._templateIdStr, ",".join(repr(arg) for arg in self._operArgs))
+        return "<TemplateCallRep '{}': ({})>".format(self._templateIdRep._idStr, ",".join(repr(arg) for arg in self._parameters))
 
     def construct(self):
-        return TemplateCall(self._templateIdStr, self._parameters)
+        identifier = self._templateIdRep.construct()
+        return TemplateCall(identifier, self._parameters)
 
     def _traverseChildren(self, reprType, onReprFn):
         self._parameters = [
@@ -325,6 +326,8 @@ class Identifier(Model):
 
 class Template(Model):
     def __init__(self, templateId, paramNames, templateStr):
+        assert type(templateId) is Identifier, "'templateId' must be an Identifier"
+        assert len([paramId for paramId in paramNames if type(paramId) is not Identifier]) == 0, "'paramNames' must be an iterable of Identifiers"
         self._templateId = templateId
         self._paramNames = paramNames
         self._templateStr = templateStr
