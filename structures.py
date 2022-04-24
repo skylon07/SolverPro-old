@@ -27,7 +27,7 @@ class Representation(Displayable, AbstractClass):
         return  # a new object from the representation
 
     def traverse(self, reprType, onReprFn):
-        assert onReprFn.__code__.co_argcount == 1
+        assert onReprFn.__code__.co_argcount == 1, "traverse() callback must only accept one argument"
 
         self._traverseChildren(reprType, onReprFn)
         if reprType is type(self):
@@ -37,7 +37,8 @@ class Representation(Displayable, AbstractClass):
         else:
             result = self
         
-        assert isinstance(result, Representation)
+        if not isinstance(result, Representation):
+            raise TypeError("traverse() callback must return a Representation-type (or None)")
         return result
     
     @abstractmethod
@@ -67,7 +68,7 @@ class DummyRepresentation(Representation):
 
 class IdentifierRepresentation(Representation):
     def __init__(self, idStr):
-        assert type(idStr) is str
+        assert type(idStr) is str, "'idStr' must be a string"
         self._idStr = idStr
 
     def __repr__(self):
@@ -85,7 +86,7 @@ class IdentifierRepresentation(Representation):
 
 class NumberRepresentation(Representation):
     def __init__(self, numStr):
-        assert type(numStr) is str
+        assert type(numStr) is str, "'numStr' must be a string"
         self._numStr = numStr
 
     def __repr__(self):
@@ -101,7 +102,7 @@ class NumberRepresentation(Representation):
 
 class VariableRepresentation(Representation):
     def __init__(self, idRep):
-        assert type(idRep) is IdentifierRepresentation
+        assert type(idRep) is IdentifierRepresentation, "Only IdentifierRepresentations are acceptable inputs"
         self._idRep = idRep
 
     def __repr__(self):
@@ -117,8 +118,8 @@ class VariableRepresentation(Representation):
 
 class OperatorRepresentation(Representation):
     def __init__(self, operFn, operStr):
-        assert isfunction(operFn)
-        assert type(operStr) is str
+        assert isfunction(operFn), "Operator function was not a function"
+        assert type(operStr) is str, "Operator representation string was not a string"
         self._operFn = operFn
         self._operStr = operStr
     
@@ -156,9 +157,9 @@ class ExpressionRepresentation(Representation):
         return ExpressionRepresentation(cls._noOper, argsThatConstructToVal)
 
     def __init__(self, operRep, operArgs):
-        assert type(operRep) is OperatorRepresentation
-        assert iter(operArgs) is not None
-        assert len(operArgs) == 0 or isinstance(operArgs[0], Representation)
+        assert type(operRep) is OperatorRepresentation, "Can only receive Operator Representations as first argument"
+        assert iter(operArgs) is not None, "Operator arguments must be an iterable of arguments"
+        assert len([arg for arg in operArgs if not isinstance(arg, Representation)]) == 0, "Operator arguments must contain Representation objects"
         self._operRep = operRep
         self._operArgs = operArgs
 
@@ -310,7 +311,7 @@ class RoundedFloat(Model):
 
 class Identifier(Model):
     def __init__(self, idStr):
-        assert type(idStr) is str
+        assert type(idStr) is str, "idStr must be a string"
         self._idStr = idStr
 
     def __repr__(self):
@@ -354,6 +355,7 @@ class Template(Model):
 
 class TemplateCall(Model):
     def __init__(self, templateId, params):
+        assert type(templateId) is Identifier, "'templateId' must be an Identifier"
         self._templateId = templateId
         self._params = params
 

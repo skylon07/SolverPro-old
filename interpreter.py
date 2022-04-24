@@ -134,9 +134,7 @@ class InterpreterParser:
                 if token.type != Lexer.types["COMMENT"]
             )
             self._parser.inspect(tokensNoComments, string)
-            # stack should be empty (otherwise, parser callbacks aren't
-            # communicating/working properly)
-            assert len([badStack for badStack in self._stacks if len(badStack) > 0]) == 0
+            assert len([badStack for badStack in self._stacks if len(badStack) > 0]) == 0, "Parser stack should be empty"
             return self.lastResult
         finally:
             self._resetStack()
@@ -145,7 +143,7 @@ class InterpreterParser:
         # this function is only run on initialization; these helper functions
         # aren't too inefficient
         def pushStack(stack, stackPiece):
-            assert type(stackPiece) is StackPieceTracer
+            assert type(stackPiece) is StackPieceTracer, "Can only push stack piece tracers"
             return stack.append(stackPiece)
         def popStack(stack):
             return stack.pop()
@@ -285,7 +283,7 @@ class InterpreterParser:
 
         # specifically binary operations
         def evaluateOperationList(opList):
-            assert type(opList) is list
+            assert type(opList) is list, "Can only evaluate lists of expressions/operators"
             
             # collapses operations left-to-right
             while len(opList) > 1:
@@ -293,9 +291,9 @@ class InterpreterParser:
                     leftExpr = opList.pop(0)
                     operRep = opList.pop(0)
                     rightExpr = opList.pop(0)
-                    assert type(leftExpr) is ExpressionRepresentation
-                    assert type(operRep) is OperatorRepresentation
-                    assert type(rightExpr) is ExpressionRepresentation
+                    assert type(leftExpr) is ExpressionRepresentation, "'opList' was not in a valid format"
+                    assert type(operRep) is OperatorRepresentation, "'opList' was not in a valid format"
+                    assert type(rightExpr) is ExpressionRepresentation, "'opList' was not in a valid format"
                 except IndexError as e:
                     if "pop from empty" in str(e):
                         raise IndexError("Interpreter -> evaluateOperationList(opList); opList did not follow [expr, oper, expr, ..., oper, expr] pattern")
@@ -331,8 +329,8 @@ class InterpreterParser:
             else:
                 throwBranchNotCaught(branch, "onOperationANY")
             
-            assert isOperatorBranch is not None
-            assert isChainBranch is not None
+            assert isOperatorBranch is not None, "'isOperatorBranch' must be set"
+            assert isChainBranch is not None, "'isChainBranch' must be set"
             
             # operation-max production
             if branch == "DASH operationmax":
@@ -402,7 +400,7 @@ class InterpreterParser:
             elif branch in exprBranches:
                 # no need to process;
                 # the expression is already in the right place
-                assert type(self.expressions[-1]) is ExpressionRepresentation
+                assert type(self._stacks.expressions[-1]) is ExpressionRepresentation, "Expression stack has non-expression, and tried to pass"
                 return
             else:
                 throwBranchNotCaught(branch, "onEvaluation")
@@ -423,7 +421,7 @@ class InterpreterParser:
             elif isTemplateBranch:
                 if branch == "fullidentifier PAREN_OPEN identifierss PAREN_CLOSE":
                     paramsPiece = popStack(self._stacks.identifiers)
-                    assert type(paramsPiece.obj) is list
+                    assert type(paramsPiece.obj) is list, "Identifiers should come in a list"
                 elif branch == "fullidentifier PAREN_OPEN PAREN_CLOSE":
                     paramsPiece = StackPieceTracer([], [])
                 else:
@@ -560,7 +558,7 @@ class StackPieceTracer:
         return self
 
     def trace(self, traceType):
-        assert traceType in StackPieceTracer.types
+        assert traceType in StackPieceTracer.types, "An invalid trace type was given"
         traceStart = self._tokens[0].placementStart
         traceEnd = self._tokens[-1].placementEnd
         trace = {
