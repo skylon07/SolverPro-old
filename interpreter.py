@@ -33,9 +33,14 @@ class Interpreter:
                 raise InterpreterNotImplementedError("aliases")
             
             elif result["type"] == "expression":
+                exprRepPiece = result["expression"]
                 # TODO: evaluate template calls
+                def convFn(templateCall):
+                    return templateCall
+                evaledRep = Constructor.convertTemplateCalls(exprRepPiece.obj, convFn)
                 # TODO: evaluate variables
-                raise InterpreterNotImplementedError("expressions")
+                subsVal = Constructor.evalRepresentation(evaledRep)
+                self._print(subsVal)
             
             elif result["type"] == "command":
                 # TODO: evaluate template calls
@@ -585,6 +590,19 @@ class StackPieceTracer:
             else:
                 raise ValueError("trace ids were not unique (or a trace was re-added into the list)")
         self._traces[lowBound:upBound] = [trace]
+
+
+class Constructor:
+    @classmethod
+    def convertTemplateCalls(cls, rep, convertFn):
+        assert isinstance(rep, Representation), "Can only convert Representations"
+        assert isfunction(convertFn), "The convert function must be a function"
+        return rep.traverse(TemplateCallRepresentation, convertFn)
+
+    @classmethod
+    def evalRepresentation(cls, rep):
+        assert isinstance(rep, Representation), "Can only evaluate Representations"
+        return rep.construct()
 
 
 if __name__ == "__main__":
