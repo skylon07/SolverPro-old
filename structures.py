@@ -110,7 +110,8 @@ class VariableRepresentation(Representation):
         return "<VariableRep '{}'>".format(self._idRep._idStr)
 
     def construct(self):
-        nameStr = self._idRep.construct()
+        identifier = self._idRep.construct()
+        nameStr = str(identifier)
         return sympy.Symbol(nameStr)
 
     def _traverseChildren(self, reprType, onReprFn):
