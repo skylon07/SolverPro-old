@@ -159,7 +159,7 @@ class ExpressionRepresentation(Representation):
 
     def __init__(self, operRep, operArgs):
         assert type(operRep) is OperatorRepresentation, "Can only receive Operator Representations as first argument"
-        assert iter(operArgs) is not None, "Operator arguments must be an iterable of arguments"
+        assert type(operArgs) in (tuple, list), "Operator arguments must be tuple or list"
         assert len([arg for arg in operArgs if not isinstance(arg, Representation)]) == 0, "Operator arguments must contain Representation objects"
         self._operRep = operRep
         self._operArgs = operArgs
@@ -183,7 +183,7 @@ class ExpressionRepresentation(Representation):
 class TemplateCallRepresentation(Representation):
     def __init__(self, templateIdRep, parameters):
         assert type(templateIdRep) is IdentifierRepresentation, "Template ID must be a string"
-        assert iter(parameters) is not None, "Parameters must be iterable"
+        assert type(parameters) in (tuple, list), "Parameters must be a tuple or list"
         assert len([param for param in parameters if not isinstance(param, Representation)]) == 0, "Parameters must only contain Representation objects"
         self._templateIdRep = templateIdRep
         self._parameters = parameters
@@ -341,6 +341,7 @@ class Identifier(Model):
 class Template(Model):
     def __init__(self, templateId, paramNames, templateStr):
         assert type(templateId) is Identifier, "'templateId' must be an Identifier"
+        assert type(paramNames) in (tuple, list), "Parameter names must be a tuple or list"
         assert len([paramId for paramId in paramNames if type(paramId) is not Identifier]) == 0, "'paramNames' must be an iterable of Identifiers"
         self._templateId = templateId
         self._paramNames = paramNames

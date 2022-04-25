@@ -576,6 +576,8 @@ class StackPieceTracer:
         return traceId
 
     def __init__(self, obj, tokens):
+        assert isinstance(obj, [Representation, tuple, list]), "Traced object must be a Representation or list/tuple of Representations"
+        assert len([nonRep for nonRep in obj if not isinstance(nonRep, Representation)]) == 0, "Tuple/list must only contain Representations"
         self._obj = obj
         self._tokens = tokens
         self._traces = []
