@@ -353,12 +353,16 @@ class InterpreterParser:
                 opListPiece = popStack(stack)
                 operPiece = popStack(self._stacks.operations)
                 nextOpListPiece = popStack(nextStack)
+                # TODO: make separate opList datatype, and allow reversing evaluation
+                # for exponents (should be evaluated right-left, but currently evaluated
+                # left-right; everything else should be left-right)
                 opList = opListPiece.obj
                 operRep = operPiece.obj
                 nextOpList = nextOpListPiece.obj
                 nextExpr = evaluateOperationList(nextOpList)
-                # inserted on left to later be evaluated left-to-right
+                # inserted on left to reverse order to match expectations
                 # (parser productions return right-to-left)
+                # ex. parser "1 + 2 + 3" > 3, 2, 1; reversing gives expected 1, 2, 3
                 opList.insert(0, operRep)
                 opList.insert(0, nextExpr)
                 piece = opListPiece.update(opList, tokens, nextOpListPiece.traces)
