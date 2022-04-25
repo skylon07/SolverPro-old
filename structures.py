@@ -93,6 +93,7 @@ class NumberRepresentation(Representation):
         return "<NumberRep '{}'>".format(self._numStr)
 
     def construct(self):
+        # TODO: just use regular float, since they're rounded on formatting now
         return RoundedFloat(self._numStr)
 
     def _traverseChildren(self, reprType, onReprFn):
@@ -207,7 +208,7 @@ class Model(Displayable):
 
 class RoundedFloat(Model):
     @classmethod
-    def _roundFloat(cls, rawFloat):
+    def roundFloat(cls, rawFloat, sig=15):
         # special case for 0 (log10 gives domain error)
         if rawFloat == 0:
             return rawFloat
@@ -220,7 +221,7 @@ class RoundedFloat(Model):
         # round() using positive arg will round after decimal;
         # with negative arg will round before decimal; this is
         # the opposite of numDigits, therefore we use -numDigits
-        roundTo = 15 - numDigits
+        roundTo = sig - numDigits
         roundFloat = round(rawFloat, roundTo)
         return roundFloat
     
@@ -231,13 +232,19 @@ class RoundedFloat(Model):
         return "<RoundedFloat {}>".format(self._val)
 
     def __str__(self):
-        return str(self._val)
+        if self._val // 1 == self._val:
+            return str(int(self._val))
+        else:
+            return str(self._val)
+
+    def __hash__(self):
+        return hash(self._val)
 
     def _convertArithmetic(self, other, opFn):
         if type(other) is RoundedFloat:
-            return RoundedFloat(self._roundFloat(opFn(self._val, other._val)))
+            return RoundedFloat(self.roundFloat(opFn(self._val, other._val)))
         elif type(other) in {int, float}:
-            return RoundedFloat(self._roundFloat(opFn(self._val, other)))
+            return RoundedFloat(self.roundFloat(opFn(self._val, other)))
         else:
             return opFn(self._val, other)
 
@@ -403,7 +410,7 @@ class SubSet(Model):
         self._set.remove(expr)
 
     def removeFrom(self, iterable):
-        self._set.difference_update(iterable)
+        self._set.difference_update(iterable) 
         
 
 

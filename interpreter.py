@@ -15,11 +15,25 @@ class Interpreter:
         
         self._parser = InterpreterParser()
         self._master = AlgebraMaster()
+        self._fillMasterWithFakeData()
         self._initializeBuiltins()
 
     # TODO: error when trying to redefine builtins
     def _initializeBuiltins(self):
         pass
+
+    def _fillMasterWithFakeData(self):
+        self._master._substitutions.update({
+            sympy.Symbol('a'): SubSet({4}),
+            sympy.Symbol('b'): SubSet({-5}),
+            sympy.Symbol('c'): SubSet({sympy.Symbol('a') + sympy.Symbol('b')}),
+            sympy.Symbol('x'): SubSet({4, -4}),
+            sympy.Symbol('y'): SubSet({sympy.Symbol('c'), sympy.Symbol('x')}),
+            sympy.Symbol('a2'): SubSet({sympy.Symbol('b2')}),
+            sympy.Symbol('b2'): SubSet({sympy.Symbol('c2')}),
+            sympy.Symbol('c2'): SubSet({sympy.Symbol('a2')}),
+        })
+        
 
     # treats the string as user input
     # TODO: change paradigm so templates are evaluated before expressions are created
@@ -63,9 +77,21 @@ class Interpreter:
 
     # I/O helper functions
     def _print(self, *args):
-        args = [str(arg) for arg in args]
+        args = [self._formatForPrint(arg) for arg in args]
         args[0] = INDENT + args[0]
         self._outputFn(*args)
+
+    def _formatForPrint(self, val):
+        # floats are rounded on format because there's
+        # no way to round them inside the sympy expression
+        if type(val) is sympy.Float:
+            val = RoundedFloat.roundFloat(float(val), 12)
+            if val == val // 1:
+                return str(int(val))
+            else:
+                return str(val)
+        else:
+            return str(val)
 
     def _handleError(self, e):
         parserErrors = (
