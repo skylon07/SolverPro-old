@@ -5,6 +5,7 @@ from errors import *
 
 from lexer import Lexer
 from solverparser import Parser
+from algebramaster import AlgebraMaster
 from structures import *
 
 
@@ -13,6 +14,7 @@ class Interpreter:
         self._outputFn = outputFn
         
         self._parser = InterpreterParser()
+        self._master = AlgebraMaster()
         self._initializeBuiltins()
 
     # TODO: error when trying to redefine builtins
@@ -38,9 +40,14 @@ class Interpreter:
                 def convFn(templateCall):
                     return templateCall
                 evaledRep = Constructor.convertTemplateCalls(exprRepPiece.obj, convFn)
-                # TODO: evaluate variables
-                subsVal = Constructor.evalRepresentation(evaledRep)
-                self._print(subsVal)
+                expression = Constructor.evalRepresentation(evaledRep)
+                if type(expression) is RoundedFloat:
+                    self._print(expression)
+                else:
+                    subExprSet = self._master.substituteKnown(expression)
+                    assert type(subExprSet) is SubSet, "substituteKnown() did not return a SubSet()"
+                    for item in subExprSet:
+                        self._print(item)
             
             elif result["type"] == "command":
                 # TODO: evaluate template calls
