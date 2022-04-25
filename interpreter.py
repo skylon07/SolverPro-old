@@ -400,7 +400,7 @@ class InterpreterParser:
             elif branch in exprBranches:
                 # no need to process;
                 # the expression is already in the right place
-                assert type(self._stacks.expressions[-1]) is ExpressionRepresentation, "Expression stack has non-expression, and tried to pass"
+                assert type(self._stacks.expressions[-1].obj) is ExpressionRepresentation, "Expression stack has non-expression, and tried to pass"
                 return
             else:
                 throwBranchNotCaught(branch, "onEvaluation")
