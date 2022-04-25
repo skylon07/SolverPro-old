@@ -39,18 +39,17 @@ class Interpreter:
     # TODO: change paradigm so templates are evaluated before expressions are created
     def executeLine(self, string):
         try:
+            # TODO: evaluate template calls
             result = self._parser.evaluateLine(string)
+            
             if result["type"] == "relation":
-                # TODO: evaluate template calls
                 raise InterpreterNotImplementedError("relations")
             
             elif result["type"] == "alias":
-                # TODO: evaluate template calls
                 raise InterpreterNotImplementedError("aliases")
             
             elif result["type"] == "expression":
                 exprRepPiece = result["expression"]
-                # TODO: evaluate template calls
                 def convFn(templateCall):
                     return templateCall
                 evaledRep = Constructor.convertTemplateCalls(exprRepPiece.obj, convFn)
@@ -64,7 +63,6 @@ class Interpreter:
                         self._print(item)
             
             elif result["type"] == "command":
-                # TODO: evaluate template calls
                 raise InterpreterNotImplementedError("commands")
             
             elif result["type"] == "empty":
@@ -265,21 +263,22 @@ class InterpreterParser:
                 piece.update(varRep, tokens, [])
             elif branch == "number":
                 piece = popStack(self._stacks.numbers)
-            elif branch == "fullidentifier PAREN_OPEN expressions PAREN_CLOSE":
-                paramsPiece = popStack(self._stacks.expressions)
-                namePiece = popStack(self._stacks.identifiers)
-                exprParams = paramsPiece.obj
-                nameId = namePiece.obj
-                templateResult = TemplateCallRepresentation(nameId, exprParams)
-                piece = paramsPiece.update(templateResult, tokens, namePiece.traces)
-                piece.trace(StackPieceTracer.types.TEMPLATE_CALL)
-            elif branch == "fullidentifier PAREN_OPEN PAREN_CLOSE":
-                namePiece = popStack(self._stacks.identifiers)
-                exprParams = []
-                nameId = namePiece.obj
-                templateResult = TemplateCallRepresentation(nameId, exprParams)
-                piece = namePiece.update(templateResult, tokens, [])
-                piece.trace(StackPieceTracer.types.TEMPLATE_CALL)
+            # TODO: PARSER NO LONGER SUPPORTS TEMPLATE CALLS
+            # elif branch == "fullidentifier PAREN_OPEN expressions PAREN_CLOSE":
+            #     paramsPiece = popStack(self._stacks.expressions)
+            #     namePiece = popStack(self._stacks.identifiers)
+            #     exprParams = paramsPiece.obj
+            #     nameId = namePiece.obj
+            #     templateResult = TemplateCallRepresentation(nameId, exprParams)
+            #     piece = paramsPiece.update(templateResult, tokens, namePiece.traces)
+            #     piece.trace(StackPieceTracer.types.TEMPLATE_CALL)
+            # elif branch == "fullidentifier PAREN_OPEN PAREN_CLOSE":
+            #     namePiece = popStack(self._stacks.identifiers)
+            #     exprParams = []
+            #     nameId = namePiece.obj
+            #     templateResult = TemplateCallRepresentation(nameId, exprParams)
+            #     piece = namePiece.update(templateResult, tokens, [])
+            #     piece.trace(StackPieceTracer.types.TEMPLATE_CALL)
             else:
                 throwBranchNotCaught(branch, "onValue")
             piece.trace(StackPieceTracer.types.VALUE)

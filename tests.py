@@ -1066,20 +1066,30 @@ class TestSuites:
         eval4 = lexer.process("(b + c)", withEOL=False)
         testInspectPerforms(tokens, lineStr, "onEvaluation", [(eval1, "value"), (eval2, "value"), (eval3, "value"), (eval4, "PAREN_OPEN expression PAREN_CLOSE")], "(low-key order-ops test)")
 
+        # TODO: PARSER NO LONGER SUPPORTS TEMPLATE CALLS
+        # lineStr = "a(b)"
+        # tokens = lexer.process(lineStr)
+        # expTokens = lexer.process("b", withEOL=False)
+        # testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens, "expression")], "can process a single argument")
+        # lineStr = "a(b, c)"
+        # tokens = lexer.process(lineStr)
+        # expTokens1 = lexer.process("c", withEOL=False)
+        # expTokens2 = lexer.process("b, c", withEOL=False)
+        # testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens1, "expression"), (expTokens2, "expression COMMA expressions")], "can process multiple singular arguments")
+        # lineStr = "a(b + c, d * e - f)"
+        # tokens = lexer.process(lineStr)
+        # expTokens1 = lexer.process("d * e - f", withEOL=False)
+        # expTokens2 = lexer.process("b + c, d * e - f", withEOL=False)
+        # testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens1, "expression"), (expTokens2, "expression COMMA expressions")], "can process multiple complex arguments")
         lineStr = "a(b)"
         tokens = lexer.process(lineStr)
-        expTokens = lexer.process("b", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens, "expression")], "can process a single argument")
-        lineStr = "a(b, c)"
+        testInspectErrors(tokens, lineStr, parser.ParseError, "template call evaluation")
+        lineStr = "a()"
         tokens = lexer.process(lineStr)
-        expTokens1 = lexer.process("c", withEOL=False)
-        expTokens2 = lexer.process("b, c", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens1, "expression"), (expTokens2, "expression COMMA expressions")], "can process multiple singular arguments")
-        lineStr = "a(b + c, d * e - f)"
+        testInspectErrors(tokens, lineStr, parser.ParseError, "template call evaluation")
+        lineStr = "a(b, c, d, e)"
         tokens = lexer.process(lineStr)
-        expTokens1 = lexer.process("d * e - f", withEOL=False)
-        expTokens2 = lexer.process("b + c, d * e - f", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onExpressions", [(expTokens1, "expression"), (expTokens2, "expression COMMA expressions")], "can process multiple complex arguments")
+        testInspectErrors(tokens, lineStr, parser.ParseError, "template call evaluation")
 
         lineStr = "var<unit>"
         tokens = lexer.process(lineStr)
@@ -1096,23 +1106,24 @@ class TestSuites:
         expTokens = lexer.process(".8e-6<unit>", withEOL=False)
         unitTokens = lexer.process("unit", withEOL=False)
         testInspectPerforms(tokens, lineStr, "onValue", [(unitTokens, "fullidentifier"), (expTokens, "number unit")], "E-number with units")
-        lineStr = "a(b, c)"
-        tokens = lexer.process(lineStr)
-        eval1 = lexer.process("b", withEOL=False)
-        eval2 = lexer.process("c", withEOL=False)
-        eval3 = lexer.process("a(b, c)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fullidentifier"), (eval2, "fullidentifier"), (eval3, "fullidentifier PAREN_OPEN expressions PAREN_CLOSE")], "can evaluate template arguments (single identifiers)")
-        lineStr = "a(b + c, d)"
-        tokens = lexer.process(lineStr)
-        eval1 = lexer.process("b", withEOL=False)
-        eval2 = lexer.process("c", withEOL=False)
-        eval3 = lexer.process("d", withEOL=False)
-        eval4 = lexer.process("a(b + c, d)", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fullidentifier"), (eval2, "fullidentifier"), (eval3, "fullidentifier"), (eval4, "fullidentifier PAREN_OPEN expressions PAREN_CLOSE")], "can evaluate template arguments (with expressions)")
-        lineStr = "a()"
-        tokens = lexer.process(lineStr)
-        expTokens = lexer.process("a()", withEOL=False)
-        testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "fullidentifier PAREN_OPEN PAREN_CLOSE")], "can evaluate templates (with no arguments)")
+        # TODO: PARSER NO LONGER SUPPORTS TEMPLATE CALLS
+        # lineStr = "a(b, c)"
+        # tokens = lexer.process(lineStr)
+        # eval1 = lexer.process("b", withEOL=False)
+        # eval2 = lexer.process("c", withEOL=False)
+        # eval3 = lexer.process("a(b, c)", withEOL=False)
+        # testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fullidentifier"), (eval2, "fullidentifier"), (eval3, "fullidentifier PAREN_OPEN expressions PAREN_CLOSE")], "can evaluate template arguments (single identifiers)")
+        # lineStr = "a(b + c, d)"
+        # tokens = lexer.process(lineStr)
+        # eval1 = lexer.process("b", withEOL=False)
+        # eval2 = lexer.process("c", withEOL=False)
+        # eval3 = lexer.process("d", withEOL=False)
+        # eval4 = lexer.process("a(b + c, d)", withEOL=False)
+        # testInspectPerforms(tokens, lineStr, "onValue", [(eval1, "fullidentifier"), (eval2, "fullidentifier"), (eval3, "fullidentifier"), (eval4, "fullidentifier PAREN_OPEN expressions PAREN_CLOSE")], "can evaluate template arguments (with expressions)")
+        # lineStr = "a()"
+        # tokens = lexer.process(lineStr)
+        # expTokens = lexer.process("a()", withEOL=False)
+        # testInspectPerforms(tokens, lineStr, "onValue", [(expTokens, "fullidentifier PAREN_OPEN PAREN_CLOSE")], "can evaluate templates (with no arguments)")
 
         lineStr = "var<unit>"
         tokens = lexer.process(lineStr)

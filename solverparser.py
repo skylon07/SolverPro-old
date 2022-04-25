@@ -353,20 +353,21 @@ class ParserMatcher:
             self.unit()
             return "fullidentifier unit"
 
-        # branch fullidentifier PAREN_OPEN PAREN_CLOSE/
-        #     fullidentifier PAREN_OPEN expressions PAREN_CLOSE
-        # (would make more sense for these branches to be in
-        # evaluable, but it is easier to implement here)
-        elif moreTokens and self.currToken.type == Lexer.types.PAREN_OPEN:
-            self.match(Lexer.types.PAREN_OPEN)
-            # branch fullidentifier PAREN_OPEN PAREN_CLOSE
-            if self.currToken.type == Lexer.types.PAREN_CLOSE:
-                self.match(Lexer.types.PAREN_CLOSE)
-                return "fullidentifier PAREN_OPEN PAREN_CLOSE"
-            # branch fullidentifier PAREN_OPEN expressions PAREN_CLOSE
-            self.expressions()
-            self.match(Lexer.types.PAREN_CLOSE)
-            return "fullidentifier PAREN_OPEN expressions PAREN_CLOSE"
+        # TODO: PARSER NO LONGER SUPPORTS TEMPLATE CALLS
+        # # branch fullidentifier PAREN_OPEN PAREN_CLOSE/
+        # #     fullidentifier PAREN_OPEN expressions PAREN_CLOSE
+        # # (would make more sense for these branches to be in
+        # # evaluable, but it is easier to implement here)
+        # elif moreTokens and self.currToken.type == Lexer.types.PAREN_OPEN:
+        #     self.match(Lexer.types.PAREN_OPEN)
+        #     # branch fullidentifier PAREN_OPEN PAREN_CLOSE
+        #     if self.currToken.type == Lexer.types.PAREN_CLOSE:
+        #         self.match(Lexer.types.PAREN_CLOSE)
+        #         return "fullidentifier PAREN_OPEN PAREN_CLOSE"
+        #     # branch fullidentifier PAREN_OPEN expressions PAREN_CLOSE
+        #     self.expressions()
+        #     self.match(Lexer.types.PAREN_CLOSE)
+        #     return "fullidentifier PAREN_OPEN expressions PAREN_CLOSE"
 
         # (end of default branch fullidentifier)
         return "fullidentifier"
