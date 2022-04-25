@@ -599,14 +599,13 @@ class StackPieceTracer:
         assert traceType in StackPieceTracer.types, "An invalid trace type was given"
         traceStart = self._tokens[0].placementStart
         traceEnd = self._tokens[-1].placementEnd
-        trace = {
-            "id": self._getUniqueTraceId(),
-            "type": traceType,
-            "obj": self._obj,
-            "tokens": self._tokens,
-            "start": traceStart,
-            "end": traceEnd,
-        }
+        trace = self.Trace(
+            traceType,
+            self._obj,
+            self._tokens,
+            traceStart,
+            traceEnd,
+        )
         self._traces.append(trace)
 
     @property
@@ -619,13 +618,22 @@ class StackPieceTracer:
         while upBound != lowBound:
             bisectIdx = int((lowBound + upBound) / 2)
             bisectTrace = self._traces[bisectIdx]
-            if trace["id"] < bisectTrace["id"]:
+            if trace.id < bisectTrace.id:
                 upBound = bisectIdx
-            elif trace["id"] > bisectTrace["id"]:
+            elif trace.id > bisectTrace.id:
                 lowBound = bisectIdx + 1
             else:
                 raise ValueError("trace ids were not unique (or a trace was re-added into the list)")
         self._traces[lowBound:upBound] = [trace]
+
+    class Trace:
+        def __init__(self, traceType, obj, tokens, start, end):
+            self.id = StackPieceTracer._getUniqueTraceId()
+            self.type = traceType
+            self.obj = obj
+            self.tokens = tokens
+            self.start = start
+            self.end = end
 
 
 class Constructor:

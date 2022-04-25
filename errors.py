@@ -52,8 +52,8 @@ class InterpreterTracebackError(TracebackError, InterpreterError, ABC):
         message = self._generateMessage(badTraces)
         # indent after first line
         message = ('\n' + INDENT).join(message.split('\n'))
-        badStarts = [trace["start"] for trace in badTraces]
-        badEnds = [trace["end"] for trace in badTraces]
+        badStarts = [trace.start for trace in badTraces]
+        badEnds = [trace.end for trace in badTraces]
         super().__init__(message, badStarts, badEnds)
 
     @abstractmethod
@@ -70,13 +70,13 @@ class InterpreterTracebackWarning(InterpreterTracebackError):
 class UndefinedIdentifierError(InterpreterTracebackError):
     def _generateMessage(self, idTraces):
         plural = len(idTraces) > 1
-        badIdentifierStrs = (trace["obj"].args[0] for trace in idTraces)
+        badIdentifierStrs = (str(trace.obj.construct()) for trace in idTraces)
         return "{}{}ndefined identifier{} {} given: {}".format(
             "An " if not plural else "",
             "u" if not plural else "U",
             "s" if plural else "",
             "were" if plural else "was",
-            ','.join(badIdentifierStrs),
+            ", ".join(badIdentifierStrs),
         )
 
 
@@ -87,14 +87,14 @@ class InvalidExpressionError(InterpreterTracebackError):
         badIdentifierStrs = (trace["obj"].args[0].args[0] for trace in valTraces)
         return "The variable{} {} cannot be evaluated in an expression".format(
             "s" if plural else "",
-            ','.join(badIdentifierStrs)
+            ", ".join(badIdentifierStrs)
         )
 
 
 class NotATemplateError(InterpreterTracebackError):
     def _generateMessage(self, callTraces):
         plural = len(callTraces) > 1
-        badTemplateNames = (trace["obj"].nameId for trace in callTraces)
+        badTemplateNames = (str(trace.obj.construct().templateId) for trace in callTraces)
         return "{} {} not defined as {}template{} and cannot be evaluated as {}".format(
             ','.join(badTemplateNames),
             "are" if plural else "is",
@@ -112,10 +112,10 @@ class TemplateMismatchError(InterpreterTracebackError):
 class UnusedArgumentsWarning(InterpreterTracebackWarning):
     def _generateMessage(self, idTraces):
         plural = len(idTraces) > 1
-        badIdentifierStrs = (trace["obj"].args[0] for trace in idTraces)
+        badIdentifierStrs = (str(trace.obj) for trace in idTraces)
         return "Variable{} {} {} not used in {} template definition".format(
             "s" if plural else "",
-            ','.join(badIdentifierStrs),
+            ", ".join(badIdentifierStrs),
             "were" if plural else "was",
             "their" if plural else "its",
         )
