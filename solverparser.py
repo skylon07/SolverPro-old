@@ -600,7 +600,7 @@ class ParserMatcher:
             self.objectdeclaration()
             return "objectdeclaration"
 
-        # branch BRACKET_OPEN expressions BACKET_CLOSE
+        # branch BRACKET_OPEN expressions BRACKET_CLOSE
         if self.currToken.type == Lexer.types.BRACKET_OPEN:
             self.match(Lexer.types.BRACKET_OPEN)
             self.expressions()
