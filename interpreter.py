@@ -455,7 +455,7 @@ class InterpreterParser:
                 idsPiece = popStack(self._stacks.identifiers)
                 paramsPiece = StackPieceTracer(None, [])
             elif isTemplateBranch:
-                if branch == "fullidentifier PAREN_OPEN identifierss PAREN_CLOSE":
+                if branch == "fullidentifier PAREN_OPEN identifiers PAREN_CLOSE":
                     paramsPiece = popStack(self._stacks.identifiers)
                     assert type(paramsPiece.obj) is list, "Identifiers should come in a list"
                 elif branch == "fullidentifier PAREN_OPEN PAREN_CLOSE":
