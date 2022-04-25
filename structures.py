@@ -77,7 +77,7 @@ class IdentifierRepresentation(Representation):
     def construct(self):
         # this function intentionally does NOT return an actual Identifier()
         # (since these will be manually created by the interpreter)
-        return self._idStr
+        return Identifier(self._idStr)
 
     def _traverseChildren(self, reprType, onReprFn):
         # no children
