@@ -7,12 +7,22 @@ class AlgebraMaster:
     def __init__(self):
         self._substitutions = dict()
 
+    @classmethod
+    def isNumeric(cls, obj):
+        return isinstance(obj, (int, float, RoundedFloat, sympy.Number))
+
     def substituteKnown(self, expr):
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         return SubSet({
             self._subUntilFixed(expr, subCombo)
             for subCombo in self._subCombos()
         })
+
+    def define(self, ids, vals):
+        pass # TODO
+
+    def getDefinition(self, identifier):
+        pass # TODO
 
     def _subUntilFixed(self, expr, subCombo):
         lastExpr = None

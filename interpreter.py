@@ -46,15 +46,23 @@ class Interpreter:
                 raise InterpreterNotImplementedError("relations")
             
             elif result["type"] == "alias":
-                raise InterpreterNotImplementedError("aliases")
+                newIdsConstructor = Constructor(result['aliasNames'])
+                paramsConstructor = Constructor(result['templateParams'])
+                rightHandConstructor = Constructor(result['rightHand'])
+
+                isTemplateAlias = result['templateParams'].obj != None
+                if not isTemplateAlias:
+                    rightHandConstructor.ensureDefined(self._master.getDefinition)
+                    # self._master.define(newIds, value)
+                else:
+                    raise InterpreterNotImplementedError("template aliases")
             
             elif result["type"] == "expression":
-                exprRepPiece = result["expression"]
-                def convFn(templateCall):
-                    return templateCall
-                evaledRep = Constructor.convertTemplateCalls(exprRepPiece.obj, convFn)
-                expression = Constructor.evalRepresentation(evaledRep)
-                if type(expression) is RoundedFloat:
+                exprConstructor = Constructor(result['expression'])
+
+                # TODO: ensure identifiers exist (as definitions or relations) before constructing
+                expression = exprConstructor.construct()
+                if self._master.isNumeric(expression):
                     self._print(expression)
                 else:
                     subExprSet = self._master.substituteKnown(expression)
@@ -639,16 +647,53 @@ class StackPieceTracer:
 
 
 class Constructor:
-    @classmethod
-    def convertTemplateCalls(cls, rep, convertFn):
-        assert isinstance(rep, Representation), "Can only convert Representations"
-        assert isfunction(convertFn), "The convert function must be a function"
-        return rep.traverse(TemplateCallRepresentation, convertFn)
+    def __init__(self, stackPiece):
+        self._piece = stackPiece
 
-    @classmethod
-    def evalRepresentation(cls, rep):
-        assert isinstance(rep, Representation), "Can only evaluate Representations"
-        return rep.construct()
+    def convertTemplateCalls(self, convertFn):
+        assert isfunction(convertFn), "The convert function must be a function"
+        convertedReps = list(map(convertFn, self._repList))
+        if self._isSingleRep:
+            return convertedReps[0]
+        else:
+            return convertedReps
+
+    def construct(self):
+        constructedVals = list(map(lambda rep: rep.construct(), self._repList))
+        if self._isSingleRep:
+            return constructedVals[0]
+        else:
+            return constructedVals
+
+    # ensure methods
+    def ensureDefined(self, getIdValFn):
+        badTraces = []
+        for idTrace in self._piece.traces:
+            if idTrace.type == StackPieceTracer.types.IDENTIFIER:
+                identifier = idTrace.obj.construct()
+                isDefined = getIdValFn(identifier) is not None
+                if not isDefined:
+                    badTraces.append(idTrace)
+        self._checkEnsureFailed(UndefinedIdentifierError, badTraces)
+
+    def _checkEnsureFailed(self, ErrType, badTraces):
+        assert issubclass(ErrType, InterpreterTracebackError), "Ensure functions should only work with traceback errors"
+        if len(badTraces) > 0:
+            raise ErrType(badTraces)
+
+    @property
+    def _repList(self):
+        repOrList = self._piece.obj
+        if type(repOrList) in (tuple, list):
+            return repOrList
+        elif isinstance(repOrList, (type(None), Representation)):
+            return [repOrList]
+        else:
+            assert "this" == "impossible", "Stack piece had an unconsidered value"
+    
+    @property
+    def _isSingleRep(self):
+        return isinstance(self._piece.obj, Representation)
 
 
 if __name__ == "__main__":
