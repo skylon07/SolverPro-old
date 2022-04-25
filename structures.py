@@ -114,7 +114,12 @@ class VariableRepresentation(Representation):
         return sympy.Symbol(nameStr)
 
     def _traverseChildren(self, reprType, onReprFn):
-        self._idRep = self._idRep.traverse(reprType, onReprFn)
+        newIdRep = self._idRep.traverse(reprType, onReprFn)
+        if newIdRep is not self._idRep:
+            return VariableRepresentation(newIdRep)
+        else:
+            return self
+
 
 
 class OperatorRepresentation(Representation):
@@ -173,11 +178,15 @@ class ExpressionRepresentation(Representation):
         return operFn(*constructedArgs)
 
     def _traverseChildren(self, reprType, onReprFn):
-        self._operRep = self._operRep.traverse(reprType, onReprFn)
-        self._operArgs = [
+        newOperRep = self._operRep.traverse(reprType, onReprFn)
+        newOperArgs = [
             argRep.traverse(reprType, onReprFn)
             for argRep in self._operArgs
         ]
+        if newOperRep is not self._operRep or any(newOperArg is not operArg for (newOperArg, operArg) in zip(newOperArgs, self._operArgs)):
+            return ExpressionRepresentation(newOperRep, newOperArgs)
+        else:
+            return self
 
 
 class TemplateCallRepresentation(Representation):
@@ -196,10 +205,15 @@ class TemplateCallRepresentation(Representation):
         return TemplateCall(identifier, self._parameters)
 
     def _traverseChildren(self, reprType, onReprFn):
-        self._parameters = [
+        newIdRep = self._templateIdRep.traverse(reprType, onReprFn)
+        newParameters = [
             paramRep.traverse(reprType, onReprFn)
             for paramRep in self._parameters
         ]
+        if newIdRep is not self._templateIdRep or any(newParam is not param for (newParam, param) in zip(newParameters, self._parameters)):
+            return TemplateCallRepresentation(newIdRep, newParameters)
+        else:
+            return self
 
 
 class Model(Displayable):
