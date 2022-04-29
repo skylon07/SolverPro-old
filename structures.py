@@ -46,11 +46,6 @@ class Representation(Displayable, AbstractClass):
         return  # nothing, but should call traverse() for each "child" (if any)
 
 
-# TODO: RepresentationByString mixin
-# TODO: consider how to evaluate Represent_Expression
-#       (doesn't it need to be given Represents?)
-
-
 class DummyRepresentation(Representation):
     def __init__(self, obj):
         self._obj = obj

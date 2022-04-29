@@ -83,7 +83,7 @@ class UndefinedIdentifierError(InterpreterTracebackError):
 class InvalidExpressionError(InterpreterTracebackError):
     def _generateMessage(self, valTraces):
         plural = len(valTraces) > 1
-        # TODO: define a function that makes the Represent() mapping clear
+        # TODO: define a function that makes the Represent mapping clear
         badIdentifierStrs = (trace["obj"].args[0].args[0] for trace in valTraces)
         return "The variable{} {} cannot be evaluated in an expression".format(
             "s" if plural else "",
