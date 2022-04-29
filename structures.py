@@ -88,8 +88,7 @@ class NumberRepresentation(Representation):
         return "<NumberRep '{}'>".format(self._numStr)
 
     def construct(self):
-        # TODO: just use regular float, since they're rounded on formatting now
-        return RoundedFloat(self._numStr)
+        return float(self._numStr)
 
     def _traverseChildren(self, reprType, onReprFn):
         # no children
