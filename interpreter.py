@@ -104,7 +104,7 @@ class Interpreter:
             Parser.ParseError,
             Parser.EOLError,
         )
-        if isinstance(e, parserErrors) or isinstance(e, InterpreterError):
+        if isinstance(e, parserErrors) or isinstance(e, InterpreterException):
             self._outputFn(e)
             return
         
@@ -678,7 +678,7 @@ class Constructor:
         self._checkFailerFailed(UndefinedIdentifierError, badTraces)
 
     def _checkFailerFailed(self, ErrType, badTraces):
-        assert issubclass(ErrType, InterpreterTracebackError), "Failer functions should only work with traceback errors"
+        assert issubclass(ErrType, InterpreterTracebackException), "Failer functions should only work with traceback errors"
         if len(badTraces) > 0:
             raise ErrType(badTraces)
 
