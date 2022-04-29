@@ -4,6 +4,7 @@ from constants import INDENT, USER_INPUT
 
 
 # an abstract error class that gives an interface for tracing inputs
+# TODO: change to TracebackException
 class TracebackError(Exception, ABC):
     # subclasses must implement __init__ and call this
     @abstractmethod
