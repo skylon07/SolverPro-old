@@ -424,6 +424,20 @@ class SubSet(Model):
         self._set.difference_update(iterable) 
         
 
+def isNumeric(obj):
+    return isinstance(obj, (int, float, RoundedFloat, sympy.Number))
+
+
+def symbolToIdentifier(sympyObj):
+    assert isinstance(sympyObj, sympy.Symbol), "symbolToIdentifier() requires a sympy object"
+    assert not isNumeric(sympyObj), "symbolToIdentifier() cannot convert numbers"
+    return Identifier(str(sympyObj))
+
+
+def identifierToSymbol(identifier):
+    assert type(identifier) is Identifier, "identifierToSymbol() only takes Identifiers"
+    return sympy.Symbol(str(identifier))
+
 
 if __name__ == "__main__":
     e = ExpressionRepresentation(OperatorRepresentation(lambda x, y: x + y, "+"), [

@@ -62,7 +62,7 @@ class Interpreter:
 
                 # TODO: ensure identifiers exist (as definitions or relations) before constructing
                 expression = exprConstructor.construct()
-                if self._master.isNumeric(expression):
+                if isNumeric(expression):
                     self._print(expression)
                 else:
                     subExprSet = self._master.substituteKnown(expression)
