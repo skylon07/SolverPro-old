@@ -88,7 +88,16 @@ class NumberRepresentation(Representation):
         return "<NumberRep '{}'>".format(self._numStr)
 
     def construct(self):
-        return float(self._numStr)
+        isFloat = False
+        for char in self._numStr:
+            if char in [".", "E", "e"]:
+                isFloat = True
+                break
+        
+        if isFloat:
+            return float(self._numStr)
+        else:
+            return int(self._numStr)
 
     def _traverseChildren(self, reprType, onReprFn):
         # no children
