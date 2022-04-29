@@ -41,24 +41,24 @@ class Interpreter:
                 raise InterpreterNotImplementedError("relations")
             
             elif result["type"] == "alias":
-                newIdsConstructor = Constructor(result['aliasNames'])
-                paramsConstructor = Constructor(result['templateParams'])
-                rightHandConstructor = Constructor(result['rightHand'])
+                newIdsConstructor = Constructor(result['aliasNames'], "list")
+                paramsConstructor = Constructor(result['templateParams'], "list")
+                rightHandConstructor = Constructor(result['rightHand'], "either", forceList=True)
 
                 isTemplateAlias = result['templateParams'].obj != None
                 if not isTemplateAlias:
                     newIds = newIdsConstructor.construct()
-                    values = rightHandConstructor.construct()
+                    values = SubSet(rightHandConstructor.construct())
                     try:
                         self._master.define(newIds, values)
                     except NotANumericException as err:
-                        rightHandConstructor.traceUndefined()
+                        rightHandConstructor.failForUndefined()
                         raise err
                 else:
                     raise InterpreterNotImplementedError("template aliases")
             
             elif result["type"] == "expression":
-                exprConstructor = Constructor(result['expression'])
+                exprConstructor = Constructor(result['expression'], "single")
 
                 # TODO: ensure identifiers exist (as definitions or relations) before constructing
                 expression = exprConstructor.construct()
