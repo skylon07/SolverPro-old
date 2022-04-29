@@ -647,23 +647,20 @@ class StackPieceTracer:
 
 
 class Constructor:
-    def __init__(self, stackPiece):
+    def __init__(self, stackPiece, mode, forceList=False):
+        assert mode in ["list", "single", "either"], "Constructor mode must be 'list', 'single', or 'either'"
         self._piece = stackPiece
+        self._mode = mode
+        self._forceList = forceList
 
     def convertTemplateCalls(self, convertFn):
         assert isfunction(convertFn), "The convert function must be a function"
         convertedReps = [convertFn(item) for item in self._repList]
-        if self._isSingleRep:
-            return convertedReps[0]
-        else:
-            return convertedReps
+        return self._convertList(convertedReps)
 
     def construct(self):
         constructedVals = [rep.construct() for rep in self._repList]
-        if self._isSingleRep:
-            return constructedVals[0]
-        else:
-            return constructedVals
+        return self._convertList(constructedVals)
 
     # failer functions
     def failForUndefined(self, isDefinedFn):
@@ -682,6 +679,19 @@ class Constructor:
         if len(badTraces) > 0:
             raise ErrType(badTraces)
 
+    def _convertList(self, repList):
+        if self._mode == "single":
+            assert self._isSingleRep, "Constructor mode mismatch: tracer contained a list"
+            return repList[0] if not self._forceList else repList
+        elif self._mode == "list":
+            assert not self._isSingleRep, "Constructor mode mismatch: tracer contained a single Representation"
+            return repList
+        elif self._mode == "either":
+            shouldBeSingle = not self._forceList and self._isSingleRep
+            return repList[0] if shouldBeSingle else repList
+        else:
+            assert "this" == "impossible", "An unconsidered Constructor mode occurred"
+    
     @property
     def _repList(self):
         repOrList = self._piece.obj
@@ -691,7 +701,7 @@ class Constructor:
             return [repOrList]
         else:
             assert "this" == "impossible", "Stack piece had an unconsidered value"
-    
+
     @property
     def _isSingleRep(self):
         return isinstance(self._piece.obj, Representation)
