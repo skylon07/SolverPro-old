@@ -652,14 +652,14 @@ class Constructor:
 
     def convertTemplateCalls(self, convertFn):
         assert isfunction(convertFn), "The convert function must be a function"
-        convertedReps = list(map(convertFn, self._repList))
+        convertedReps = [convertFn(item) for item in self._repList]
         if self._isSingleRep:
             return convertedReps[0]
         else:
             return convertedReps
 
     def construct(self):
-        constructedVals = list(map(lambda rep: rep.construct(), self._repList))
+        constructedVals = [rep.construct() for rep in self._repList]
         if self._isSingleRep:
             return constructedVals[0]
         else:
