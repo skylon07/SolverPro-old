@@ -5,7 +5,7 @@ from errors import *
 
 from lexer import Lexer
 from solverparser import Parser
-from algebramaster import AlgebraMaster
+from algebramaster import AlgebraMaster, NotANumericException
 from structures import *
 
 
@@ -23,16 +23,11 @@ class Interpreter:
         pass
 
     def _fillMasterWithFakeData(self):
-        self._master._substitutions.update({
-            sympy.Symbol('a'): SubSet({4}),
-            sympy.Symbol('b'): SubSet({-5}),
-            sympy.Symbol('c'): SubSet({sympy.Symbol('a') + sympy.Symbol('b')}),
-            sympy.Symbol('x'): SubSet({4, -4}),
-            sympy.Symbol('y'): SubSet({sympy.Symbol('c'), sympy.Symbol('x')}),
-            sympy.Symbol('a2'): SubSet({sympy.Symbol('b2')}),
-            sympy.Symbol('b2'): SubSet({sympy.Symbol('c2')}),
-            sympy.Symbol('c2'): SubSet({sympy.Symbol('a2')}),
-        })
+        self._master.define([Identifier('a')], SubSet({4}))
+        self._master.define([Identifier('b')], SubSet({-5}))
+        self._master.define([Identifier('c')], SubSet({sympy.Symbol('a') + sympy.Symbol('b')}))
+        self._master.define([Identifier('x')], SubSet({4, -4}))
+        self._master.define([Identifier('y')], SubSet({sympy.Symbol('c'), sympy.Symbol('x')}))
         
 
     # treats the string as user input
@@ -52,8 +47,13 @@ class Interpreter:
 
                 isTemplateAlias = result['templateParams'].obj != None
                 if not isTemplateAlias:
-                    rightHandConstructor.ensureDefined(self._master.getDefinition)
-                    # self._master.define(newIds, value)
+                    newIds = newIdsConstructor.construct()
+                    values = rightHandConstructor.construct()
+                    try:
+                        self._master.define(newIds, values)
+                    except NotANumericException as err:
+                        rightHandConstructor.traceUndefined()
+                        raise err
                 else:
                     raise InterpreterNotImplementedError("template aliases")
             
