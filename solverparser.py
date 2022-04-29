@@ -1,12 +1,12 @@
 from lexer import Lexer
-from errors import TracebackError
+from errors import TracebackException
 
 # see docs/dev-notes/parsing.puml for a list of productions
 class Parser:
     def __init__(self):
         self.onFunctions = dict()
 
-    class ParseError(TracebackError):
+    class ParseError(TracebackException):
         def __init__(self, expectedTypes, unexpectedToken):
             try:
                 iter(expectedTypes)
@@ -31,7 +31,7 @@ class Parser:
             end = self.unexpectedToken.placementEnd
             super().__init__(fullMessage, start, end)
 
-    class EOLError(TracebackError):
+    class EOLError(TracebackException):
         def __init__(self, eolToken):
             if type(eolToken) is not Lexer.Token or eolToken.type != Lexer.types.EOL:
                 raise TypeError("EOLError was given a bad EOL-token argument")
