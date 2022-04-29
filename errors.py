@@ -4,8 +4,7 @@ from constants import INDENT, USER_INPUT
 
 
 # an abstract error class that gives an interface for tracing inputs
-# TODO: change to TracebackException
-class TracebackError(Exception, ABC):
+class TracebackException(Exception, ABC):
     # subclasses must implement __init__ and call this
     @abstractmethod
     def __init__(self, message, badColStarts, badColEnds):
@@ -38,17 +37,17 @@ class TracebackError(Exception, ABC):
         self.__message = '\n'.join((linePtrs, indentedMsg))
 
 
-class InterpreterError(Exception):
+class InterpreterException(Exception):
     pass # just used as a type-group for all "handled errors"
 
 
-class InterpreterNotImplementedError(NotImplementedError, InterpreterError):
+class InterpreterNotImplementedError(NotImplementedError, InterpreterException):
     def __init__(self, featureAsPlural):
-        # line below assumes InterpreterError has no __init__
+        # line below assumes InterpreterException has no __init__
         super().__init__(INDENT + "SolverPro cannot process {} (yet)".format(featureAsPlural))
 
 
-class InterpreterTracebackError(TracebackError, InterpreterError, ABC):
+class InterpreterTracebackException(TracebackException, InterpreterException, ABC):
     def __init__(self, badTraces):
         message = self._generateMessage(badTraces)
         # indent after first line
@@ -62,13 +61,13 @@ class InterpreterTracebackError(TracebackError, InterpreterError, ABC):
         return # message string
 
 
-# not meant to be raised; just inherits from TracebackError for its formatting capabilities
-class InterpreterTracebackWarning(InterpreterTracebackError):
+# not meant to be raised; just inherits from TracebackException for its formatting capabilities
+class InterpreterTracebackWarning(InterpreterTracebackException):
     def warn(self, outputFn):
         outputFn(self.message)
 
 
-class UndefinedIdentifierError(InterpreterTracebackError):
+class UndefinedIdentifierError(InterpreterTracebackException):
     def _generateMessage(self, idTraces):
         plural = len(idTraces) > 1
         badIdentifierStrs = (str(trace.obj.construct()) for trace in idTraces)
@@ -81,7 +80,7 @@ class UndefinedIdentifierError(InterpreterTracebackError):
         )
 
 
-class InvalidExpressionError(InterpreterTracebackError):
+class InvalidExpressionError(InterpreterTracebackException):
     def _generateMessage(self, valTraces):
         plural = len(valTraces) > 1
         # TODO: define a function that makes the Represent mapping clear
@@ -92,7 +91,7 @@ class InvalidExpressionError(InterpreterTracebackError):
         )
 
 
-class NotATemplateError(InterpreterTracebackError):
+class NotATemplateError(InterpreterTracebackException):
     def _generateMessage(self, callTraces):
         plural = len(callTraces) > 1
         badTemplateNames = (str(trace.obj.construct().templateId) for trace in callTraces)
@@ -105,7 +104,7 @@ class NotATemplateError(InterpreterTracebackError):
         )
 
 
-class TemplateMismatchError(InterpreterTracebackError):
+class TemplateMismatchError(InterpreterTracebackException):
     def _generateMessage(self, badTraces):
         raise NotImplementedError("TemplateMismatchError()")
 
@@ -122,7 +121,7 @@ class UnusedArgumentsWarning(InterpreterTracebackWarning):
         )
 
 
-class TemplateEvaluationError(InterpreterTracebackError):
+class TemplateEvaluationError(InterpreterTracebackException):
     pass # TODO
 
 
