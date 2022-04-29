@@ -665,19 +665,20 @@ class Constructor:
         else:
             return constructedVals
 
-    # ensure methods
-    def ensureDefined(self, getIdValFn):
+    # failer functions
+    def failForUndefined(self, isDefinedFn):
         badTraces = []
         for idTrace in self._piece.traces:
             if idTrace.type == StackPieceTracer.types.IDENTIFIER:
                 identifier = idTrace.obj.construct()
-                isDefined = getIdValFn(identifier) is not None
+                isDefined = isDefinedFn(identifier)
+                assert type(isDefined) is bool, "isDefinedFn() must return a boolean"
                 if not isDefined:
                     badTraces.append(idTrace)
-        self._checkEnsureFailed(UndefinedIdentifierError, badTraces)
+        self._checkFailerFailed(UndefinedIdentifierError, badTraces)
 
-    def _checkEnsureFailed(self, ErrType, badTraces):
-        assert issubclass(ErrType, InterpreterTracebackError), "Ensure functions should only work with traceback errors"
+    def _checkFailerFailed(self, ErrType, badTraces):
+        assert issubclass(ErrType, InterpreterTracebackError), "Failer functions should only work with traceback errors"
         if len(badTraces) > 0:
             raise ErrType(badTraces)
 
