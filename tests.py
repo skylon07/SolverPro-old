@@ -1493,6 +1493,16 @@ class TestSuites:
             "-9",
             "correctly performs negation on evaluations",
         )
+        testLineOnInterpreter(
+            "2 ^ 2 ^ 3",
+            "256",
+            "correctly evaluates exponents right-to-left",
+        )
+        testLineOnInterpreter(
+            "2 - 1 + 4",
+            "5",
+            "correctly evaluates other expressions left-to-right",
+        )
         resetState()
         Tester.stopIfFailed()
 
