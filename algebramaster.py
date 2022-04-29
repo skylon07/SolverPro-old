@@ -5,7 +5,7 @@ from structures import *
 
 class AlgebraMaster:
     def __init__(self):
-        self._substitutions = dict()
+        self._numericSubstitutions = dict()
 
     def substituteKnown(self, expr):
         if isNumeric(expr):
@@ -18,10 +18,17 @@ class AlgebraMaster:
         })
 
     def define(self, ids, vals):
-        pass # TODO
+        assert type(ids) in (tuple, list), "define() requires list or tuple of ids"
+        assert len([identifier for identifier in ids if type(identifier) is not Identifier]) == 0, "ids must be list/tuple of Identifiers"
+        assert type(vals) is SubSet, "define() requires a SubSet of vals"
+        
+        subVals = SubSet.join(self.substituteKnown(val) for val in vals)
+        if not subVals.isNumeric:
+            raise NotANumericException()
+        self._numericSubstitutions.update({identifier: subVals for identifier in ids})
 
     def getDefinition(self, identifier):
-        pass # TODO
+        return self._numericSubstitutions.get(identifier)
 
     def _subUntilFixed(self, expr, subCombo):
         lastExpr = None
@@ -40,23 +47,30 @@ class AlgebraMaster:
             yield combo
 
     def _subCombos_nextRec(self, comboDict):
-        myExprKey = None
-        for someExprKey in self._substitutions:
-            someExprKeyUsedAlready = someExprKey in comboDict
+        currKey = None
+        currSymbol = None
+        for someExprKey in self._numericSubstitutions:
+            trySymbol = identifierToSymbol(someExprKey)
+            someExprKeyUsedAlready = trySymbol in comboDict
             if not someExprKeyUsedAlready:
-                myExprKey = someExprKey
+                currKey = someExprKey
+                currSymbol = trySymbol
                 break
 
-        if myExprKey is None:
+        if currSymbol is None:
             yield comboDict
         else:
-            associatedSet = self._substitutions[myExprKey]
+            associatedSet = self._numericSubstitutions[currKey]
             assert type(associatedSet) is SubSet, "A non-SubSet substitution made its way into the AlgebraMaster..."
             for exprSub in associatedSet:
-                comboDict[myExprKey] = exprSub
+                comboDict[currSymbol] = exprSub
                 for combo in self._subCombos_nextRec(comboDict):
                     yield combo
-            comboDict.pop(myExprKey)
+            comboDict.pop(trySymbol)
+
+
+class NotANumericException(Exception):
+    pass # exists just as a type
 
 
 if __name__ == "__main__":
