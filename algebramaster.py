@@ -8,6 +8,9 @@ class AlgebraMaster:
         self._substitutions = dict()
 
     def substituteKnown(self, expr):
+        if isNumeric(expr):
+            return SubSet({expr})
+        
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         return SubSet({
             self._subUntilFixed(expr, subCombo)
