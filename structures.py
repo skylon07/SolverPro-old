@@ -396,6 +396,16 @@ class TemplateCall(Model):
 
 
 class SubSet(Model):
+    @classmethod
+    def join(cls, subSets):
+        joinSet = None
+        for subSet in subSets:
+            if joinSet is None:
+                joinSet = SubSet(subSet)
+            else:
+                joinSet.addFrom(subSet)
+        return joinSet
+
     def __init__(self, iterable=None):
         if iterable is not None:
             if __debug__:
@@ -413,6 +423,14 @@ class SubSet(Model):
 
     def __iter__(self):
         return iter(self._set)
+
+    @property
+    def isNumeric(self):
+        # TODO: cache value on construction/addition of values
+        for item in self._set:
+            if not isNumeric(item):
+                return False
+        return True
 
     def add(self, expr):
         assert not isinstance(expr, (tuple, list, set, SubSet)), "SubSet cannot add an iterable element"
