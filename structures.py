@@ -396,9 +396,12 @@ class TemplateCall(Model):
 
 
 class SubSet(Model):
-    def __init__(self, copyIter=None):
-        if copyIter is not None:
-            self._set = set(copyIter)
+    def __init__(self, iterable=None):
+        if iterable is not None:
+            if __debug__:
+                iterable = tuple(iterable)
+                assert len([item for item in iterable if isinstance(item, (tuple, list, set, SubSet))]) == 0, "SubSet should not contain iterable elements"
+            self._set = set(iterable)
         else:
             self._set = set()
 
@@ -412,17 +415,21 @@ class SubSet(Model):
         return iter(self._set)
 
     def add(self, expr):
+        assert not isinstance(expr, (tuple, list, set, SubSet)), "SubSet cannot add an iterable element"
         self._set.add(expr)
 
     def addFrom(self, iterable):
+        if __debug__:
+            iterable = tuple(iterable)
+            assert len([item for item in iterable if isinstance(item, (tuple, list, set, SubSet))]) == 0, "SubSet cannot add iterable elements"
         self._set.update(iterable)
 
     def remove(self, expr):
         self._set.remove(expr)
 
     def removeFrom(self, iterable):
-        self._set.difference_update(iterable) 
-        
+        self._set.difference_update(iterable)
+
 
 def isNumeric(obj):
     return isinstance(obj, (int, float, RoundedFloat, sympy.Number))
