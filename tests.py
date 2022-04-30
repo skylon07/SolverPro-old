@@ -1422,6 +1422,11 @@ class TestSuites:
             "8e+16",
             "can print previously assigned variables (E-numbers)",
         )
+        testLineOnInterpreter(
+            "80000000000000000",
+            "8e+16",
+            "converts ints to e-number floats",
+        )
         Tester.stopIfFailed()
         
         testLineOnInterpreter(

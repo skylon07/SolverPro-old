@@ -90,14 +90,15 @@ class Interpreter:
     def _formatForPrint(self, val):
         # floats are rounded on format because there's
         # no way to round them inside the sympy expression
-        if type(val) in [float, sympy.Float]:
+        if type(val) in (float, sympy.Float):
             val = RoundedFloat.roundFloat(float(val), 12)
-            if val == val // 1:
+            if val == val // 1 and "e" not in str(val).lower():
                 return str(int(val))
-            else:
-                return str(val)
-        else:
-            return str(val)
+        elif type(val) in (int, sympy.Integer):
+            floatValStr = str(float(val))
+            if "e" in floatValStr.lower():
+                return floatValStr
+        return str(val)
 
     def _handleError(self, e):
         parserErrors = (
