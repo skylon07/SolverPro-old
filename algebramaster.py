@@ -32,10 +32,12 @@ class AlgebraMaster:
 
     def getDefinition(self, symbol):
         assert type(symbol) in (sympy.Symbol, Identifier), "getDefinition() can only work for sympy Symbols and Identifiers"
+        symbol = self._identifiersToSymbols([symbol])[0]
         return self._definedSubstitutions.get(symbol)
 
     def isDefined(self, symbol):
         assert type(symbol) in (sympy.Symbol, Identifier), "isDefined() can only work for sympy Symbols and Identifiers"
+        symbol = self._identifiersToSymbols([symbol])[0]
         return symbol in self._definedSubstitutions
 
     def getUndefinedSymbols(self, expr):
