@@ -1,3 +1,4 @@
+from ast import Expression
 import sympy
 
 from constants import INDENT
@@ -162,6 +163,71 @@ class InterpreterParser:
                 self.aliasRightHands,
             ])
 
+    class _OpList:
+        def __init__(self, startExpr):
+            assert type(startExpr) is ExpressionRepresentation, "OpList must be initalized with an ExpressionRepresentation"
+            # this list is technically reversed relative to the abstraction
+            self._list = [startExpr]
+            self._expectedType = OperatorRepresentation
+            self._reversed = False
+        
+        @property
+        def hasOpersLeft(self):
+            return len(self._list) > 1
+        
+        def pushLeft(self, rep):
+            assert type(rep) is self._expectedType, "Cannot pushLeft() wrong type (arguments did not alternate)"
+            self._list.append(rep)
+            self._switchExpected()
+
+        def reverseEvalDirection(self):
+            self._reversed = not self._reversed
+
+        def evaluate(self):
+            while self.hasOpersLeft:
+                (leftExprRep, operRep, rightExprRep) = self._popOperation()
+                leftRight = (leftExprRep, rightExprRep)
+                newExpr = ExpressionRepresentation(operRep, leftRight)
+                self._pushEvaled(newExpr) 
+            return self._list[0]
+
+        def _popOperation(self):
+            assert type(self._list[-1]) is ExpressionRepresentation, "Tried to pop before pushing an ExpressionRepresentation"
+            assert self.hasOpersLeft, "Cannot pop when no operators are left"
+            if not self._reversed:
+                leftExprRep = self._list.pop()
+                operRep = self._list.pop()
+                rightExprRep = self._list.pop()
+            else:
+                rightExprRep = self._list.pop(0)
+                operRep = self._list.pop(0)
+                leftExprRep = self._list.pop(0)
+            # since the top is now an OperatorRepresentation,
+            # we expect an ExpressionRepresentation
+            self._switchExpected()
+
+            assert type(leftExprRep) is ExpressionRepresentation, "OpList popped an invalid format (expr--left)"
+            assert type(operRep) is OperatorRepresentation, "OpList popped an invalid format (oper)"
+            assert type(rightExprRep) is ExpressionRepresentation, "OpList popped an invalid format (expr--right)"
+            return (leftExprRep, operRep, rightExprRep)
+        
+        def _pushEvaled(self, newExpr):
+            if not self._reversed:
+                self._list.append(newExpr)
+            else:
+                self._list.insert(0, newExpr)
+
+        def _switchExpected(self):
+            self._expectedType = self._opposite(self._expectedType)
+
+        def _opposite(self, repType):
+            opposites = {
+                ExpressionRepresentation: OperatorRepresentation,
+                OperatorRepresentation: ExpressionRepresentation,
+            }
+            assert repType in opposites, "Unconsidered opposite"
+            return opposites[repType]
+
     def evaluateLine(self, string):
         try:
             if '\n' in string:
@@ -321,28 +387,6 @@ class InterpreterParser:
         self._parser.onOperatorMid(onOperatorANY)
         self._parser.onOperatorHigh(onOperatorANY)
 
-        # specifically binary operations
-        def evaluateOperationList(opList):
-            assert type(opList) is list, "Can only evaluate lists of expressions/operators"
-            
-            # collapses operations left-to-right
-            while len(opList) > 1:
-                try:
-                    leftExpr = opList.pop(0)
-                    operRep = opList.pop(0)
-                    rightExpr = opList.pop(0)
-                    assert type(leftExpr) is ExpressionRepresentation, "'opList' was not in a valid format"
-                    assert type(operRep) is OperatorRepresentation, "'opList' was not in a valid format"
-                    assert type(rightExpr) is ExpressionRepresentation, "'opList' was not in a valid format"
-                except IndexError as e:
-                    if "pop from empty" in str(e):
-                        raise IndexError("Interpreter -> evaluateOperationList(opList); opList did not follow [expr, oper, expr, ..., oper, expr] pattern")
-                leftRight = (leftExpr, rightExpr)
-                newExpr = ExpressionRepresentation(operRep, leftRight)
-                opList.insert(0, newExpr)
-            resultExpr = opList[0]
-            return resultExpr
-        
         def onOperationANY(tokens, branch):
             isOperatorBranch = None
             isChainBranch = None
@@ -376,43 +420,44 @@ class InterpreterParser:
             if branch == "DASH operationmax":
                 opListPiece = popStack(stack)
                 opList = opListPiece.obj
-                expr = evaluateOperationList(opList)
+                expr = opList.evaluate()
                 negOperRep = OperatorRepresentation(lambda x: -x, "-")
                 newExpr = ExpressionRepresentation(negOperRep, [expr])
-                newOpList = [newExpr]
+                newOpList = self._OpList(newExpr)
                 piece = opListPiece.update(newOpList, tokens, [])
             # operation-max production
             elif branch == "evaluation":
                 piece = popStack(nextStack)
                 expr = piece.obj
-                exprs = [expr]
-                # lower precedence productions expect the stack to contain lists
-                piece.update(exprs, tokens, [])
+                opList = self._OpList(expr)
+                # lower precedence productions expect the stack to contain OpLists
+                piece.update(opList, tokens, [])
             # all other productions that use an operator
             elif isOperatorBranch:
                 opListPiece = popStack(stack)
                 operPiece = popStack(self._stacks.operations)
                 nextOpListPiece = popStack(nextStack)
-                # TODO: make separate opList datatype, and allow reversing evaluation
-                # for exponents (should be evaluated right-left, but currently evaluated
-                # left-right; everything else should be left-right)
                 opList = opListPiece.obj
                 operRep = operPiece.obj
                 nextOpList = nextOpListPiece.obj
-                nextExpr = evaluateOperationList(nextOpList)
+                nextExpr = nextOpList.evaluate()
                 # inserted on left to reverse order to match expectations
                 # (parser productions return right-to-left)
                 # ex. parser "1 + 2 + 3" > 3, 2, 1; reversing gives expected 1, 2, 3
-                opList.insert(0, operRep)
-                opList.insert(0, nextExpr)
+                opList.pushLeft(operRep)
+                opList.pushLeft(nextExpr)
                 piece = opListPiece.update(opList, tokens, nextOpListPiece.traces)
             # all other productions that just chain precedence
             elif isChainBranch:
                 nextOpListPiece = popStack(nextStack)
                 nextOpList = nextOpListPiece.obj
-                expr = evaluateOperationList(nextOpList)
+                expr = nextOpList.evaluate()
                 # productions that use operators will append to this list later
-                opList = [expr]
+                opList = self._OpList(expr)
+                # branch == "operationmax" when we are in the operationhigh production (aka exponents)
+                processingExponents = branch == "operationmax"
+                if processingExponents:
+                    opList.reverseEvalDirection()
                 piece = nextOpListPiece.update(opList, tokens, [])
             else:
                 throwBranchNotCaught(branch, "onOperationANY")
@@ -425,7 +470,7 @@ class InterpreterParser:
         def onExpression(tokens, branch):
             opListPiece = popStack(self._stacks.operationslow)
             opList = opListPiece.obj
-            expr = evaluateOperationList(opList)
+            expr = opList.evaluate()
             piece = opListPiece.update(expr, tokens, [])
             pushStack(self._stacks.expressions, piece)
         self._parser.onExpression(onExpression)
