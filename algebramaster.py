@@ -9,7 +9,7 @@ class AlgebraMaster:
         self._inferredSubstitutions = dict()
         self._relationsEqZero = set()
 
-    def substituteKnown(self, expr):
+    def substitute(self, expr):
         if isNumeric(expr):
             return SubSet({expr})
         
@@ -25,7 +25,7 @@ class AlgebraMaster:
         assert type(vals) is SubSet, "define() requires vals to be a SubSet"
         
         symbols = self._identifiersToSymbols(symbols)
-        subVals = SubSet.join(self.substituteKnown(val) for val in vals)
+        subVals = SubSet.join(self.substitute(val) for val in vals)
         if not subVals.isNumeric:
             raise NotANumericException()
         self._definedSubstitutions.update({symbol: subVals for symbol in symbols})

@@ -58,8 +58,8 @@ class Interpreter:
                 if isNumeric(expression):
                     self._print(expression)
                 else:
-                    subExprSet = self._master.substituteKnown(expression)
-                    assert type(subExprSet) is SubSet, "substituteKnown() did not return a SubSet()"
+                    subExprSet = self._master.substitute(expression)
+                    assert type(subExprSet) is SubSet, "substitute() did not return a SubSet()"
                     undefSymbols = set()
                     # efficiently check for and fail for nonexistent values
                     for subExpr in subExprSet:
