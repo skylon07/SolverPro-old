@@ -39,7 +39,7 @@ class AlgebraMaster:
         assert isinstance(expr, sympy.Expr), "Can only get undefined symbols for Sympy expressions"
         for symbol in expr.free_symbols:
             identifier = symbolToIdentifier(symbol)
-            if self.isDefined(identifier):
+            if not self.isDefined(identifier):
                 if yieldIdentifiers:
                     yield identifier
                 else:

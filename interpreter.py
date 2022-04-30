@@ -52,7 +52,7 @@ class Interpreter:
                     try:
                         self._master.define(newIds, values)
                     except NotANumericException as err:
-                        rightHandConstructor.failForUndefined()
+                        rightHandConstructor.failForUndefined(self._master.isDefined)
                         raise err
                 else:
                     raise InterpreterNotImplementedError("template aliases")
@@ -67,8 +67,15 @@ class Interpreter:
                 else:
                     subExprSet = self._master.substituteKnown(expression)
                     assert type(subExprSet) is SubSet, "substituteKnown() did not return a SubSet()"
-                    for item in subExprSet:
-                        self._print(item)
+                    undefSymbols = set()
+                    # efficiently check for and fail for nonexistent values
+                    for subExpr in subExprSet:
+                        if not isNumeric(subExpr):
+                            # TODO: this is technically for existing, not undefined, variables (ie in a relation somewhere)
+                            for undefSymbol in self._master.getUndefinedSymbols(subExpr):
+                                exprConstructor.failForUndefined(self._master.isDefined)
+                    for subExpr in subExprSet:
+                        self._print(subExpr)
             
             elif result["type"] == "command":
                 raise InterpreterNotImplementedError("commands")
