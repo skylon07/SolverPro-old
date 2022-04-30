@@ -17,33 +17,42 @@ class AlgebraMaster:
             for subCombo in self._subCombos()
         })
 
-    def define(self, ids, vals):
-        assert type(ids) in (tuple, list), "define() requires list or tuple of ids"
-        assert len([identifier for identifier in ids if type(identifier) is not Identifier]) == 0, "ids must be list/tuple of Identifiers"
-        assert type(vals) is SubSet, "define() requires a SubSet of vals"
+    def define(self, symbols, vals):
+        assert type(symbols) in (tuple, list), "define() requires list or tuple of symbols"
+        assert len([symbol for symbol in symbols if type(symbol) not in (sympy.Symbol, Identifier)]) == 0, "symbols must be list/tuple of sympy Symbols or Identifiers"
+        assert type(vals) is SubSet, "define() requires vals to be a SubSet"
         
+        symbols = self._identifiersToSymbols(symbols)
         subVals = SubSet.join(self.substituteKnown(val) for val in vals)
         if not subVals.isNumeric:
             raise NotANumericException()
-        self._numericSubstitutions.update({identifier: subVals for identifier in ids})
+        self._numericSubstitutions.update({symbol: subVals for symbol in symbols})
 
-    def getDefinition(self, identifier):
-        assert type(identifier) is Identifier, "getDefinition() can only work for Identifiers"
-        return self._numericSubstitutions.get(identifier)
+    def getDefinition(self, symbol):
+        assert type(symbol) in (sympy.Symbol, Identifier), "getDefinition() can only work for sympy Symbols and Identifiers"
+        return self._numericSubstitutions.get(symbol)
 
-    def isDefined(self, identifier):
-        assert type(identifier) is Identifier, "isDefined() can only work for Identifiers"
-        return identifier in self._numericSubstitutions
+    def isDefined(self, symbol):
+        assert type(symbol) in (sympy.Symbol, Identifier), "isDefined() can only work for sympy Symbols and Identifiers"
+        return symbol in self._numericSubstitutions
 
-    def getUndefinedSymbols(self, expr, yieldIdentifiers=False):
+    def getUndefinedSymbols(self, expr):
         assert isinstance(expr, sympy.Expr), "Can only get undefined symbols for Sympy expressions"
         for symbol in expr.free_symbols:
-            identifier = symbolToIdentifier(symbol)
-            if not self.isDefined(identifier):
-                if yieldIdentifiers:
-                    yield identifier
-                else:
-                    yield symbol
+            if not self.isDefined(symbol):
+                yield symbol
+
+    def _identifiersToSymbols(self, identifiersOrSymbols):
+        # function exists purely for syntactical purposes
+        def raiseInvalidType():
+            assert "this" == "invalid type", "List must contain Identifiers and sympy Symbols; nothing else"
+        
+        return [
+            identifierToSymbol(symbol) if type(symbol) is Identifier
+            else symbol if type(symbol) is sympy.Symbol()
+            else raiseInvalidType()
+            for symbol in identifiersOrSymbols
+        ]
 
     def _subUntilFixed(self, expr, subCombo):
         lastExpr = None
@@ -62,26 +71,23 @@ class AlgebraMaster:
             yield combo
 
     def _subCombos_nextRec(self, comboDict):
-        currKey = None
         currSymbol = None
-        for someExprKey in self._numericSubstitutions:
-            trySymbol = identifierToSymbol(someExprKey)
-            someExprKeyUsedAlready = trySymbol in comboDict
-            if not someExprKeyUsedAlready:
-                currKey = someExprKey
-                currSymbol = trySymbol
+        for someSymbol in self._numericSubstitutions:
+            someSymbolUsedAlready = someSymbol in comboDict
+            if not someSymbolUsedAlready:
+                currSymbol = someSymbol
                 break
 
         if currSymbol is None:
             yield comboDict
         else:
-            associatedSet = self._numericSubstitutions[currKey]
+            associatedSet = self.getDefinition(currSymbol)
             assert type(associatedSet) is SubSet, "A non-SubSet substitution made its way into the AlgebraMaster..."
             for exprSub in associatedSet:
                 comboDict[currSymbol] = exprSub
                 for combo in self._subCombos_nextRec(comboDict):
                     yield combo
-            comboDict.pop(trySymbol)
+            comboDict.pop(currSymbol)
 
 
 class NotANumericException(Exception):
