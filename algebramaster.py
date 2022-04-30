@@ -28,7 +28,22 @@ class AlgebraMaster:
         self._numericSubstitutions.update({identifier: subVals for identifier in ids})
 
     def getDefinition(self, identifier):
+        assert type(identifier) is Identifier, "getDefinition() can only work for Identifiers"
         return self._numericSubstitutions.get(identifier)
+
+    def isDefined(self, identifier):
+        assert type(identifier) is Identifier, "isDefined() can only work for Identifiers"
+        return identifier in self._numericSubstitutions
+
+    def getUndefinedSymbols(self, expr, yieldIdentifiers=False):
+        assert isinstance(expr, sympy.Expr), "Can only get undefined symbols for Sympy expressions"
+        for symbol in expr.free_symbols:
+            identifier = symbolToIdentifier(symbol)
+            if self.isDefined(identifier):
+                if yieldIdentifiers:
+                    yield identifier
+                else:
+                    yield symbol
 
     def _subUntilFixed(self, expr, subCombo):
         lastExpr = None
