@@ -51,7 +51,7 @@ class AlgebraMaster:
         
         return [
             identifierToSymbol(symbol) if type(symbol) is Identifier
-            else symbol if type(symbol) is sympy.Symbol()
+            else symbol if type(symbol) is sympy.Symbol
             else raiseInvalidType()
             for symbol in identifiersOrSymbols
         ]
