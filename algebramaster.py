@@ -5,7 +5,9 @@ from structures import *
 
 class AlgebraMaster:
     def __init__(self):
-        self._numericSubstitutions = dict()
+        self._definedSubstitutions = dict()
+        self._inferredSubstitutions = dict()
+        self._relationsEqZero = set()
 
     def substituteKnown(self, expr):
         if isNumeric(expr):
@@ -26,15 +28,15 @@ class AlgebraMaster:
         subVals = SubSet.join(self.substituteKnown(val) for val in vals)
         if not subVals.isNumeric:
             raise NotANumericException()
-        self._numericSubstitutions.update({symbol: subVals for symbol in symbols})
+        self._definedSubstitutions.update({symbol: subVals for symbol in symbols})
 
     def getDefinition(self, symbol):
         assert type(symbol) in (sympy.Symbol, Identifier), "getDefinition() can only work for sympy Symbols and Identifiers"
-        return self._numericSubstitutions.get(symbol)
+        return self._definedSubstitutions.get(symbol)
 
     def isDefined(self, symbol):
         assert type(symbol) in (sympy.Symbol, Identifier), "isDefined() can only work for sympy Symbols and Identifiers"
-        return symbol in self._numericSubstitutions
+        return symbol in self._definedSubstitutions
 
     def getUndefinedSymbols(self, expr):
         assert isinstance(expr, sympy.Expr), "Can only get undefined symbols for Sympy expressions"
@@ -72,7 +74,7 @@ class AlgebraMaster:
 
     def _subCombos_nextRec(self, comboDict):
         currSymbol = None
-        for someSymbol in self._numericSubstitutions:
+        for someSymbol in self._definedSubstitutions:
             someSymbolUsedAlready = someSymbol in comboDict
             if not someSymbolUsedAlready:
                 currSymbol = someSymbol
