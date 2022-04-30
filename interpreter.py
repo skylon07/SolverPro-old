@@ -15,19 +15,11 @@ class Interpreter:
         
         self._parser = InterpreterParser()
         self._master = AlgebraMaster()
-        self._fillMasterWithFakeData()
         self._initializeBuiltins()
 
     # TODO: error when trying to redefine builtins
     def _initializeBuiltins(self):
         pass
-
-    def _fillMasterWithFakeData(self):
-        self._master.define([Identifier('a')], SubSet({4}))
-        self._master.define([Identifier('b')], SubSet({-5}))
-        self._master.define([Identifier('c')], SubSet({sympy.Symbol('a') + sympy.Symbol('b')}))
-        self._master.define([Identifier('x')], SubSet({4, -4}))
-        self._master.define([Identifier('y')], SubSet({sympy.Symbol('c'), sympy.Symbol('x')}))
         
 
     # treats the string as user input
