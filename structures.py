@@ -443,9 +443,7 @@ class SubSet(Model):
             return self._set == other._set
         return False
 
-    @property
-    # TODO: rename to isNumericSet
-    def isNumeric(self):
+    def isNumericSet(self):
         # TODO: cache value on construction/addition of values
         for item in self._set:
             if not isNumeric(item):

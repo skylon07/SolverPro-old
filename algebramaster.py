@@ -24,7 +24,7 @@ class AlgebraMaster:
         
         symbols = self._identifiersToSymbols(symbols)
         subVals = SubSet.join(self.substitute(val) for val in vals)
-        if not subVals.isNumeric:
+        if not subVals.isNumericSet:
             raise NotANumericException()
         self._definedSubstitutions.update({symbol: subVals for symbol in symbols})
 
@@ -86,7 +86,7 @@ class AlgebraMaster:
             usedSymbols.add(symbolToSub)
 
             symbolNumericSet = self._subSymToNumericIfPossible(symbolToSub, usedSymbols)
-            assert symbolNumericSet.isNumeric, "symbolNumericSet must be a numeric SubSet"
+            assert symbolNumericSet.isNumericSet, "symbolNumericSet must be a numeric SubSet"
             if len(symbolNumericSet) > 0:
                 exprSubSet = SubSet({
                     currExpr.subs(symbolToSub, symbolSub)
@@ -101,7 +101,7 @@ class AlgebraMaster:
         if self.isKnown(symbolToSub):
             numericSet = self.getKnown(symbolToSub)
             assert type(numericSet) is SubSet, "getKnown() did not return a SubSet"
-            assert numericSet.isNumeric, "getKnown() returned a SubSet that had non-numerics"
+            assert numericSet.isNumericSet, "getKnown() returned a SubSet that had non-numerics"
             return numericSet
         # DEBUG
         elif symbolToSub == sympy.Symbol('c'):
@@ -118,7 +118,7 @@ class AlgebraMaster:
                         break
                 if not isCircSub:
                     possibleNumericSet = self._subToNumericIfPossible(symbolSub, usedSymbols)
-                    if possibleNumericSet.isNumeric:
+                    if possibleNumericSet.isNumericSet:
                         numericSet.addFrom(possibleNumericSet)
             return numericSet
 
