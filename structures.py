@@ -424,7 +424,10 @@ class SubSet(Model):
             self._set = set()
 
     def __repr__(self):
-        return "S{}".format(repr(self._set))
+        if len(self._set) > 0:
+            return "S{}".format(repr(self._set))
+        else:
+            return "S{}"
 
     def __contains__(self, item):
         return item in self._set
@@ -432,11 +435,28 @@ class SubSet(Model):
     def __iter__(self):
         return iter(self._set)
 
+    def __len__(self):
+        return len(self._set)
+
+    def __eq__(self, other):
+        if type(other) is SubSet:
+            return self._set == other._set
+        return False
+
     @property
+    # TODO: rename to isNumericSet
     def isNumeric(self):
         # TODO: cache value on construction/addition of values
         for item in self._set:
             if not isNumeric(item):
+                return False
+        return True
+
+    @property
+    def isExpressionSet(self):
+        # TODO: cache value on construction/addition of values
+        for item in self._set:
+            if isNumeric(item):
                 return False
         return True
 
