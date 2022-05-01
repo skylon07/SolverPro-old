@@ -5,8 +5,15 @@ from structures import *
 
 class AlgebraMaster:
     def __init__(self):
-        self._definedSubstitutions = dict()
-        self._inferredSubstitutions = dict()
+        # DEBUG
+        S = sympy.Symbol
+        self._definedSubstitutions = {
+            S('c'): SubSet({1, 10}),
+        } # dict()
+        self._inferredSubstitutions = {
+            S('b') + S('a'): SubSet({100}),
+            S('a'): SubSet({1000}),
+        } # dict()
         self._relationsEqZero = set()
 
     def substitute(self, expr):
@@ -38,18 +45,6 @@ class AlgebraMaster:
         symbol = self._identifiersToSymbols([symbol])[0]
         return symbol in self._definedSubstitutions
 
-    def _identifiersToSymbols(self, identifiersOrSymbols):
-        # function exists purely for syntactical purposes
-        def raiseInvalidType():
-            assert "this" == "invalid type", "List must contain Identifiers and sympy Symbols; nothing else"
-        
-        return [
-            identifierToSymbol(symbol) if type(symbol) is Identifier
-            else symbol if type(symbol) is sympy.Symbol
-            else raiseInvalidType()
-            for symbol in identifiersOrSymbols
-        ]
-
     def relate(self, leftExpr, rightExpr):
         assert type(leftExpr) is sympy.Expr, "Cannot relate left side; not a sympy Expr"
         assert type(rightExpr) is sympy.Expr, "Cannot relate right side; not a sympy Expr"
@@ -57,73 +52,69 @@ class AlgebraMaster:
         self._relationsEqZero.add(exprEqZero)
         # TODO: update self._inferredSubstitutions
 
-    def getInference(self, symbol):
-        assert type(symbol) in (sympy.Symbol, Identifier), "getInference() can only work for sympy Symbols and Identifiers"
-        symbol = self._identifiersToSymbols([symbol])[0]
-        return self._inferredSubstitutions.get(symbol)
+    def getInference(self, expr):
+        assert isinstance(expr, sympy.Expr) or type(expr) is Identifier, "getInference() can only work for sympy Exprs and Identifiers"
+        expr = self._identifiersToSymbols([expr])[0]
+        return self._inferredSubstitutions.get(expr)
 
-    def isInferred(self, symbol):
-        assert type(symbol) in (sympy.Symbol, Identifier), "isInferred() can only work for sympy Symbols and Identifiers"
-        symbol = self._identifiersToSymbols([symbol])[0]
-        return symbol in self._inferredSubstitutions
+    def isInferred(self, expr):
+        assert isinstance(expr, sympy.Expr) or type(expr) is Identifier, "getInference() can only work for sympy Exprs and Identifiers"
+        expr = self._identifiersToSymbols([expr])[0]
+        return expr in self._inferredSubstitutions
 
-    def getKnown(self, symbol):
-        return self.getDefinition(symbol) or self.getInference(symbol)
+    def getKnown(self, expr):
+        if type(expr) in (sympy.Symbol, Identifier):
+            return self.getDefinition(expr) or self.getInference(expr)
+        else:
+            return self.getInference(expr)
 
-    def isKnown(self, symbol):
-        return self.isDefined(symbol) or self.isInferred(symbol)
+    def isKnown(self, expr):
+        if type(expr) in (sympy.Symbol, Identifier):
+            return self.isDefined(expr) or self.isInferred(expr)
+        else:
+            return self.isInferred(expr)
 
     def exists(self, symbol):
         pass # TODO
 
+    def _identifiersToSymbols(self, identifiersOrSymbols):
+        # function exists purely for syntactical purposes
+        def raiseInvalidType():
+            assert "this" == "invalid type", "List must contain Identifiers and sympy Symbols/Exprs; nothing else"
+        
+        return [
+            identifierToSymbol(symbol) if type(symbol) is Identifier
+            else symbol if isinstance(symbol, sympy.Expr)
+            else raiseInvalidType()
+            for symbol in identifiersOrSymbols
+        ]
+
     # substitution helper methods
-    def _subToNumericIfPossible(self, expr, usedSymbols):
+    def _subToNumericIfPossible(self, expr, usedExprKeys):
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         exprSubSet = SubSet({expr})
-        for symbolToSub in expr.free_symbols:
-            if symbolToSub in usedSymbols:
+        for exprSubKey in self._subDictKeys():
+            if exprSubKey in usedExprKeys:
                 continue
-            usedSymbols.add(symbolToSub)
+            usedExprKeys.add(exprSubKey)
 
-            symbolNumericSet = self._subSymToNumericIfPossible(symbolToSub, usedSymbols)
-            assert symbolNumericSet.isNumericSet, "symbolNumericSet must be a numeric SubSet"
-            if len(symbolNumericSet) > 0:
-                exprSubSet = SubSet({
-                    currExpr.subs(symbolToSub, symbolSub)
-                    for currExpr in exprSubSet
-                    for symbolSub in symbolNumericSet
-                })
-            
-            usedSymbols.remove(symbolToSub)
+            exprSubSet = SubSet.join(
+                self._subToNumericIfPossible(
+                    expr.subs(exprSubKey, subForExprSubKey),
+                    usedExprKeys,
+                )
+                for expr in exprSubSet
+                for subForExprSubKey in self.getKnown(exprSubKey)
+            )
+
+            usedExprKeys.remove(exprSubKey)
         return exprSubSet
 
-    def _subSymToNumericIfPossible(self, symbolToSub, usedSymbols):
-        if self.isKnown(symbolToSub):
-            numericSet = self.getKnown(symbolToSub)
-            assert type(numericSet) is SubSet, "getKnown() did not return a SubSet"
-            assert numericSet.isNumericSet, "getKnown() returned a SubSet that had non-numerics"
-            return numericSet
-        # DEBUG
-        elif symbolToSub == sympy.Symbol('c'):
-            return SubSet({-1, 2})
-        else:
-            numericSet = SubSet()
-            symbolSubSet = self._getSolutionsForSymbol(symbolToSub)
-            assert symbolSubSet.isExpressionSet, "solutionSet should not contain numerics"
-            for symbolSub in symbolSubSet:
-                isCircSub = False
-                for symbol in symbolSub.free_symbols:
-                    if symbol in usedSymbols:
-                        isCircSub = True
-                        break
-                if not isCircSub:
-                    possibleNumericSet = self._subToNumericIfPossible(symbolSub, usedSymbols)
-                    if possibleNumericSet.isNumericSet:
-                        numericSet.addFrom(possibleNumericSet)
-            return numericSet
-
-    def _getSolutionsForSymbol(symbol):
-        pass # TODO
+    def _subDictKeys(self):
+        for symbolKey in self._definedSubstitutions:
+            yield symbolKey
+        for symbolKey in self._inferredSubstitutions:
+            yield symbolKey
 
     # TODO: remove unneeded functions below (if they really are unneeded):
     def _subUntilFixed(self, expr, subCombo):
@@ -167,6 +158,34 @@ class AlgebraMaster:
         for symbolKey in self._inferredSubstitutions:
             yield symbolKey
 
+    def _subSymToNumericIfPossible(self, symbolToSub, usedSymbols):
+        if self.isKnown(symbolToSub):
+            numericSet = self.getKnown(symbolToSub)
+            assert type(numericSet) is SubSet, "getKnown() did not return a SubSet"
+            assert numericSet.isNumericSet, "getKnown() returned a SubSet that had non-numerics"
+            return numericSet
+        # DEBUG
+        elif symbolToSub == sympy.Symbol('c'):
+            return SubSet({-1, 2})
+        else:
+            numericSet = SubSet()
+            symbolSubSet = self._getSolutionsForSymbol(symbolToSub)
+            assert symbolSubSet.isExpressionSet, "solutionSet should not contain numerics"
+            for symbolSub in symbolSubSet:
+                isCircSub = False
+                for symbol in symbolSub.free_symbols:
+                    if symbol in usedSymbols:
+                        isCircSub = True
+                        break
+                if not isCircSub:
+                    possibleNumericSet = self._subToNumericIfPossible(symbolSub, usedSymbols)
+                    if possibleNumericSet.isNumericSet:
+                        numericSet.addFrom(possibleNumericSet)
+            return numericSet
+
+    def _getSolutionsForSymbol(symbol):
+        pass # TODO
+
     def _solveSingle(self, leftExpr, rightExpr, forSymbol):
         assert isinstance(leftExpr, sympy.Expr), "_solve() not given correct arguments (leftExpr)"
         assert isinstance(rightExpr, sympy.Expr), "_solve() not given correct arguments (rightExpr)"
@@ -185,14 +204,8 @@ class NotANumericException(Exception):
 
 
 if __name__ == "__main__":
-    # testMode = parseInt(input("Enter AlgebraMaster test mode: "))
-    testMode = 1
-    if testMode == 1:
-        a = AlgebraMaster()
-        a._substitutions.update({
-            sympy.Symbol('a'): SubSet({1, 2}),
-            sympy.Symbol('b'): SubSet({3, 4}),
-            sympy.Symbol('c'): SubSet({5, 6, 7}),
-        })
-        for combo in a._subCombos():
-            print(combo)
+    S = sympy.Symbol
+    master = AlgebraMaster()
+    print(master.substitute(S('a')))
+    print(master.substitute(S('a') + S('b')))
+    print(master.substitute(S('c') + S('b')))
