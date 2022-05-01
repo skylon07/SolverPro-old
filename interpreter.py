@@ -45,7 +45,7 @@ class Interpreter:
                     try:
                         self._master.define(newIds, values)
                     except NotANumericException as err:
-                        rightHandConstructor.failForUndefined(self._master.isDefined)
+                        rightHandConstructor.failForUndefined(self._master.isKnown)
                         raise err
                 else:
                     raise InterpreterNotImplementedError("template aliases")
@@ -65,8 +65,10 @@ class Interpreter:
                     for subExpr in subExprSet:
                         if not isNumeric(subExpr):
                             # TODO: this is technically for existing, not undefined, variables (ie in a relation somewhere)
-                            for undefSymbol in self._master.getUndefinedSymbols(subExpr):
-                                exprConstructor.failForUndefined(self._master.isDefined)
+                            for symbol in subExpr.free_symbols:
+                                if not self._master.exists(symbol):
+                                    exprConstructor.failForUndefined(self._master.exists)
+                                    break
                     for subExpr in subExprSet:
                         self._print(subExpr)
             

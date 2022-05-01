@@ -40,12 +40,6 @@ class AlgebraMaster:
         symbol = self._identifiersToSymbols([symbol])[0]
         return symbol in self._definedSubstitutions
 
-    def getUndefinedSymbols(self, expr):
-        assert isinstance(expr, sympy.Expr), "Can only get undefined symbols for Sympy expressions"
-        for symbol in expr.free_symbols:
-            if not self.isDefined(symbol):
-                yield symbol
-
     def _identifiersToSymbols(self, identifiersOrSymbols):
         # function exists purely for syntactical purposes
         def raiseInvalidType():
@@ -58,6 +52,32 @@ class AlgebraMaster:
             for symbol in identifiersOrSymbols
         ]
 
+    def relate(self, leftExpr, rightExpr):
+        assert type(leftExpr) is sympy.Expr, "Cannot relate left side; not a sympy Expr"
+        assert type(rightExpr) is sympy.Expr, "Cannot relate right side; not a sympy Expr"
+        exprEqZero = leftExpr - rightExpr
+        self._relationsEqZero.add(exprEqZero)
+        # TODO: update self._inferredSubstitutions
+
+    def getInference(self, symbol):
+        assert type(symbol) in (sympy.Symbol, Identifier), "getInference() can only work for sympy Symbols and Identifiers"
+        symbol = self._identifiersToSymbols([symbol])[0]
+        return self._inferredSubstitutions.get(symbol)
+
+    def isInferred(self, symbol):
+        assert type(symbol) in (sympy.Symbol, Identifier), "isInferred() can only work for sympy Symbols and Identifiers"
+        symbol = self._identifiersToSymbols([symbol])[0]
+        return symbol in self._inferredSubstitutions
+
+    def getKnown(self, symbol):
+        return self.getDefinition(symbol) or self.getInference(symbol)
+
+    def isKnown(self, symbol):
+        return self.isDefined(symbol) or self.isInferred(symbol)
+
+    def exists(self, symbol):
+        pass # TODO
+
     def _subUntilFixed(self, expr, subCombo):
         lastExpr = None
         iters = 0
@@ -68,7 +88,6 @@ class AlgebraMaster:
             iters += 1
             assert iters < 10000, "_subUntilFixed() stuck in infinite loop..."
         return expr
-
 
     def _subCombos(self):
         for combo in self._subCombos_nextRec(dict()):
