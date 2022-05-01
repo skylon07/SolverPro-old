@@ -5,15 +5,8 @@ from structures import *
 
 class AlgebraMaster:
     def __init__(self):
-        # DEBUG
-        S = sympy.Symbol
-        self._definedSubstitutions = {
-            S('c'): SubSet({1, 10}),
-        } # dict()
-        self._inferredSubstitutions = {
-            S('b') + S('a'): SubSet({100}),
-            S('a'): SubSet({1000}),
-        } # dict()
+        self._definedSubstitutions = dict()
+        self._inferredSubstitutions = dict()
         self._relationsEqZero = set()
 
     def substitute(self, expr):
@@ -164,9 +157,6 @@ class AlgebraMaster:
             assert type(numericSet) is SubSet, "getKnown() did not return a SubSet"
             assert numericSet.isNumericSet, "getKnown() returned a SubSet that had non-numerics"
             return numericSet
-        # DEBUG
-        elif symbolToSub == sympy.Symbol('c'):
-            return SubSet({-1, 2})
         else:
             numericSet = SubSet()
             symbolSubSet = self._getSolutionsForSymbol(symbolToSub)
