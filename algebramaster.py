@@ -14,8 +14,12 @@ class AlgebraMaster:
             return SubSet({expr})
         
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
+        # TODO: the keys should be sorted so largest expressions are substituted first
+        subsDict = dict()
+        subsDict.update(self._definedSubstitutions)
+        subsDict.update(self._inferredSubstitutions)
         usedSymbols = set()
-        return self._subToNumericIfPossible(expr, usedSymbols)
+        return self._subToNumericIfPossible(expr, subsDict, usedSymbols)
 
     def define(self, symbols, vals):
         assert type(symbols) in (tuple, list), "define() requires list or tuple of symbols"
@@ -83,10 +87,13 @@ class AlgebraMaster:
         ]
 
     # substitution helper methods
-    def _subToNumericIfPossible(self, expr, usedExprKeys):
+    def _subToNumericIfPossible(self, expr, subsDict, usedExprKeys):
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
+        assert len([exprKey for exprKey in subsDict.keys() if not isinstance(exprKey, sympy.Expr)]) == 0, "subsDict must be a mapping from sympy Exprs"
+        assert len([subSet for subSet in subsDict.values() if type(subSet) is not SubSet]) == 0, "subsDict must be a mapping to SubSets"
+        
         exprSubSet = SubSet({expr})
-        for exprSubKey in self._subDictKeys():
+        for exprSubKey in subsDict:
             if exprSubKey in usedExprKeys:
                 continue
             usedExprKeys.add(exprSubKey)
@@ -94,20 +101,15 @@ class AlgebraMaster:
             exprSubSet = SubSet.join(
                 self._subToNumericIfPossible(
                     expr.subs(exprSubKey, subForExprSubKey),
+                    subsDict,
                     usedExprKeys,
                 )
                 for expr in exprSubSet
-                for subForExprSubKey in self.getKnown(exprSubKey)
+                for subForExprSubKey in subsDict[exprSubKey]
             )
 
             usedExprKeys.remove(exprSubKey)
         return exprSubSet
-
-    def _subDictKeys(self):
-        for symbolKey in self._definedSubstitutions:
-            yield symbolKey
-        for symbolKey in self._inferredSubstitutions:
-            yield symbolKey
 
     # TODO: remove unneeded functions below (if they really are unneeded):
     def _subUntilFixed(self, expr, subCombo):
