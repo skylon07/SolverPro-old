@@ -443,6 +443,7 @@ class SubSet(Model):
             return self._set == other._set
         return False
 
+    @property
     def isNumericSet(self):
         # TODO: cache value on construction/addition of values
         for item in self._set:
@@ -476,7 +477,7 @@ class SubSet(Model):
 
 
 def isNumeric(obj):
-    return isinstance(obj, (int, float, RoundedFloat, sympy.Number))
+    return isinstance(obj, (int, float, RoundedFloat, sympy.Number, sympy.NumberSymbol))
 
 
 def symbolToIdentifier(sympyObj):
