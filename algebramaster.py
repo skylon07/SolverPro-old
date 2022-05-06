@@ -8,6 +8,7 @@ class AlgebraMaster:
         self._definedSubstitutions = dict()
         self._inferredSubstitutions = dict()
         self._relationsEqZero = set()
+        self._relationSymbols = set()
 
     def substitute(self, expr):
         if isNumeric(expr):
@@ -43,10 +44,12 @@ class AlgebraMaster:
         return symbol in self._definedSubstitutions
 
     def relate(self, leftExpr, rightExpr):
-        assert type(leftExpr) is sympy.Expr, "Cannot relate left side; not a sympy Expr"
-        assert type(rightExpr) is sympy.Expr, "Cannot relate right side; not a sympy Expr"
+        assert isinstance(leftExpr, sympy.Expr), "Cannot relate left side; not a sympy Expr"
+        assert isinstance(rightExpr, sympy.Expr), "Cannot relate right side; not a sympy Expr"
         exprEqZero = leftExpr - rightExpr
+
         self._relationsEqZero.add(exprEqZero)
+        self._relationSymbols.update(exprEqZero.free_symbols)
         # TODO: update self._inferredSubstitutions
 
     def getInference(self, expr):
@@ -72,7 +75,7 @@ class AlgebraMaster:
             return self.isInferred(expr)
 
     def exists(self, symbol):
-        pass # TODO
+        return symbol in self._relationSymbols
 
     def _identifiersToSymbols(self, identifiersOrSymbols):
         # function exists purely for syntactical purposes
@@ -176,7 +179,7 @@ class AlgebraMaster:
             return numericSet
 
     def _getSolutionsForSymbol(symbol):
-        pass # TODO
+        pass
 
     def _solveSingle(self, leftExpr, rightExpr, forSymbol):
         assert isinstance(leftExpr, sympy.Expr), "_solve() not given correct arguments (leftExpr)"
