@@ -16,11 +16,11 @@ class AlgebraMaster:
         
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         # TODO: the keys should be sorted so largest expressions are substituted first
-        subsDict = dict()
-        subsDict.update(self._definedSubstitutions)
+        subsDict = dict(self._definedSubstitutions)
         subsDict.update(self._inferredSubstitutions)
         usedSymbols = set()
-        return self._subToNumericIfPossible(expr, subsDict, usedSymbols)
+        assert len([subSet for subSet in subsDict.values() if not subSet.isNumericSet]) == 0, "substitute() assumes that only a numeric substitution dictionary is passed"
+        return self._recursiveSubstitute(expr, subsDict, usedSymbols)
 
     def define(self, symbols, vals):
         assert type(symbols) in (tuple, list), "define() requires list or tuple of symbols"
@@ -90,7 +90,7 @@ class AlgebraMaster:
         ]
 
     # substitution helper methods
-    def _subToNumericIfPossible(self, expr, subsDict, usedExprKeys):
+    def _recursiveSubstitute(self, expr, subsDict, usedExprKeys):
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         assert len([exprKey for exprKey in subsDict.keys() if not isinstance(exprKey, sympy.Expr)]) == 0, "subsDict must be a mapping from sympy Exprs"
         assert len([subSet for subSet in subsDict.values() if type(subSet) is not SubSet]) == 0, "subsDict must be a mapping to SubSets"
@@ -102,7 +102,7 @@ class AlgebraMaster:
             usedExprKeys.add(exprSubKey)
 
             exprSubSet = SubSet.join(
-                self._subToNumericIfPossible(
+                self._recursiveSubstitute(
                     expr.subs(exprSubKey, subForExprSubKey),
                     subsDict,
                     usedExprKeys,
