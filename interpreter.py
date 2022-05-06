@@ -241,7 +241,7 @@ class InterpreterParser:
                 if token.type != Lexer.types["COMMENT"]
             )
             self._parser.inspect(tokensNoComments, string)
-            assert len([badStack for badStack in self._stacks if len(badStack) > 0]) == 0, "Parser stack should be empty"
+            assert all(len(stack) == 0 for stack in self._stacks), "Parser stack should be empty"
             return self.lastResult
         finally:
             self._resetStack()
@@ -632,9 +632,7 @@ class StackPieceTracer:
 
     def __init__(self, obj, tokens):
         assert isinstance(obj, (type(None), Representation, tuple, list)), "Traced object must be a Representation or list/tuple of Representations"
-        assert len([nonRep for nonRep in obj if not isinstance(nonRep, Representation)]) == 0 \
-            if type(obj) in (tuple, list) else True, \
-            "Tuple/list must only contain Representations"
+        assert all(isinstance(rep, Representation) for rep in obj) if type(obj) in (tuple, list) else True, "Tuple/list must only contain Representations"
         self._obj = obj
         self._tokens = tokens
         self._traces = []

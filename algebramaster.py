@@ -19,12 +19,12 @@ class AlgebraMaster:
         subsDict = dict(self._definedSubstitutions)
         subsDict.update(self._inferredSubstitutions)
         usedSymbols = set()
-        assert len([subSet for subSet in subsDict.values() if not subSet.isNumericSet]) == 0, "substitute() assumes that only a numeric substitution dictionary is passed"
+        assert all(subSet.isNumericSet for subSet in subsDict.values()), "substitute() assumes that only a numeric substitution dictionary is passed"
         return self._recursiveSubstitute(expr, subsDict, usedSymbols)
 
     def define(self, symbols, vals):
         assert type(symbols) in (tuple, list), "define() requires list or tuple of symbols"
-        assert len([symbol for symbol in symbols if type(symbol) not in (sympy.Symbol, Identifier)]) == 0, "symbols must be list/tuple of sympy Symbols or Identifiers"
+        assert all(type(symbol) in (sympy.Symbol, Identifier) for symbol in symbols), "symbols must be list/tuple of sympy Symbols or Identifiers"
         assert type(vals) is SubSet, "define() requires vals to be a SubSet"
         
         symbols = self._identifiersToSymbols(symbols)
@@ -93,8 +93,8 @@ class AlgebraMaster:
     # substitution helper methods
     def _recursiveSubstitute(self, expr, subsDict, usedExprKeys):
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
-        assert len([exprKey for exprKey in subsDict.keys() if not isinstance(exprKey, sympy.Expr)]) == 0, "subsDict must be a mapping from sympy Exprs"
-        assert len([subSet for subSet in subsDict.values() if type(subSet) is not SubSet]) == 0, "subsDict must be a mapping to SubSets"
+        assert all(isinstance(exprKey, sympy.Expr) for exprKey in subsDict.keys()), "subsDict must be a mapping from sympy Exprs"
+        assert all(type(subSet) is SubSet for subSet in subsDict.values()), "subsDict must be a mapping to SubSets"
         
         exprSubSet = SubSet({expr})
         for exprSubKey in subsDict:
@@ -224,7 +224,7 @@ class AlgebraMaster:
         if symbolSubsKnown:
             usedExprKeys = set()
             subExprSet = self._recursiveSubstitute(exprToSub, allSymbolSubs, usedExprKeys)
-            assert len([expr for expr in subExprSet if symbolToSub in expr.atoms()]) == 0, "Substituting didn't eliminate variable"
+            assert not any(symbolToSub in expr.free_symbols for expr in subExprSet), "Substituting didn't eliminate variable"
             yield subExprSet
         else:
              # dictionary changes; we have to memorize the keys to iterate
@@ -249,7 +249,7 @@ class AlgebraMaster:
                     allSymbolSubs[symbolToSub] = allSymbolicSubs[symbolToSub] = symbolSubs
                     usedExprKeys = set()
                     subExprSet = self._recursiveSubstitute(exprToSub, allSymbolSubs, usedExprKeys)
-                    assert len([expr for expr in subExprSet if symbolToSub in expr.free_symbols]) == 0, "Substituting didn't eliminate variable"
+                    assert not any(symbolToSub in expr.free_symbols for expr in subExprSet), "Substituting didn't eliminate variable"
                     yield subExprSet
 
     def _exprProvidesUniqueSolution(self, symbolSolvesForExprInQuestion, baseRelations, symbolSolvedFor):
@@ -352,7 +352,7 @@ class AlgebraMaster:
         solutions = sympy.solve(eqZeroExpr, forSymbol)
         # some assumptions I made after (a little) testing
         assert type(solutions) is list, "_solve() solutions are given in list format"
-        assert len([sol for sol in solutions if not isinstance(sol, sympy.Expr)]) == 0, "_solve() solutions are all sympy.Expr instances"
+        assert all(isinstance(sol, sympy.Expr) for sol in solutions), "_solve() solutions are all sympy.Expr instances"
         return solutions
 
 

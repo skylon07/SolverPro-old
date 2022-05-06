@@ -169,7 +169,7 @@ class ExpressionRepresentation(Representation):
     def __init__(self, operRep, operArgs):
         assert type(operRep) is OperatorRepresentation, "Can only receive Operator Representations as first argument"
         assert type(operArgs) in (tuple, list), "Operator arguments must be tuple or list"
-        assert len([arg for arg in operArgs if not isinstance(arg, Representation)]) == 0, "Operator arguments must contain Representation objects"
+        assert all(isinstance(arg, Representation) for arg in operArgs), "Operator arguments must contain Representation objects"
         self._operRep = operRep
         self._operArgs = operArgs
 
@@ -197,7 +197,7 @@ class TemplateCallRepresentation(Representation):
     def __init__(self, templateIdRep, parameters):
         assert type(templateIdRep) is IdentifierRepresentation, "Template ID must be a string"
         assert type(parameters) in (tuple, list), "Parameters must be a tuple or list"
-        assert len([param for param in parameters if not isinstance(param, Representation)]) == 0, "Parameters must only contain Representation objects"
+        assert all(isinstance(param, Representation) for param in parameters), "Parameters must only contain Representation objects"
         self._templateIdRep = templateIdRep
         self._parameters = parameters
 
@@ -360,7 +360,7 @@ class Template(Model):
     def __init__(self, templateId, paramNames, templateStr):
         assert type(templateId) is Identifier, "'templateId' must be an Identifier"
         assert type(paramNames) in (tuple, list), "Parameter names must be a tuple or list"
-        assert len([paramId for paramId in paramNames if type(paramId) is not Identifier]) == 0, "'paramNames' must be an iterable of Identifiers"
+        assert all(type(paramId) is Identifier for paramId in paramNames), "'paramNames' must be an iterable of Identifiers"
         self._templateId = templateId
         self._paramNames = paramNames
         self._templateStr = templateStr
@@ -418,7 +418,7 @@ class SubSet(Model):
         if iterable is not None:
             if __debug__:
                 iterable = tuple(iterable)
-                assert len([item for item in iterable if isinstance(item, (tuple, list, set, SubSet))]) == 0, "SubSet should not contain iterable elements"
+                assert all(isinstance(item, (tuple, list, set, SubSet)) for item in iterable), "SubSet should not contain iterable elements"
             self._set = set(iterable)
         else:
             self._set = set()
@@ -466,7 +466,7 @@ class SubSet(Model):
     def addFrom(self, iterable):
         if __debug__:
             iterable = tuple(iterable)
-            assert len([item for item in iterable if isinstance(item, (tuple, list, set, SubSet))]) == 0, "SubSet cannot add iterable elements"
+            assert all(isinstance(item, (tuple, list, set, SubSet)) for item in iterable), "SubSet cannot add iterable elements"
         self._set.update(iterable)
 
     def remove(self, expr):
