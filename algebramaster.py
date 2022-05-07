@@ -339,13 +339,15 @@ class Substituter:
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         
         result = self._substituteAllCombos(SubSet({expr}))
-        assert len(self._usedKeys) == 0, "_substituteAllCombos() did not pop all used keys"
+        assert len(self._usedKeys) == 0, "failed to pop all used keys"
         return result
 
     def substituteInOrder(self, expr, keyOrder):
         return self._substituteInOrder(SubSet({expr}), keyOrder)
-            
-    def _substituteAllCombos(self, primaryExprs):
+
+    # below are different kinds of substitution algoritms;
+    # some are used, some might not be, but they're still useful to have around
+    def _substituteAllPaths(self, primaryExprs):
         # TODO: the keys should be sorted so largest expressions are substituted first
         for exprKey in self._unusedKeys():
             if primaryExprs.isNumericSet:
@@ -354,13 +356,44 @@ class Substituter:
             self._usedKeys.add(exprKey)
 
             primaryExprs = SubSet.join(
-                self._substituteAllCombos(SubSet({primaryExpr.subs(exprKey, exprKeySub)}))
+                self._substituteAllPaths(SubSet({primaryExpr.subs(exprKey, exprKeySub)}))
                 for primaryExpr in primaryExprs
                 for exprKeySub in self._substitutions[exprKey]
             )
 
             self._usedKeys.remove(exprKey)
         return primaryExprs
+
+    def _substituteAllCombos(self, primaryExprs):
+        return SubSet(
+            primaryExpr.subs(subCombo)
+            for subCombo in self._makeSubCombos()
+            for primaryExpr in primaryExprs
+        )
+
+    def _makeSubCombos(self, comboDict=None):
+        if comboDict is None:
+            comboDict = dict()
+        
+        currKey = None
+        for someKey in self._substitutions:
+            keyAlreadyUsed = someKey in comboDict
+            if not keyAlreadyUsed:
+                currKey = someKey
+                break
+
+        if currKey is None:
+            comboDictFinished = comboDict
+            yield comboDictFinished
+        else:
+            subSet = self._substitutions[currKey]
+            for exprSub in subSet:
+                comboDict[currKey] = exprSub
+                for comboDictFinished in self._makeSubCombos(comboDict):
+                    yield comboDictFinished
+            # an empty subSet breaks popping from comboDict below, and it just isn't a good sign...
+            assert len(subSet) > 0, "Cannot have empty numeric set"
+            comboDict.pop(currKey)
 
     def _substituteInOrder(self, primaryExprs, keyOrder):
         for exprKey in keyOrder:
