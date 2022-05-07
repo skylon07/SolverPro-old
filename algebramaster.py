@@ -11,16 +11,9 @@ class AlgebraMaster:
         self._relationSymbols = set()
 
     def substitute(self, expr):
-        if isNumeric(expr):
-            return SubSet({expr})
-        
-        assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
-        # TODO: the keys should be sorted so largest expressions are substituted first
         subsDict = dict(self._definedSubstitutions)
         subsDict.update(self._inferredSubstitutions)
-        usedSymbols = set()
-        assert all(subSet.isNumericSet for subSet in subsDict.values()), "substitute() assumes that only a numeric substitution dictionary is passed"
-        return self._recursiveSubstitute(expr, subsDict, usedSymbols)
+        return Substituter(subsDict).substituteToNumerics(expr)
 
     def define(self, symbols, vals):
         assert type(symbols) in (tuple, list), "define() requires list or tuple of symbols"
@@ -89,31 +82,6 @@ class AlgebraMaster:
             else raiseInvalidType()
             for symbol in identifiersOrSymbols
         ]
-
-    # substitution helper methods
-    def _recursiveSubstitute(self, expr, subsDict, usedExprKeys):
-        assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
-        assert all(isinstance(exprKey, sympy.Expr) for exprKey in subsDict.keys()), "subsDict must be a mapping from sympy Exprs"
-        assert all(type(subSet) is SubSet for subSet in subsDict.values()), "subsDict must be a mapping to SubSets"
-        
-        exprSubSet = SubSet({expr})
-        for exprSubKey in subsDict:
-            if exprSubKey in usedExprKeys:
-                continue
-            usedExprKeys.add(exprSubKey)
-
-            exprSubSet = SubSet.join(
-                self._recursiveSubstitute(
-                    expr.subs(exprSubKey, subForExprSubKey),
-                    subsDict,
-                    usedExprKeys,
-                )
-                for expr in exprSubSet
-                for subForExprSubKey in subsDict[exprSubKey]
-            )
-
-            usedExprKeys.remove(exprSubKey)
-        return exprSubSet
 
     # relational/solving functions
     def _updateInferredSubstitutions(self):
@@ -354,6 +322,60 @@ class AlgebraMaster:
         assert type(solutions) is list, "_solve() solutions are given in list format"
         assert all(isinstance(sol, sympy.Expr) for sol in solutions), "_solve() solutions are all sympy.Expr instances"
         return solutions
+
+
+class Substituter:
+    def __init__(self, subsDict):
+        assert all(isinstance(exprKey, sympy.Expr) for exprKey in subsDict.keys()), "Substitution dictionary must only contain sympy Expr keys"
+        assert all(type(subSet) is SubSet for subSet in subsDict.values()), "Substitution dictionary must only map to SubSet values"
+        self._substitutions = subsDict
+        self._usedKeys = set()
+
+    def substituteToNumerics(self, expr):
+        assert all(subSet.isNumericSet for subSet in self._substitutions.values()), "Substituting to numeric requires dictionary to only contain numeric substitutions"
+        
+        if isNumeric(expr):
+            return SubSet({expr})
+        assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
+        
+        result = self._substituteAllCombos(SubSet({expr}))
+        assert len(self._usedKeys) == 0, "_substituteAllCombos() did not pop all used keys"
+        return result
+
+    def substituteInOrder(self, expr, keyOrder):
+        return self._substituteInOrder(SubSet({expr}), keyOrder)
+            
+    def _substituteAllCombos(self, primaryExprs):
+        # TODO: the keys should be sorted so largest expressions are substituted first
+        for exprKey in self._unusedKeys():
+            if primaryExprs.isNumericSet:
+                return primaryExprs
+            
+            self._usedKeys.add(exprKey)
+
+            primaryExprs = SubSet.join(
+                self._substituteAllCombos(SubSet({primaryExpr.subs(exprKey, exprKeySub)}))
+                for primaryExpr in primaryExprs
+                for exprKeySub in self._substitutions[exprKey]
+            )
+
+            self._usedKeys.remove(exprKey)
+        return primaryExprs
+
+    def _substituteInOrder(self, primaryExprs, keyOrder):
+        for exprKey in keyOrder:
+            assert exprKey in self._substitutions, "keyOrder contained exprKey not included in the original subs dict"
+            primaryExprs = SubSet(
+                primaryExpr.subs(exprKey, exprKeySub)
+                for primaryExpr in primaryExprs
+                for exprKeySub in self._substitutions[exprKey]
+            )
+        return primaryExprs
+
+    def _unusedKeys(self):
+        for exprKey in self._substitutions:
+            if exprKey not in self._usedKeys:
+                yield exprKey
 
 
 class NotANumericException(Exception):
