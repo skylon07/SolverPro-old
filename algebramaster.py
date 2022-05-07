@@ -378,6 +378,83 @@ class Substituter:
                 yield exprKey
 
 
+class Solver:
+    def __init__(self, relations):
+        self._relationsEqZero = set(relations)
+        self._subsDict = dict()
+
+    def genNumericSolutions(self):
+        self._genSolutionsFromNumericsInRelations()
+
+    def _genSolutionsFromNumericsInRelations(self):
+        for relation in self._relationsEqZero:
+            # negative because it's on the "wrong side" of the equals sign;
+            # a + 2 (= 0) --> negNumeric = atom = 2;
+            # flipping to other side of equals gives us the "eqNumeric" -2
+            for negNumeric in (atom for atom in relation.atoms() if isNumeric(atom)):
+                eqNumeric = -negNumeric
+                solution = self._solveSet(relation, eqNumeric)
+                if solution.type is self._Solution.types.SUBSET:
+                    pass
+                else:
+                    assert "this" == "should not have been missed", "_genSolutionsFromNumericsInRelations() missed a solution type case"
+                # TODO
+                subSet = numericSubs.get(solution, SubSet())
+                for solution in solutionSet:
+                    subSet.add(eqToNumeric)
+                    numericSubs[solution] = subSet
+
+    def _solveSet(self, expr, atom):
+        solutionSet = sympy.solveset(expr, atom)
+        return SubSet(solutionSet)
+
+    class _Solution:
+        class _types:
+            @property
+            def NORMAL(self):
+                return "NORMAL"
+
+            @property
+            def COMPLEXES(self):
+                return "COMPLEXES"
+
+            @property
+            def COMPLEMENT(self):
+                return "COMPLEMENT"
+
+            @property
+            def EMPTY(self):
+                return "EMPTY"
+
+        types = _types()
+
+        def __init__(self, solutionSet):
+            self._solutionSet = solutionSet
+
+            if type(solutionSet) is sympy.FiniteSet:
+                if len(solutionSet) == 0:
+                    self._type = self.types.EMPTY
+                else:
+                    self._type = self.types.NORMAL
+            elif type(solutionSet) is sympy.EmptySet:
+                self._type = self.types.EMPTY
+            elif type(solutionSet) is sympy.Complement:
+                self._type = self.types.COMPLEMENT
+            elif solutionSet is sympy.Complexes:
+                self._type = self.types.COMPLEXES
+            else:
+                # TODO: maybe assert statements like this should just raise AssertionErrors
+                assert "this" == "bad", "Solution ran into an unconsidered type scenario"
+
+        @property
+        def type(self):
+            return self._type
+
+        @property
+        def set(self):
+            return self._solutionSet
+
+
 class NotANumericException(Exception):
     pass # exists just as a type
 
