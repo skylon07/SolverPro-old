@@ -381,13 +381,7 @@ class Substituter:
         if comboDict is None:
             comboDict = dict()
         
-        currKey = None
-        for someKey in self._substitutions:
-            keyAlreadyUsed = someKey in comboDict
-            if not keyAlreadyUsed:
-                currKey = someKey
-                break
-
+        currKey = first(iterDifference(self._substitutions, comboDict), None)
         if currKey is None:
             comboDictFinished = comboDict
             yield comboDictFinished
@@ -412,9 +406,7 @@ class Substituter:
         return primaryExprs
 
     def _unusedKeys(self):
-        for exprKey in self._substitutions:
-            if exprKey not in self._usedKeys:
-                yield exprKey
+        return iterDifference(self._substitutions, self._usedKeys)
 
 
 class Solver:
