@@ -418,7 +418,7 @@ class SubSet(Model):
         if iterable is not None:
             if __debug__:
                 iterable = tuple(iterable)
-                assert all(isinstance(item, (tuple, list, set, SubSet)) for item in iterable), "SubSet should not contain iterable elements"
+                assert not any(isinstance(item, (tuple, list, set, SubSet)) for item in iterable), "SubSet should not contain iterable elements"
             self._set = set(iterable)
         else:
             self._set = set()
@@ -466,7 +466,7 @@ class SubSet(Model):
     def addFrom(self, iterable):
         if __debug__:
             iterable = tuple(iterable)
-            assert all(isinstance(item, (tuple, list, set, SubSet)) for item in iterable), "SubSet cannot add iterable elements"
+            assert not any(isinstance(item, (tuple, list, set, SubSet)) for item in iterable), "SubSet cannot add iterable elements"
         self._set.update(iterable)
 
     def remove(self, expr):
