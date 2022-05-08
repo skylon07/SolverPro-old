@@ -338,9 +338,15 @@ class Substituter:
             return SubSet({expr})
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         
-        result = self._substituteAllCombos(SubSet({expr}))
+        resultSet = self._substituteAllCombos(SubSet({expr}))
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
-        return result
+        return resultSet
+
+    def backSubstitute(self, expr):
+        resultSet = self._substituteAllCombos(SubSet({expr}))
+        assert len(self._usedKeys) == 0, "failed to pop all used keys"
+        assert not any(symbol in result.free_symbols for result in resultSet for exprKey in self._substitutions for symbol in exprKey.free_symbols), "Backwards-substitution requires a dict with expression keys with unidirectional dependencies"
+        return resultSet
 
     def substituteInOrder(self, expr, keyOrder):
         return self._substituteInOrder(SubSet({expr}), keyOrder)
