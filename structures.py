@@ -477,7 +477,14 @@ class SubSet(Model):
 
 
 def isNumeric(obj):
-    return isinstance(obj, (int, float, RoundedFloat, sympy.Number, sympy.NumberSymbol))
+    isRawType = isinstance(obj, (int, float, RoundedFloat, sympy.Number, sympy.NumberSymbol))
+    if isRawType:
+        return True
+    try:
+        obj = float(obj)
+        return True
+    except TypeError:
+        return False
 
 
 def symbolToIdentifier(sympyObj):
@@ -489,6 +496,25 @@ def symbolToIdentifier(sympyObj):
 def identifierToSymbol(identifier):
     assert type(identifier) is Identifier, "identifierToSymbol() only takes Identifiers"
     return sympy.Symbol(str(identifier))
+
+
+def iterDifference(iter1, iter2):
+    for item in iter1:
+        if item not in iter2:
+            yield item
+
+_firstNoDefault = object()
+def first(iterable, default=_firstNoDefault):
+    try:
+        for item in iterable:
+            firstItem = item
+            # because we...
+            return firstItem
+    except StopIteration:
+        if default is _firstNoDefault:
+            raise ValueError("Iterable contained no elements (and no default value was given)")
+        else:
+            return default
 
 
 if __name__ == "__main__":
