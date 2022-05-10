@@ -452,12 +452,26 @@ class SubSet(Model):
         return True
 
     @property
+    def hasNumerics(self):
+        for item in self._set:
+            if isNumeric(item):
+                return True
+        return False
+
+    @property
     def isExpressionSet(self):
         # TODO: cache value on construction/addition of values
         for item in self._set:
             if isNumeric(item):
                 return False
         return True
+
+    @property
+    def hasExpressions(self):
+        for item in self._set:
+            if not isNumeric(item):
+                return True
+        return False
 
     def add(self, expr):
         assert not isinstance(expr, (tuple, list, set, SubSet)), "SubSet cannot add an iterable element"
