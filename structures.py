@@ -406,12 +406,9 @@ class TemplateCall(Model):
 class SubSet(Model):
     @classmethod
     def join(cls, subSets):
-        joinSet = None
+        joinSet = SubSet()
         for subSet in subSets:
-            if joinSet is None:
-                joinSet = SubSet(subSet)
-            else:
-                joinSet.addFrom(subSet)
+            joinSet.addFrom(subSet)
         return joinSet
 
     def __init__(self, iterable=None):
@@ -444,34 +441,28 @@ class SubSet(Model):
         return False
 
     @property
-    def isNumericSet(self):
-        # TODO: cache value on construction/addition of values
-        for item in self._set:
-            if not isNumeric(item):
-                return False
-        return True
-
-    @property
     def hasNumerics(self):
+        # TODO: cache value on construction/addition of values
         for item in self._set:
             if isNumeric(item):
                 return True
         return False
-
-    @property
-    def isExpressionSet(self):
-        # TODO: cache value on construction/addition of values
-        for item in self._set:
-            if isNumeric(item):
-                return False
-        return True
 
     @property
     def hasExpressions(self):
+        # TODO: cache value on construction/addition of values
         for item in self._set:
             if not isNumeric(item):
                 return True
         return False
+
+    @property
+    def isNumericSet(self):
+        return not self.hasExpressions
+
+    @property
+    def isExpressionSet(self):
+        return not self.hasNumerics
 
     def add(self, expr):
         assert not isinstance(expr, (tuple, list, set, SubSet)), "SubSet cannot add an iterable element"
