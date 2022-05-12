@@ -528,8 +528,20 @@ class Solver:
             return symbolSubs
 
     def _solveSet(self, expr, atom):
-        solutionSet = sympy.solveset(expr, atom)
-        return self._Solution(solutionSet)
+        # solving x ** 2 for 2 gives us errors (but if we substitute a symbol it's fine...?)
+        # so since solving for numeric atoms doesn't work as expected,
+        # hopefully substituting them for symbols will match expectations better
+        if isNumeric(atom):
+            numericSub = sympy.Symbol(":NUMERIC {}:".format(atom))
+            exprWithNumericSubbed = expr.subs(atom, numericSub)
+            solution = self._solveSet(exprWithNumericSubbed, numericSub)
+            # at first, you might think a reverse-substitution is needed, but in fact
+            # we have just solved for the numeric, which implies it is not going to be
+            # inside the set we end up returning
+            return solution
+        else:
+            solutionSet = sympy.solveset(expr, atom)
+            return self._Solution(solutionSet)
 
     def _updateNumericSubs(self, exprKey, subSet):
         assert type(subSet) is SubSet, "_updateNumericSubs() requires a SubSet"
@@ -603,21 +615,7 @@ class Solver:
 
         def __init__(self, solutionSet):
             self._solutionSet = solutionSet
-
-            if type(solutionSet) is sympy.FiniteSet:
-                if len(solutionSet) == 0:
-                    self._type = self.types.EMPTY
-                else:
-                    self._type = self.types.NORMAL
-            elif solutionSet is sympy.EmptySet:
-                self._type = self.types.EMPTY
-            elif type(solutionSet) is sympy.Complement:
-                self._type = self.types.COMPLEMENT
-            elif solutionSet is sympy.Complexes:
-                self._type = self.types.COMPLEXES
-            else:
-                # TODO: maybe assert statements like this should just raise NotImplementedErrors
-                assert "this" == "bad", "Solution ran into an unconsidered type scenario"
+            self._type = self._getSetType(solutionSet)
 
         @property
         def type(self):
@@ -626,6 +624,52 @@ class Solver:
         @property
         def set(self):
             return self._solutionSet
+
+        def _getSetType(self, solutionSet):
+            types = self.types
+            if type(solutionSet) is sympy.FiniteSet:
+                if len(solutionSet) == 0:
+                    return types.EMPTY
+                else:
+                    return types.NORMAL
+            elif solutionSet is sympy.EmptySet:
+                return types.EMPTY
+            elif type(solutionSet) is sympy.Complement:
+                return types.COMPLEMENT
+            elif solutionSet is sympy.Complexes:
+                return types.COMPLEXES
+            else:
+                # TODO: maybe assert statements like this should just raise NotImplementedErrors
+                assert "this" == "bad", "Solution ran into an unconsidered type scenario"
+
+        # TODO: delete reverse substitution methods if not needed
+        # def reverseSubstitutionMade(self, subsDict):
+        #     self._solutionSet = self._reverseSubsForSet(self._solutionSet, subsDict)
+
+        # def _reverseSubsForSet(self, sympySet, subsDict):
+        #     # subsDict is used directly since it is assumed it is already a reverse-dictionary
+        #     # of the substitutions that already occurred (instead of making the caller construct
+        #     # a dictionary accurate to history and reversing it here, which would be less efficient)
+        #     types = self.types
+        #     setType = self._getSetType(sympySet)
+        #     if setType is types.NORMAL:
+        #         # ew... why would you use the arguments as elements in the set
+        #         # instead of using the same pattern as set()?
+        #         return sympy.FiniteSet(*(
+        #             expr.subs(subsDict)
+        #             for expr in self._solutionSet
+        #         ))
+        #     elif setType is types.EMPTY:
+        #         return sympySet # there is nothing to substitute back
+        #     elif setType is types.COMPLEXES:
+        #         return sympySet # sort of like the above case, except it's everything
+        #     elif setType is types.COMPLEMENT:
+        #         (mainSet, complementSet) = sympySet.args
+        #         mainSetSubbed = self._reverseSubsForSet(mainSet, subsDict)
+        #         complementSetSubbed = self._reverseSubsForSet(complementSet, subsDict)
+        #         return sympy.Complement(mainSetSubbed, complementSetSubbed)
+        #     else:
+        #         raise NotImplementedError("Tried to reverse a previous substitution for an unconsidered solution type")
 
 
 class NotANumericException(Exception):
