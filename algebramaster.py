@@ -446,12 +446,22 @@ class Substituter:
 
 
 class Solver:
-    def __init__(self, relations):
+    def __init__(self, relations, symbolDefinitions=None):
         self._relationsEqZero = set(relations)
         self._subsDict = dict()
+        self._symbolSubs = dict(symbolDefinitions) if symbolDefinitions is not None else dict()
 
     def genNumericSolutions(self):
+        self._subsDict = dict()
         self._genSolutionsFromNumericsInRelations()
+        self._extrapolateNumericSolutionsForSymbols()
+        self._subsDict.update({
+            symbol: numericSubSet
+            for symbol in self._symbolSubs
+            for numericSubSet in [self._symbolSubs[symbol]]
+            if numericSubSet.isNumericSet
+        })
+        return self._subsDict
 
     def _genSolutionsFromNumericsInRelations(self):
         for relation in self._relationsEqZero:
@@ -460,20 +470,116 @@ class Solver:
             # flipping to other side of equals gives us the "eqNumeric" -2
             for negNumeric in (atom for atom in relation.atoms() if isNumeric(atom)):
                 eqNumeric = -negNumeric
-                solution = self._solveSet(relation, eqNumeric)
-                if solution.type is self._Solution.types.SUBSET:
-                    pass
-                else:
-                    assert "this" == "should not have been missed", "_genSolutionsFromNumericsInRelations() missed a solution type case"
-                # TODO
-                subSet = numericSubs.get(solution, SubSet())
-                for solution in solutionSet:
-                    subSet.add(eqToNumeric)
-                    numericSubs[solution] = subSet
+                solutionSet = self._extractRelationalSolutionSet(self._solveSet(relation, eqNumeric))
+                for exprKey in solutionSet:
+                    self._updateNumericSubs(exprKey, SubSet({eqNumeric}))
+
+    def _extrapolateNumericSolutionsForSymbols(self):
+        numSubs = self._getTotalNumSubstitutions()
+        substitutionsChanged = True
+        iters = 0
+        while substitutionsChanged:
+            lastNumSubs = numSubs
+            
+            for exprKey in self._subsDict:
+                symbol = self._findSymbolToSolve(exprKey)
+                cantInferFromExprKey = symbol is None
+                if cantInferFromExprKey:
+                    continue
+
+                symbolSubs = SubSet.join(
+                    self._inferSymbolFromRelation(symbol, exprKey - numericSub)
+                    for numericSub in self._subsDict[exprKey]
+                )
+                inferredAnyVals = len(symbolSubs) > 0
+                if inferredAnyVals:
+                    self._updateSymbolSub(symbol, symbolSubs)
+            self._symbolSubs = Substituter(self._symbolSubs).backSubstitute()
+
+            numSubs = self._getTotalNumSubstitutions()
+            substitutionsChanged = numSubs != lastNumSubs
+
+            iters += 1
+            assert iters < 9999, "Substitutions shouldn't get stuck changing..."
+
+    def _getTotalNumSubstitutions(self):
+        return (
+            sum(len(subSet) for subSet in self._symbolSubs.values() if subSet.isNumericSet),
+            sum(len(subSet) for subSet in self._symbolSubs.values()),
+        )
+
+    def _findSymbolToSolve(self, expr):
+        return first(iterDifference(expr.free_symbols, self._symbolSubs), None)
+
+    def _inferSymbolFromRelation(self, symbol, relation):
+        subRelationSet = Substituter(self._symbolSubs).substituteByElimination(relation)
+        symbolSubs = SubSet.join(
+            newSubSet
+            for subRelation in subRelationSet
+            for newSubSet in [self._extractInferenceSolutionSet(self._solveSet(subRelation, symbol))]
+            if newSubSet is not None
+        )
+        if symbolSubs.hasNumerics:
+            if symbolSubs.isNumericSet:
+                return symbolSubs
+            else:
+                return SubSet(numeric for numeric in symbolSubs if isNumeric(numeric))
+        else:
+            return symbolSubs
 
     def _solveSet(self, expr, atom):
         solutionSet = sympy.solveset(expr, atom)
-        return SubSet(solutionSet)
+        return self._Solution(solutionSet)
+
+    def _updateNumericSubs(self, exprKey, subSet):
+        assert type(subSet) is SubSet, "_updateNumericSubs() requires a SubSet"
+        assert subSet.isNumericSet, "_subsDict can only contain numeric substitutions"
+        if exprKey not in self._subsDict:
+            self._subsDict[exprKey] = subSet
+        else:
+            self._subsDict[exprKey].addFrom(subSet)
+        assert len(self._subsDict[exprKey]) > 0, "Cannot have empty substitution set for main expression substitutions"
+
+    def _updateSymbolSub(self, symbolKey, subSet):
+        assert type(subSet) is SubSet, "_updateSymbolSub() requires a SubSet"
+        assert type(symbolKey) is sympy.Symbol, "_updateSymbolSub() requires a sympy Symbol key"
+        if symbolKey not in self._symbolSubs:
+            self._symbolSubs[symbolKey] = subSet
+        else:
+            self._symbolSubs[symbolKey].addFrom(subSet)
+        assert len(self._symbolSubs[symbolKey]) > 0, "Cannot have empty substitution set for symbol substitutions"
+
+    def _extractRelationalSolutionSet(self, solution):
+        types = self._Solution.types
+        if solution.type is types.NORMAL:
+            solutionSet = SubSet(solution.set)
+            return solutionSet
+        else:
+            raise NotImplementedError("missing a relational solution type case (general case)")
+
+    def _extractInferenceSolutionSet(self, solution):
+        types = self._Solution.types
+        if solution.type is types.NORMAL:
+            solutionSet = SubSet(solution.set)
+            return solutionSet
+        elif solution.type is types.COMPLEXES:
+            # this means a variable can be any value and still hold true in the relation,
+            # which ultimately means the relation provided no new information for the symbol;
+            # we therefore return saying "hey, this symbol has no new substitutions"
+            return None
+        elif solution.type is types.EMPTY:
+            # similar to the above case, except we ended up with some kind of
+            # 4 = 0 case (say, 1 + 3(b + 1)/(b + 1))
+            return None
+        elif solution.type is types.COMPLEMENT:
+            if len(solution.set.args[1]) > 0:
+                # this happens when the solver is forced to put a variable in the denominator of a fraction;
+                # this generates a solution with (calculus) "holes", which can be ignored
+                return SubSet(solution.set.args[0])
+            else:
+                raise NotImplementedError("missing an inference solution type case (for COMPLEMENT sets)")
+        else:
+            raise NotImplementedError("missing an inference solution type case (general case)")
 
     class _Solution:
         class _types:
@@ -503,14 +609,14 @@ class Solver:
                     self._type = self.types.EMPTY
                 else:
                     self._type = self.types.NORMAL
-            elif type(solutionSet) is sympy.EmptySet:
+            elif solutionSet is sympy.EmptySet:
                 self._type = self.types.EMPTY
             elif type(solutionSet) is sympy.Complement:
                 self._type = self.types.COMPLEMENT
             elif solutionSet is sympy.Complexes:
                 self._type = self.types.COMPLEXES
             else:
-                # TODO: maybe assert statements like this should just raise AssertionErrors
+                # TODO: maybe assert statements like this should just raise NotImplementedErrors
                 assert "this" == "bad", "Solution ran into an unconsidered type scenario"
 
         @property
@@ -592,13 +698,26 @@ if __name__ == "__main__":
     # master.relate(S('a') - S('b'), sympy.simplify(1))
     # master.relate(S('a') + S('b'), sympy.simplify(9))
 
-    (a, b, c) = sympy.symbols("a, b, c")
+    (a, b, c, d) = sympy.symbols("a, b, c, d")
+    sd = Solver({
+        a + 2 * b + c  -  0,
+        3 * a - b + 2 * c  -  11,
+        -a + b - c  -  -6,
+    }).genNumericSolutions()
+    # a + 2b + c = 0
+    # 3a - b + 2c = 11
+    # -a + b - c = -6
+    # a = -2b - c
+    # b = -(11 + c) / 7
     ans = {
-        a: sympy.simplify(4),
-        b: sympy.simplify(7),
-        c: sympy.simplify(-5),
+        a: sympy.simplify(1),
+        b: sympy.simplify(-2),
+        c: sympy.simplify(3),
     }
-    master.relate(a + b + c, ans[a] + ans[b] + ans[c])
-    master.relate(a * c + 2 * b, ans[a] * ans[c] + 2 * ans[b])
-    master.relate(c * (b - a), ans[c] * (ans[b] - ans[a]))
+    # master.relate(a + 2 * b + c, (a + 2 * b + c).subs(ans))
+    # master.relate(a * c + 2 * b, (a * c + 2 * b).subs(ans))
+    # master.relate(c * (b - a), (c * (b - a)).subs(ans))
+    master.relate(a + 2 * b + c, (a + 2 * b + c).subs(ans))
+    master.relate(3 * a - b + 2 * c, (3 * a - b + 2 * c).subs(ans))
+    master.relate(-a + b - c, (-a + b - c).subs(ans))
     master = master
