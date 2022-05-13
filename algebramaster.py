@@ -74,7 +74,7 @@ class AlgebraMaster:
     def _identifiersToSymbols(self, identifiersOrSymbols):
         # function exists purely for syntactical purposes
         def raiseInvalidType():
-            assert "this" == "invalid type", "List must contain Identifiers and sympy Symbols/Exprs; nothing else"
+            raise NotImplementedError("List must contain Identifiers and sympy Symbols/Exprs; nothing else")
         
         return [
             identifierToSymbol(symbol) if type(symbol) is Identifier
@@ -150,7 +150,20 @@ class AlgebraMaster:
                     symbol = theOnlySymbol
                 for numericForExprToSub in exprsEqSubSet:
                     relationForExprToSub = exprToSub - numericForExprToSub
-                    symbolNumSubSet = SubSet(sympy.solveset(relationForExprToSub, symbol))
+                    solutions = sympy.solveset(relationForExprToSub, symbol)
+                    # TODO: this indicates some solve function needs to be refactored...
+                    if type(solutions) is sympy.Complement:
+                        if solutions.args[0] == sympy.Complexes:
+                            solutions = solutions.args[1]
+                        else:
+                            # this happens when an expression was originally solved into the denominator;
+                            # just ignore the undefined point
+                            solutions = solutions.args[0]
+                    symbolIsStillFreeVariable = solutions is sympy.Complexes or len(solutions) == 0
+                    if symbolIsStillFreeVariable:
+                        # no way to collapse to numerics then!
+                        continue # TODO: maybe we can just return...?
+                    symbolNumSubSet = SubSet(solutions)
                     assert symbolNumSubSet.isNumericSet, "SubSet after solving for single variable was not a numeric set"
                     
                     if symbol not in allSymbolicSubs:
@@ -179,6 +192,8 @@ class AlgebraMaster:
                             break # to avoid redundantly substituting the same variable again
 
                     usedSymbols.remove(symbolToSub)
+                    if symbolToSub in allSymbolicSubs and allSymbolicSubs[symbolToSub].isExpressionSet:
+                        allSymbolicSubs.pop(symbolToSub)
         return resultSubSet
 
     def _subExprUsingAllRoutesForSymbol(self, exprToSub, exprEqSubSet, symbolToSub, allSymbolicSubs):
@@ -186,6 +201,10 @@ class AlgebraMaster:
             symbol: allSymbolicSubs[symbol]
             for symbol in allSymbolicSubs
             if type(symbol) is sympy.Symbol
+        }
+        relationsToSub = {
+            exprToSub - numericEqToExprToSub
+            for numericEqToExprToSub in exprEqSubSet
         }
         
         symbolSubsKnown = symbolToSub in allSymbolicSubs
@@ -203,29 +222,37 @@ class AlgebraMaster:
                     continue
                 exprKeyEqSubSet = allSymbolicSubs[exprKey]
                 
-                symbolSubs = SubSet.join(
-                    self._solveRelationForSymbol(exprKey - numericEqToExprKey, symbolToSub)
-                    for numericEqToExprKey in exprKeyEqSubSet
-                )
-                relationsToSub = {
-                    exprToSub - numericEqToExprToSub
-                    for numericEqToExprToSub in exprEqSubSet
-                }
                 # you know how you need 3 unique equations to solve a syatem of 3 variables?
                 # this is what this is trying to determine...
-                if self._exprProvidesUniqueSolution(symbolSubs, relationsToSub, symbolToSub):
+                if self._exprProvidesUniqueSolution(exprKey, exprKeyEqSubSet, relationsToSub, symbolToSub, allSymbolSubs):
+                    symbolSubs = SubSet.join(
+                        self._solveRelationForSymbol(subExprKey - numericEqToExprKey, symbolToSub)
+                        for subExprKey in self._recursiveSubstitute(exprKey, allSymbolSubs, set())
+                        for numericEqToExprKey in exprKeyEqSubSet
+                    )
                     allSymbolSubs[symbolToSub] = allSymbolicSubs[symbolToSub] = symbolSubs
                     usedExprKeys = set()
                     subExprSet = self._recursiveSubstitute(exprToSub, allSymbolSubs, usedExprKeys)
                     assert not any(symbolToSub in expr.free_symbols for expr in subExprSet), "Substituting didn't eliminate variable"
                     yield subExprSet
 
-    def _exprProvidesUniqueSolution(self, symbolSolvesForExprInQuestion, baseRelations, symbolSolvedFor):
-        for symbolSub in symbolSolvesForExprInQuestion:
-            for relation in baseRelations:
-                solutionIsRedundant = relation.subs(symbolSolvedFor, symbolSub) == 0
-                if solutionIsRedundant:
+    def _exprProvidesUniqueSolution(self, expr, exprEqSubSet, baseRelations, symbol, allSymbolSubs):
+        for subExpr in self._recursiveSubstitute(expr, allSymbolSubs, set()):
+            for numericEqToExprKey in exprEqSubSet:
+                solutions = sympy.solveset(subExpr - numericEqToExprKey, symbol)
+                # TODO: this indicates some solve function needs to be refactored...
+                if type(solutions) is sympy.Complement:
+                    # this happens when an expression was originally solved into the denominator;
+                    # just ignore the undefined point
+                    solutions = solutions.args[0]
+                if solutions is sympy.Complexes or len(solutions) == 0:
                     return False
+                symbolSubs = SubSet(solutions)
+                for symbolSub in symbolSubs:
+                    for relation in baseRelations:
+                        solutionIsRedundant = relation.subs(symbol, symbolSub) == 0
+                        if solutionIsRedundant:
+                            return False
         return True
 
     def _solveRelationForSymbol(self, relation, symbol):
@@ -234,6 +261,7 @@ class AlgebraMaster:
             # this happens when an expression was originally solved into the denominator;
             # just ignore the undefined point
             symbolSubs = symbolSubs.args[0]
+        assert symbolSubs is not sympy.Complexes, "Tried to solve relation for single symbol which was a free variable"
         return SubSet(symbolSubs)
 
     def _filterNonNumericSubSets(self, subDict):
@@ -243,85 +271,6 @@ class AlgebraMaster:
             assert type(subSet) is SubSet, "subDict did not contain SubSet values"
             if subSet.isNumericSet:
                 yield (exprKey, subSet)
-
-    # TODO: remove unneeded functions below (if they really are unneeded):
-    def _subUntilFixed(self, expr, subCombo):
-        lastExpr = None
-        iters = 0
-        while lastExpr != expr:
-            lastExpr = expr
-            expr = expr.subs(subCombo)
-            
-            iters += 1
-            assert iters < 10000, "_subUntilFixed() stuck in infinite loop..."
-        return expr
-
-    def _subCombos(self):
-        for combo in self._subCombos_nextRec(dict()):
-            yield combo
-
-    def _subCombos_nextRec(self, comboDict):
-        currSymbol = None
-        for someSymbol in self._subCombos_symbolKeys():
-            someSymbolUsedAlready = someSymbol in comboDict
-            if not someSymbolUsedAlready:
-                currSymbol = someSymbol
-                break
-
-        if currSymbol is None:
-            yield comboDict
-        else:
-            associatedSet = self.getKnown(currSymbol)
-            assert type(associatedSet) is SubSet, "A non-SubSet substitution made its way into the AlgebraMaster..."
-            for exprSub in associatedSet:
-                comboDict[currSymbol] = exprSub
-                for combo in self._subCombos_nextRec(comboDict):
-                    yield combo
-            assert len(associatedSet) > 0, "Cannot have empty numeric set"
-            comboDict.pop(currSymbol)
-
-    def _subCombos_symbolKeys(self):
-        for symbolKey in self._definedSubstitutions:
-            yield symbolKey
-        for symbolKey in self._inferredSubstitutions:
-            yield symbolKey
-
-    def _subSymToNumericIfPossible(self, symbolToSub, usedSymbols):
-        if self.isKnown(symbolToSub):
-            numericSet = self.getKnown(symbolToSub)
-            assert type(numericSet) is SubSet, "getKnown() did not return a SubSet"
-            assert numericSet.isNumericSet, "getKnown() returned a SubSet that had non-numerics"
-            return numericSet
-        else:
-            numericSet = SubSet()
-            symbolSubSet = self._getSolutionsForSymbol(symbolToSub)
-            assert symbolSubSet.isExpressionSet, "solutionSet should not contain numerics"
-            for symbolSub in symbolSubSet:
-                isCircSub = False
-                for symbol in symbolSub.free_symbols:
-                    if symbol in usedSymbols:
-                        isCircSub = True
-                        break
-                if not isCircSub:
-                    possibleNumericSet = self._subToNumericIfPossible(symbolSub, usedSymbols)
-                    if possibleNumericSet.isNumericSet:
-                        numericSet.addFrom(possibleNumericSet)
-            return numericSet
-
-    def _getSolutionsForSymbol(symbol):
-        pass
-
-    def _solveSingle(self, leftExpr, rightExpr, forSymbol):
-        assert isinstance(leftExpr, sympy.Expr), "_solve() not given correct arguments (leftExpr)"
-        assert isinstance(rightExpr, sympy.Expr), "_solve() not given correct arguments (rightExpr)"
-        assert isinstance(forSymbol, sympy.Symbol), "_solve() not given correct arguments (forSymbol)"
-
-        eqZeroExpr = leftExpr - rightExpr
-        solutions = sympy.solve(eqZeroExpr, forSymbol)
-        # some assumptions I made after (a little) testing
-        assert type(solutions) is list, "_solve() solutions are given in list format"
-        assert all(isinstance(sol, sympy.Expr) for sol in solutions), "_solve() solutions are all sympy.Expr instances"
-        return solutions
 
 
 class Substituter:
@@ -639,8 +588,7 @@ class Solver:
             elif solutionSet is sympy.Complexes:
                 return types.COMPLEXES
             else:
-                # TODO: maybe assert statements like this should just raise NotImplementedErrors
-                assert "this" == "bad", "Solution ran into an unconsidered type scenario"
+                raise NotImplementedError("Solution ran into an unconsidered type scenario")
 
         # TODO: delete reverse substitution methods if not needed
         # def reverseSubstitutionMade(self, subsDict):
@@ -743,11 +691,37 @@ if __name__ == "__main__":
     # master.relate(S('a') + S('b'), sympy.simplify(9))
 
     (a, b, c, d) = sympy.symbols("a, b, c, d")
-    sd = Solver({
+    def dictIncludes(mainDict, shouldContainDict):
+        dictDoesNotContainItem = object()
+        for shouldContainKey in shouldContainDict:
+            shouldContainVal = shouldContainDict[shouldContainKey]
+            mainVal = mainDict.get(shouldContainKey, dictDoesNotContainItem)
+            mainDictContainsVal = mainVal == shouldContainVal
+            if not mainDictContainsVal:
+                return False
+        return True
+    
+    solutions = Solver({
         a + 2 * b + c  -  0,
         3 * a - b + 2 * c  -  11,
         -a + b - c  -  -6,
     }).genNumericSolutions()
+    assert dictIncludes(solutions, {
+        a: SubSet({1}),
+        b: SubSet({-2}),
+        c: SubSet({3}),
+    })
+    
+    solutions = Solver({
+        (a * c) - b  -  5,
+        (c ** 2 - a)/ b  -  -4,
+    }).genNumericSolutions()
+    assert dictIncludes(solutions, {
+        a: SubSet({1}),
+        b: SubSet({-2}),
+        c: SubSet({3}),
+    })
+
     # a + 2b + c = 0
     # 3a - b + 2c = 11
     # -a + b - c = -6

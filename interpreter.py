@@ -735,7 +735,7 @@ class Constructor:
             shouldBeSingle = not self._forceList and self._isSingleRep
             return repList[0] if shouldBeSingle else repList
         else:
-            assert "this" == "impossible", "An unconsidered Constructor mode occurred"
+            raise NotImplementedError("An unconsidered Constructor mode occurred")
     
     @property
     def _repList(self):
@@ -745,7 +745,7 @@ class Constructor:
         elif isinstance(repOrList, (type(None), Representation)):
             return [repOrList]
         else:
-            assert "this" == "impossible", "Stack piece had an unconsidered value"
+            raise NotImplementedError("Stack piece had an unconsidered value")
 
     @property
     def _isSingleRep(self):
