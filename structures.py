@@ -492,6 +492,15 @@ def isNumeric(obj):
         return False
 
 
+class NumericSymbol(sympy.Symbol):
+    def __new__(cls, repFloatOrStr):
+        try:
+            float(repFloatOrStr)
+        except TypeError:
+            raise TypeError("NumericSymbol requires a float-able argument")
+        return sympy.Symbol.__new__(cls, str(repFloatOrStr))
+
+
 def symbolToIdentifier(sympyObj):
     assert isinstance(sympyObj, sympy.Symbol), "symbolToIdentifier() requires a sympy object"
     assert not isNumeric(sympyObj), "symbolToIdentifier() cannot convert numbers"
@@ -501,6 +510,18 @@ def symbolToIdentifier(sympyObj):
 def identifierToSymbol(identifier):
     assert type(identifier) is Identifier, "identifierToSymbol() only takes Identifiers"
     return sympy.Symbol(str(identifier))
+
+
+def toNumber(something):
+    try:
+        num = float(something)
+    except TypeError:
+        raise TypeError("toNumber() requires something that can at least convert to a float")
+    numAsInt = int(num)
+    if num == numAsInt:
+        return numAsInt
+    else:
+        return num
 
 
 def iterDifference(iter1, iter2):
