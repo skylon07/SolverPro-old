@@ -112,19 +112,28 @@ class Substituter:
         assert not any(symbol in result.free_symbols for result in resultSet for exprKey in self._substitutions for symbol in exprKey.free_symbols), "Elimination-substitution requires a dict with expression keys with unidirectional dependencies (can't have {a: b + c, b: a * c}, but CAN have {a: b + c, b: 2 * c})"
         return resultSet
 
-    def backSubstitute(self):
+    def backSubstitute(self, relations):
         assert all(type(symbolKey) is sympy.Symbol for symbolKey in self._substitutions.keys()), "Backwards-substitution only works on symbol substitution dictionaries"
         symbolKeys = sorted(self._substitutions.keys(), key=self._getNumBackSubDeps)
         for (symbolKey, numSymbolsProcessed) in zip(symbolKeys, range(len(symbolKeys))):
             symbolSubs = self._substitutions[symbolKey]
 
             if symbolSubs.hasNumerics:
-                symbolSubs = SubSet(numeric for numeric in symbolSubs if isNumeric(numeric))
+                newSubs = SubSet(numeric for numeric in symbolSubs if isNumeric(numeric))
             else:
-                substituter = Substituter(self._substitutions)
-                symbolSubs = substituter._substituteInOrder(symbolSubs, symbolKeys[:numSymbolsProcessed])
+                newSubs = self._substituteInOrder(symbolSubs, symbolKeys[:numSymbolsProcessed])
             
-            self._substitutions[symbolKey] = symbolSubs
+            self._substitutions[symbolKey] = newSubs
+        
+        # not all combinations are valid...
+        # (if b = {1, -4} and a = {±sqrt(5-b)}, a isn't necessarily all the
+        # combinations {2, 3, -2, -3}, since it was derived from
+        # a^2 = 5 - b and a + b = -1; ie a = -2 when b = 1 and a = 3 when b = -4)
+        # TODO: we need to take this exact fact into account when substituting values
+        #       (ie if a = ... when b = ... like above, we should get two solutions
+        #       when substituting the above situation, not four from a naive get-all-combos method)
+        self._stripSubsThatDontFitRelations(relations)
+
         return self._substitutions
 
     def substituteInOrder(self, expr, keyOrder):
@@ -195,18 +204,20 @@ class Substituter:
     def _unusedKeys(self):
         return iterDifference(self._substitutions, self._usedKeys)
 
+    def _stripSubsThatDontFitRelations(self, relations):
+        pass # TODO
+
     def _getNumBackSubDeps(self, symbolKey):
-        symbolSubs = self._substitutions[symbolKey]
-        if symbolSubs.hasNumerics:
+        symbolSubs = self._substitutions.get(symbolKey)
+        if symbolSubs is None or symbolSubs.hasNumerics:
             return 0
         
-        symbolDeps = {
-            symbolDep
+        symbolDepNums = {
+            self._getNumBackSubDeps(symbolDep) + 1
             for subExpr in symbolSubs
             for symbolDep in subExpr.free_symbols
         }
-        assert symbolKey not in symbolDeps, "symbol can't depend on itself"
-        return len(symbolDeps)
+        return sum(symbolDepNums)
 
 
 class Solver:
@@ -243,10 +254,11 @@ class Solver:
         numSubs = self._getTotalNumSubstitutions()
         substitutionsChanged = True
         iters = 0
+        DEBUG = []
         while substitutionsChanged:
             lastNumSubs = numSubs
             
-            for exprKey in self._subsDict:
+            for exprKey in self._exprKeysSortedByIndependence():
                 symbol = self._findSymbolToSolve(exprKey)
                 cantInferFromExprKey = symbol is None
                 if cantInferFromExprKey:
@@ -259,7 +271,8 @@ class Solver:
                 inferredAnyVals = len(symbolSubs) > 0
                 if inferredAnyVals:
                     self._updateSymbolSub(symbol, symbolSubs)
-            self._symbolSubs = Substituter(self._symbolSubs).backSubstitute()
+                    DEBUG.append((exprKey, symbol, symbolSubs))
+            self._symbolSubs = Substituter(self._symbolSubs).backSubstitute(self._relationsEqZero)
 
             numSubs = self._getTotalNumSubstitutions()
             substitutionsChanged = numSubs != lastNumSubs
@@ -272,6 +285,14 @@ class Solver:
             sum(len(subSet) for subSet in self._symbolSubs.values() if subSet.isNumericSet),
             sum(len(subSet) for subSet in self._symbolSubs.values()),
         )
+
+    def _exprKeysSortedByIndependence(self):
+        # this ensures that variables needing to be solved don't get "trapped"
+        # trying to use an expression they don't exist in
+        # (a -- a..2b..2c)
+        # (b -- 2a..b..3c)
+        # (c -- 2a..4b -- TRAPPED)
+        return sorted(self._subsDict.keys(), key=lambda expr: len(expr.free_symbols))
 
     def _findSymbolToSolve(self, expr):
         return first(iterDifference(expr.free_symbols, self._symbolSubs), None)
@@ -331,10 +352,18 @@ class Solver:
             return solutionSet
         elif solution.type is types.CONDITIONAL:
             (numericSymbol, eqCondition, baseSet) = solution.set.args
+            numeric = toNumber(str(numericSymbol))
             assert type(numericSymbol) is NumericSymbol, "Tried to extract a realtional solution from a condition set which was not solved for a numeric"
             (leftCondition, rightCondition) = eqCondition.args
             expRelation = leftCondition - rightCondition
-            return self._extractRelationalSolutionSet(self._solveExponents(expRelation, toNumber(str(numericSymbol))))
+            setIsConditionalBecauseOfAnExponent = any(numeric in term.atoms() for term in self._findPowTerms(expRelation))
+            if setIsConditionalBecauseOfAnExponent:
+                # solving for an exponent gets messy (and in some cases solutions
+                # are lost and can't be preserved using the current expr: SubSet() substitution
+                # structure), so we just ignore solving for them altogether
+                return SubSet()
+            else:
+                raise NotImplementedError("Extracting a relational ConditionSet (that isn't from an exponent case)")
         elif solution.type is types.BRANCHES:
             return SubSet.join(
                 self._extractRelationalSolutionSet(branchSolution)
@@ -417,10 +446,15 @@ class Solver:
             # 4 = 0 case (say, 1 + 3(b + 1)/(b + 1))
             return None
         elif solution.type is types.COMPLEMENT:
-            if len(solution.set.args[1]) > 0:
+            if solution.set.args[0] is not sympy.Complexes:
                 # this happens when the solver is forced to put a variable in the denominator of a fraction;
                 # this generates a solution with (calculus) "holes", which can be ignored
                 return SubSet(solution.set.args[0])
+            elif solution.set.args[0] is sympy.Complexes:
+                # this happens in cases similar to the above, except sort of reversed;
+                # here, the "holes" are actually the solutions, since graphically any value is
+                # included in the complement set (this happens in cases like (c + 1)/(c + 2))
+                return SubSet(solution.set.args[1])
             else:
                 raise NotImplementedError("missing an inference solution type case (for COMPLEMENT sets)")
         else:
@@ -455,6 +489,7 @@ class Solver:
             def CONDITIONAL(self):
                 return "CONDITIONAL"
 
+            # TODO: maybe we can replace this with sympy.Union()?
             @property
             def BRANCHES(self):
                 return "BRANCHES"
@@ -640,18 +675,38 @@ if __name__ == "__main__":
 
     solutions = Solver({c ** 2 - 4}).genNumericSolutions()
     assert dictIncludes(solutions, {
-        c: SubSet({2}),
+        c: SubSet({2, -2}),
     })
 
     solutions = Solver({d ** -2 - 1/4}).genNumericSolutions()
     assert dictIncludes(solutions, {
         d: SubSet({2, -2}),
     })
+
+    solutions = Solver({
+        a + b  -  -1,
+        a ** 2 + b  -  5,
+    }).genNumericSolutions()
+    assert dictIncludes(solutions, {
+        a: SubSet({3}),
+        b: SubSet({-4}),
+    })
+
+    solutions = Solver({
+        (a * c) - b  -  5,
+        a ** 2 + c  -  4,
+        a + b + c  -  2,
+    }).genNumericSolutions()
+    assert dictIncludes(solutions, {
+        a: SubSet({1}),
+        b: SubSet({-2}),
+        c: SubSet({3}),
+    })
     
     solutions = Solver({
         (a * c) - b  -  5,
         (c ** 2 - a) / b  -  -4,
-        a + b + c  -  2
+        a + b + c  -  2,
     }).genNumericSolutions()
     assert dictIncludes(solutions, {
         a: SubSet({1}),
