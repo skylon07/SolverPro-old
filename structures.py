@@ -413,21 +413,25 @@ class SubSet(Model):
 
     def __init__(self, iterable=None):
         if iterable is not None:
-            if __debug__:
-                iterable = tuple(iterable)
-                assert not any(isinstance(item, (tuple, list, set, SubSet)) for item in iterable), "SubSet should not contain iterable elements"
+            iterable = {self._convertToSub(item) for item in iterable}
+            assert all(self.Sub._checkValidExpr(item) or type(item) is self.Sub for item in iterable), "SubSet can only be initialized with Substitution objects"
             self._set = set(iterable)
+            self._strippedSet = {sub.expr for sub in iterable}
         else:
             self._set = set()
+            self._strippedSet = set()
 
     def __repr__(self):
         if len(self._set) > 0:
-            return "S{}".format(repr(self._set))
+            return "SubSet{}".format(repr(self._set))
         else:
-            return "S{}"
+            return "SubSet{}"
 
     def __contains__(self, item):
-        return item in self._set
+        if type(item) is self.Sub:
+            return item in self._set
+        else:
+            return item in self._strippedSet
 
     def __iter__(self):
         return iter(self._set)
@@ -436,23 +440,23 @@ class SubSet(Model):
         return len(self._set)
 
     def __eq__(self, other):
-        if type(other) is SubSet:
+        if type(other) is type(self):
             return self._set == other._set
         return False
 
     @property
     def hasNumerics(self):
         # TODO: cache value on construction/addition of values
-        for item in self._set:
-            if isNumeric(item):
+        for expr in self._strippedSet:
+            if isNumeric(expr):
                 return True
         return False
 
     @property
     def hasExpressions(self):
         # TODO: cache value on construction/addition of values
-        for item in self._set:
-            if not isNumeric(item):
+        for expr in self._strippedSet:
+            if not isNumeric(expr):
                 return True
         return False
 
@@ -465,20 +469,132 @@ class SubSet(Model):
         return not self.hasNumerics
 
     def add(self, expr):
-        assert not isinstance(expr, (tuple, list, set, SubSet)), "SubSet cannot add an iterable element"
-        self._set.add(expr)
+        assert self.Sub._checkValidExpr(expr) or type(expr) is self.Sub, "SubSet tried to add an invalid item"
+        sub = self._convertToSub(expr)
+        self._set.add(sub)
+        self._strippedSet.add(sub.expr)
+
+        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
 
     def addFrom(self, iterable):
-        if __debug__:
-            iterable = tuple(iterable)
-            assert not any(isinstance(item, (tuple, list, set, SubSet)) for item in iterable), "SubSet cannot add iterable elements"
+        iterable = {self._convertToSub(expr) for expr in iterable}
+        assert all(self.Sub._checkValidExpr(expr) or type(expr) is self.Sub for expr in iterable), "SubSet can only add from iterable yielding SubSet Substitutions"
         self._set.update(iterable)
+        self._strippedSet.update({sub.expr for sub in iterable})
+
+        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
 
     def remove(self, expr):
-        self._set.remove(expr)
+        assert self.Sub._checkValidExpr(expr) or type(expr) is self.Sub, "SubSet can't remove non-Substitution item (as it only contains (or should only contain) SubSet Substitutions)"
+        self._strippedSet.remove(expr)
+        self._set.remove(self.getSub(expr))
+
+        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
 
     def removeFrom(self, iterable):
-        self._set.difference_update(iterable)
+        iterable = tuple(iterable)
+        assert all(self.Sub._checkValidExpr(expr) or type(expr) is self.Sub for expr in iterable), "SubSet can only remove from iterable yielding SubSet Substitutions (since that's all a SubSet has anyway)"
+        self._strippedSet.difference_update(iterable)
+        self._set.difference_update(self.getSubs(iterable))
+
+        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
+
+    def getSubs(self, items):
+        lookup = {
+            sub.expr: sub
+            for sub in self._set
+        }
+        for item in items:
+            if type(item) is self.Sub:
+                if item in self._set:
+                    yield item
+                else:
+                    raise KeyError("SubSet Substitution item is not in the SubSet")
+            else:
+                sub = lookup.get(item)
+                if sub is not None:
+                    yield sub
+                else:
+                    raise KeyError("SubSet non-Substitution item is not in the SubSet")
+
+
+    def getSub(self, expr):
+        return first(self.getSubs({expr}))
+
+    def _convertToSub(self, item):
+        if type(item) is self.Sub:
+            return item
+        else:
+            return self.Sub(item)
+
+    class Sub:
+        @classmethod
+        def _checkValidExpr(cls, expr):
+            return isinstance(expr, sympy.Expr) or isNumeric(expr)
+        
+        def __init__(self, expr, conditions=None):
+            if conditions is None:
+                conditions = set()
+            
+            assert self._checkValidExpr(expr), "SubSet Substitution can only represent sympy expressions"
+            if __debug__:
+                conditions = tuple(conditions)
+                assert all(isinstance(con, sympy.Expr) for con in conditions), "SubSet Substitution must be given a set of sympy expressions as the condition set"
+            self._expr = expr
+            self._conditions = self._ConditionSet(conditions)
+
+        def __repr__(self):
+            return "S({}, {})".format(self._expr, self._conditions)
+
+        def __eq__(self, other):
+            if type(other) is type(self):
+                return self._expr == other._expr and self._conditions == other._conditions
+            return False
+
+        def __hash__(self):
+            return hash((self._expr, self._conditions))
+
+        @property
+        def expr(self):
+            return self._expr
+
+        @property
+        def conditions(self):
+            return self._conditions
+
+        @property
+        def args(self):
+            return (self.expr, self.conditions)
+
+        class _ConditionSet:
+            def __init__(self, conIter):
+                self._set = set(conIter)
+                self._hash = None
+
+            def __repr__(self):
+                if len(self._set) > 0:
+                    return "Con{}".format(repr(self._set))
+                else:
+                    return "Con{}"
+
+            def __contains__(self, item):
+                return item in self._set
+
+            def __iter__(self):
+                return iter(self._set)
+
+            def __len__(self):
+                return len(self._set)
+
+            def __eq__(self, other):
+                if type(other) is type(self):
+                    return self._set == other._set
+                return False
+
+            def __hash__(self):
+                if self._hash is None:
+                    self._hash = hash(tuple(self._set))
+                return self._hash
 
 
 def isNumeric(obj):
@@ -558,4 +674,16 @@ if __name__ == "__main__":
     
     e = e.traverse(VariableRepresentation, onFn)
     print(e)
+
+    s = SubSet({})
+    s.add(1)
+    s.add(2)
+    s.add(SubSet.Sub(3, {sympy.Symbol('a') - 4}))
+    s.add(SubSet.Sub(3, {sympy.Symbol('a') - 4}))
+    print(s)
+    print("s == s --", s == s)
+    print("s == SubSet (but without conditions) --", s == SubSet({1, 2, 3}))
+    print(list(s.getSubs({3, SubSet.Sub(2)})))
+    s.removeFrom({2, 3})
+    print(s)
     
