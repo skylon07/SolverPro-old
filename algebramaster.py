@@ -10,11 +10,6 @@ class AlgebraMaster:
         self._relationsEqZero = set()
         self._relationSymbols = set()
 
-    def substitute(self, expr):
-        subsDict = dict(self._definedSubstitutions)
-        subsDict.update(self._inferredSubstitutions)
-        return Substituter(subsDict).substituteToNumerics(expr)
-
     def define(self, symbols, vals):
         assert type(symbols) in (tuple, list), "define() requires list or tuple of symbols"
         assert all(type(symbol) in (sympy.Symbol, Identifier) for symbol in symbols), "symbols must be list/tuple of sympy Symbols or Identifiers"
@@ -71,6 +66,11 @@ class AlgebraMaster:
     def exists(self, symbol):
         return symbol in self._relationSymbols
 
+    def substitute(self, expr):
+        subsDict = dict(self._definedSubstitutions)
+        subsDict.update(self._inferredSubstitutions)
+        return Substituter(subsDict).substituteToNumerics(expr)
+
     def _identifiersToSymbols(self, identifiersOrSymbols):
         # function exists purely for syntactical purposes
         def raiseInvalidType():
@@ -85,192 +85,7 @@ class AlgebraMaster:
 
     # relational/solving functions
     def _updateInferredSubstitutions(self):
-        allSymbolicSubs = dict(self._definedSubstitutions)
-        allSymbolicSubs.update(self._genNumericSolsFromRelations(self._relationsEqZero))
-        self._extrapolateSolutions(allSymbolicSubs)
-        self._inferredSubstitutions = {
-            exprKey: numSubSet
-            for (exprKey, numSubSet) in self._filterNonNumericSubSets(allSymbolicSubs)
-        }
-
-    def _genNumericSolsFromRelations(self, relations):
-        numericSubs = dict()
-        for relation in relations:
-            for negNumeric in (atom for atom in relation.atoms() if isNumeric(atom)):
-                eqToNumeric = -negNumeric
-                solutionSet = SubSet(sympy.solveset(relation, eqToNumeric))
-                for solution in solutionSet:
-                    subSet = numericSubs.get(solution, SubSet())
-                    subSet.add(eqToNumeric)
-                    numericSubs[solution] = subSet
-        return numericSubs
-
-    def _extrapolateSolutions(self, allSymbolicSubs):
-        inferredSubSets = allSymbolicSubs.values()
-        numInferred = sum(len(subSet) for subSet in inferredSubSets)
-        inferredSubsChanged = True
-        iters = 0
-        while inferredSubsChanged:
-            lastNumInferred = numInferred
-            
-            # dictionary changes; we have to memorize the keys to iterate
-            exprKeys = [key for key in allSymbolicSubs.keys()]
-            for exprKey in exprKeys:
-                numericsEqToExprKey = allSymbolicSubs[exprKey]
-                if not numericsEqToExprKey.isNumericSet:
-                    continue
-
-                # TODO: is a SubSet() really necessary here?
-                #       what about other places?
-                # TODO: maybe substitute known values before making exprsToSub
-                exprsToSub = SubSet({exprKey})
-                usedSymbols = set()
-                collapsedExprSet = self._collapseExprToNumerics(exprsToSub, numericsEqToExprKey, allSymbolicSubs, usedSymbols)
-                if __debug__:
-                    if len(collapsedExprSet) > 0 and collapsedExprSet.isNumericSet:
-                        actualSubSet = allSymbolicSubs[exprKey]
-                        assert collapsedExprSet == actualSubSet, "collapsing expression yielded the wrong answer"
-                    else:
-                        assert collapsedExprSet.isExpressionSet, "collapsing expression did not extract solutions correctly"
-
-            inferredSubSets = allSymbolicSubs.values()
-            numInferred = sum(len(subSet) for subSet in inferredSubSets)
-            inferredSubsChanged = numInferred != lastNumInferred
-
-            iters += 1
-            assert iters < 999999, "_extrapolateSolutions() stuck in an infinite loop"
-
-    def _collapseExprToNumerics(self, exprsToSub, exprsEqSubSet, allSymbolicSubs, usedSymbols):
-        assert exprsEqSubSet.isNumericSet, "Cannot collapse expr to numerics if not given the numerics it equals"
-
-        resultSubSet = SubSet()
-        for exprToSub in exprsToSub:
-            if len(exprToSub.free_symbols) == 1:
-                for theOnlySymbol in exprToSub.free_symbols:
-                    symbol = theOnlySymbol
-                for numericForExprToSub in exprsEqSubSet:
-                    relationForExprToSub = exprToSub - numericForExprToSub
-                    solutions = sympy.solveset(relationForExprToSub, symbol)
-                    # TODO: this indicates some solve function needs to be refactored...
-                    if type(solutions) is sympy.Complement:
-                        if solutions.args[0] == sympy.Complexes:
-                            solutions = solutions.args[1]
-                        else:
-                            # this happens when an expression was originally solved into the denominator;
-                            # just ignore the undefined point
-                            solutions = solutions.args[0]
-                    symbolIsStillFreeVariable = solutions is sympy.Complexes or len(solutions) == 0
-                    if symbolIsStillFreeVariable:
-                        # no way to collapse to numerics then!
-                        continue # TODO: maybe we can just return...?
-                    symbolNumSubSet = SubSet(solutions)
-                    assert symbolNumSubSet.isNumericSet, "SubSet after solving for single variable was not a numeric set"
-                    
-                    if symbol not in allSymbolicSubs:
-                        allSymbolicSubs[symbol] = symbolNumSubSet
-                    else:
-                        possibleNumerics = allSymbolicSubs[symbol]
-                        invalidNumerics = [numeric for numeric in symbolNumSubSet if numeric not in possibleNumerics]
-                        if len(invalidNumerics) > 0:
-                            raise ContradictionException(symbol, possibleNumerics, invalidNumerics)
-                    resultSubSet.addFrom(
-                        exprToSub.subs(symbol, numeric)
-                        for numeric in symbolNumSubSet
-                    )
-            else:
-                for symbolToSub in exprToSub.free_symbols:
-                    if symbolToSub in usedSymbols:
-                        continue
-                    usedSymbols.add(symbolToSub)
-
-                    for subExprsToSub in self._subExprUsingAllRoutesForSymbol(exprToSub, exprsEqSubSet, symbolToSub, allSymbolicSubs):
-                        assert type(subExprsToSub) is SubSet, "Tried to substitute for a symbol, but a SubSet was not returned"
-                        exprSubSet = self._collapseExprToNumerics(subExprsToSub, exprsEqSubSet, allSymbolicSubs, usedSymbols)
-                        allSymbolsSolved = len(exprSubSet) > 0 and exprSubSet.isNumericSet
-                        if allSymbolsSolved:
-                            resultSubSet.addFrom(exprSubSet)
-                            break # to avoid redundantly substituting the same variable again
-
-                    usedSymbols.remove(symbolToSub)
-                    if symbolToSub in allSymbolicSubs and allSymbolicSubs[symbolToSub].isExpressionSet:
-                        allSymbolicSubs.pop(symbolToSub)
-        return resultSubSet
-
-    def _subExprUsingAllRoutesForSymbol(self, exprToSub, exprEqSubSet, symbolToSub, allSymbolicSubs):
-        allSymbolSubs = {
-            symbol: allSymbolicSubs[symbol]
-            for symbol in allSymbolicSubs
-            if type(symbol) is sympy.Symbol
-        }
-        relationsToSub = {
-            exprToSub - numericEqToExprToSub
-            for numericEqToExprToSub in exprEqSubSet
-        }
-        
-        symbolSubsKnown = symbolToSub in allSymbolicSubs
-        if symbolSubsKnown:
-            usedExprKeys = set()
-            subExprSet = self._recursiveSubstitute(exprToSub, allSymbolSubs, usedExprKeys)
-            assert not any(symbolToSub in expr.free_symbols for expr in subExprSet), "Substituting didn't eliminate variable"
-            yield subExprSet
-        else:
-             # dictionary changes; we have to memorize the keys to iterate
-            exprKeys = [key for key in allSymbolicSubs.keys()]
-            for exprKey in exprKeys:
-                # no point in substituting the symbol if it isn't even in the expression
-                if symbolToSub not in exprKey.free_symbols:
-                    continue
-                exprKeyEqSubSet = allSymbolicSubs[exprKey]
-                
-                # you know how you need 3 unique equations to solve a syatem of 3 variables?
-                # this is what this is trying to determine...
-                if self._exprProvidesUniqueSolution(exprKey, exprKeyEqSubSet, relationsToSub, symbolToSub, allSymbolSubs):
-                    symbolSubs = SubSet.join(
-                        self._solveRelationForSymbol(subExprKey - numericEqToExprKey, symbolToSub)
-                        for subExprKey in self._recursiveSubstitute(exprKey, allSymbolSubs, set())
-                        for numericEqToExprKey in exprKeyEqSubSet
-                    )
-                    allSymbolSubs[symbolToSub] = allSymbolicSubs[symbolToSub] = symbolSubs
-                    usedExprKeys = set()
-                    subExprSet = self._recursiveSubstitute(exprToSub, allSymbolSubs, usedExprKeys)
-                    assert not any(symbolToSub in expr.free_symbols for expr in subExprSet), "Substituting didn't eliminate variable"
-                    yield subExprSet
-
-    def _exprProvidesUniqueSolution(self, expr, exprEqSubSet, baseRelations, symbol, allSymbolSubs):
-        for subExpr in self._recursiveSubstitute(expr, allSymbolSubs, set()):
-            for numericEqToExprKey in exprEqSubSet:
-                solutions = sympy.solveset(subExpr - numericEqToExprKey, symbol)
-                # TODO: this indicates some solve function needs to be refactored...
-                if type(solutions) is sympy.Complement:
-                    # this happens when an expression was originally solved into the denominator;
-                    # just ignore the undefined point
-                    solutions = solutions.args[0]
-                if solutions is sympy.Complexes or len(solutions) == 0:
-                    return False
-                symbolSubs = SubSet(solutions)
-                for symbolSub in symbolSubs:
-                    for relation in baseRelations:
-                        solutionIsRedundant = relation.subs(symbol, symbolSub) == 0
-                        if solutionIsRedundant:
-                            return False
-        return True
-
-    def _solveRelationForSymbol(self, relation, symbol):
-        symbolSubs = sympy.solveset(relation, symbol)
-        if type(symbolSubs) is sympy.Complement:
-            # this happens when an expression was originally solved into the denominator;
-            # just ignore the undefined point
-            symbolSubs = symbolSubs.args[0]
-        assert symbolSubs is not sympy.Complexes, "Tried to solve relation for single symbol which was a free variable"
-        return SubSet(symbolSubs)
-
-    def _filterNonNumericSubSets(self, subDict):
-        for exprKey in subDict:
-            assert isinstance(exprKey, sympy.Expr), "subDict did not have sympy Expr keys"
-            subSet = subDict[exprKey]
-            assert type(subSet) is SubSet, "subDict did not contain SubSet values"
-            if subSet.isNumericSet:
-                yield (exprKey, subSet)
+        self._inferredSubstitutions = Solver(self._relationsEqZero, self._definedSubstitutions).genNumericSolutions()
 
 
 class Substituter:
@@ -519,7 +334,7 @@ class Solver:
             assert type(numericSymbol) is NumericSymbol, "Tried to extract a realtional solution from a condition set which was not solved for a numeric"
             (leftCondition, rightCondition) = eqCondition.args
             expRelation = leftCondition - rightCondition
-            return self._extractRelationalSolutionSet(self._solveExponent(expRelation, toNumber(str(numericSymbol))))
+            return self._extractRelationalSolutionSet(self._solveExponents(expRelation, toNumber(str(numericSymbol))))
         elif solution.type is types.BRANCHES:
             return SubSet.join(
                 self._extractRelationalSolutionSet(branchSolution)
@@ -528,54 +343,64 @@ class Solver:
         else:
             raise NotImplementedError("missing a relational solution type case (general case)")
 
-    def _solveExponent(self, expr, atom):
-        assert expr.is_Add, "can't solve an exponential relation if it doesn't follow the format!"
-        (exprArg1, exprArg2) = expr.args
-        (mul1, exp1, is1Exp) = self._extractMulAndExp(exprArg1)
-        (mul2, exp2, is2Exp) = self._extractMulAndExp(exprArg2)
-        assert exp1.is_Pow or exp2.is_Pow, "uh... wait, I thought we were solving exponential equations here?"
-        if exp1.is_Pow and exp2.is_Pow:
-            raise NotImplementedError("Only one term can be an exponential expression")
-        elif exp1.is_Pow:
-            exp = exp1
-            mul = mul1
-            eqToExpr = exprArg2
-        elif exp2.is_Pow:
-            exp = exp2
-            mul = mul2
-            eqToExpr = exprArg1
+    def _solveExponents(self, expr, atom):
+        powTermsWithAtom = {term for term in self._findPowTerms(expr) if atom in term.atoms()}
+        assert len(powTermsWithAtom) > 0, "uh... then why are you trying to solve for exponents?"
+        basesWithAtom = set()
+        expsWithAtom = set()
+        for powTerm in powTermsWithAtom:
+            (base, exp) = powTerm.args
+            if atom in base.atoms():
+                basesWithAtom.add(base)
+            if atom in exp.atoms():
+                expsWithAtom.add(exp)
 
-        (base, exp) = exp.args
-        inBase = atom in base.atoms()
-        inExp = atom in exp.atoms()
-        assert inBase or inExp, "Can't solve for an exponential expression if the target symbol isn't even in it"
-        if inBase and inExp:
-            raise NotImplementedError("Solving exponents where atom is in the base and exponent")
-        elif inBase:
-            baseSubs = sympy.solve(expr, base)
-            assert type(baseSubs) is list, "solve() for only one variable should have returned list"
-            return self._Solution.makeBranches(
-                self._solveSet(base - baseSub, atom)
-                for baseSub in baseSubs
-            )
-        elif inExp:
-            expSubs = sympy.solve(expr, exp)
-            assert type(expSubs) is list, "solve() for only one variable should have returned list"
-            return self._Solution.makeBranches(
-                self._solveSet(exp - expSub, atom)
-                for expSub in expSubs
-            )
+        anyBases = len(basesWithAtom) > 0
+        manyBases = len(basesWithAtom) > 1
+        anyExps = len(expsWithAtom) > 0
+        manyExps = len(expsWithAtom) > 1
+        if anyBases and anyExps:
+            return self._solveExponents_bruteSolve(expr, atom)
+        elif anyBases:
+            if manyBases:
+                return self._solveExponents_bruteSolve(expr, atom)
+            else:
+                partIsExp = False
+                return self._solveExponents_solveSingle(expr, first(basesWithAtom), atom, partIsExp)
+        elif anyExps:
+            if manyExps:
+                return self._solveExponents_bruteSolve(expr, atom)
+            else:
+                partIsExp = True
+                return self._solveExponents_solveSingle(expr, first(expsWithAtom), atom, partIsExp)
 
-    def _extractMulAndExp(self, expr):
-        if expr.is_Mul:
-            (arg1, arg2) = expr.args
-            if arg1.is_Pow:
-                return (arg2, arg1, True)
-            elif arg2.is_Pow:
-                return (arg1, arg2, True)
-        elif expr.is_Pow:
-            return (1, expr, True)
-        return (1, expr, False)
+    def _solveExponents_solveSingle(self, expr, partWithAtom, atom, partIsExp):
+        subs = sympy.solve(expr, partWithAtom)
+        assert type(subs) is list, "solve() for only one variable should have returned list"
+        if partIsExp:
+            atomIsEvenPower = atom % 2 == 0
+            if atomIsEvenPower:
+                subs = {
+                    signedSub
+                    for sub in subs
+                    for signedSub in [sub, -sub]
+                }
+        return self._Solution.makeBranches(
+            self._solveSet(partWithAtom - sub, atom)
+            for sub in subs
+        )
+    
+    def _solveExponents_bruteSolve(self, expr, atom):
+        sols = sympy.solve(expr, atom)
+        assert type(sols) is list, "solve() for only one variable should have returned list"
+        return self._Solution(set(sols))
+
+    def _findPowTerms(self, expr):
+        if expr.is_Pow:
+            yield expr
+        for term in expr.args:
+            for expTerm in self._findPowTerms(term):
+                yield expTerm
 
     def _extractInferenceSolutionSet(self, solution):
         types = self._Solution.types
@@ -825,7 +650,8 @@ if __name__ == "__main__":
     
     solutions = Solver({
         (a * c) - b  -  5,
-        (c ** 2 - a)/ b  -  -4,
+        (c ** 2 - a) / b  -  -4,
+        a + b + c  -  2
     }).genNumericSolutions()
     assert dictIncludes(solutions, {
         a: SubSet({1}),
