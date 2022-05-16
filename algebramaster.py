@@ -102,48 +102,77 @@ class Substituter:
             return SubSet({expr})
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         
-        resultSet = self._substituteAllCombos(SubSet({expr}))
+        resultSet = self._substituteAllCombos([expr])
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
         return resultSet
 
     def substituteByElimination(self, expr):
-        resultSet = self._substituteAllCombos(SubSet({expr}))
+        resultSet = self._substituteAllCombos([expr])
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
         assert not any(symbol in result.free_symbols for result in resultSet for exprKey in self._substitutions for symbol in exprKey.free_symbols), "Elimination-substitution requires a dict with expression keys with unidirectional dependencies (can't have {a: b + c, b: a * c}, but CAN have {a: b + c, b: 2 * c})"
         return resultSet
 
-    def backSubstitute(self, relations):
+    def backSubstitute(self):
         assert all(type(symbolKey) is sympy.Symbol for symbolKey in self._substitutions.keys()), "Backwards-substitution only works on symbol substitution dictionaries"
-        symbolKeys = sorted(self._substitutions.keys(), key=self._getNumBackSubDeps)
+        symbolKeys = sorted(self._substitutions.keys(), key=self._getSymbolDepSortKey)
         for (symbolKey, numSymbolsProcessed) in zip(symbolKeys, range(len(symbolKeys))):
             symbolSubs = self._substitutions[symbolKey]
 
             if symbolSubs.hasNumerics:
-                newSubs = SubSet(numeric for numeric in symbolSubs if isNumeric(numeric))
+                newSubs = SubSet(
+                    sub
+                    for sub in symbolSubs
+                    if isNumeric(sub.expr)
+                )
             else:
-                newSubs = self._substituteInOrder(symbolSubs, symbolKeys[:numSymbolsProcessed])
+                newSubs = self._substituteAllCombos(symbolSubs, symbolKeys[:numSymbolsProcessed])
             
             self._substitutions[symbolKey] = newSubs
-        
-        # not all combinations are valid...
-        # (if b = {1, -4} and a = {±sqrt(5-b)}, a isn't necessarily all the
-        # combinations {2, 3, -2, -3}, since it was derived from
-        # a^2 = 5 - b and a + b = -1; ie a = -2 when b = 1 and a = 3 when b = -4)
-        # TODO: we need to take this exact fact into account when substituting values
-        #       (ie if a = ... when b = ... like above, we should get two solutions
-        #       when substituting the above situation, not four from a naive get-all-combos method)
-        self._stripSubsThatDontFitRelations(relations)
-
         return self._substitutions
-
-    def substituteInOrder(self, expr, keyOrder):
-        return self._substituteInOrder(SubSet({expr}), keyOrder)
 
     # below are different kinds of substitution algoritms;
     # some are used, some might not be, but they're still useful to have around
+
+    def _substituteAllCombos(self, primaryExprs, keysToSub=None):
+        if keysToSub is None:
+            keysToSub = sorted(self._substitutions.keys(), key=self._getSymbolDepSortKey)
+        
+        return SubSet(
+            self._subDictUntilFixed(primaryExpr, subCombo)
+            for subCombo in self._makeSubCombos(keysToSub)
+            for primaryExpr in primaryExprs
+        )
+
+    def _makeSubCombos(self, keys, _comboDict=None):
+        comboDict = _comboDict
+        if comboDict is None:
+            comboDict = dict()
+        
+        if len(keys) == 0:
+            comboDictFinished = comboDict
+            yield comboDictFinished
+        else:
+            currKey = keys.pop(0)
+            subSet = self._substitutions[currKey]
+            for sub in subSet:
+                if not self._matchesConditions(comboDict, sub.conditions):
+                    continue
+
+                comboDict[currKey] = sub.expr
+                for comboDictFinished in self._makeSubCombos(keys, comboDict):
+                    yield comboDictFinished
+            # an empty subSet breaks popping from comboDict below, and it just isn't a good sign...
+            assert len(subSet) > 0, "Cannot have empty numeric set"
+            comboDict.pop(currKey)
+            keys.insert(0, currKey)
+
+    # unused substitution algorithms
+
     def _substituteAllPaths(self, primaryExprs):
-        # TODO: the keys should be sorted so largest expressions are substituted first
-        for exprKey in self._unusedKeys():
+        # TODO: should sort unused keys by _getSymbolDepSortKey() for accurate results
+        # TODO: this does not yet respect SubSet conditions (don't implement until this needs to be used)
+        unusedKeys = iterDifference(self._substitutions, self._usedKeys)
+        for exprKey in unusedKeys:
             if primaryExprs.isNumericSet:
                 return primaryExprs
             
@@ -158,40 +187,8 @@ class Substituter:
             self._usedKeys.remove(exprKey)
         return primaryExprs
 
-    def _substituteAllCombos(self, primaryExprs):
-        return SubSet(
-            self._subDictUntilFixed(primaryExpr, subCombo)
-            for subCombo in self._makeSubCombos()
-            for primaryExpr in primaryExprs
-        )
-
-    def _makeSubCombos(self, comboDict=None):
-        if comboDict is None:
-            comboDict = dict()
-        
-        currKey = first(iterDifference(self._substitutions, comboDict), None)
-        if currKey is None:
-            comboDictFinished = comboDict
-            yield comboDictFinished
-        else:
-            subSet = self._substitutions[currKey]
-            for exprSub in subSet:
-                comboDict[currKey] = exprSub
-                for comboDictFinished in self._makeSubCombos(comboDict):
-                    yield comboDictFinished
-            # an empty subSet breaks popping from comboDict below, and it just isn't a good sign...
-            assert len(subSet) > 0, "Cannot have empty numeric set"
-            comboDict.pop(currKey)
-
-    def _subDictUntilFixed(self, expr, subDict):
-        assert expr is not None, "cannot sub a nonexistant expression"
-        lastExpr = None
-        while lastExpr is not expr:
-            lastExpr = expr
-            expr = expr.subs(subDict)
-        return expr
-
     def _substituteInOrder(self, primaryExprs, keyOrder):
+        # TODO: this does not yet respect SubSet conditions (don't implement until this needs to be used)
         for exprKey in keyOrder:
             assert exprKey in self._substitutions, "keyOrder contained exprKey not included in the original subs dict"
             primaryExprs = SubSet(
@@ -201,24 +198,58 @@ class Substituter:
             )
         return primaryExprs
 
-    def _unusedKeys(self):
-        return iterDifference(self._substitutions, self._usedKeys)
+    # other utility functions
 
-    def _stripSubsThatDontFitRelations(self, relations):
-        pass # TODO
+    def _matchesConditions(self, subDict, conditionRelations):
+        for conRelation in conditionRelations:
+            sub = self._subDictUntilFixed(conRelation, subDict)
+            numeric = sub.expr
+            assert isNumeric(numeric), "Condition checking only works if all symbols were substituted (aka use _getSymbolDepSortKey() to evaluate symbol subs in the right order)"
+            conditionsMatchSub = numeric == 0
+            if not conditionsMatchSub:
+                return False
+        return True
 
-    def _getNumBackSubDeps(self, symbolKey):
-        symbolSubs = self._substitutions.get(symbolKey)
-        if symbolSubs is None or symbolSubs.hasNumerics:
-            return 0
-        
-        symbolDepNums = {
-            self._getNumBackSubDeps(symbolDep) + 1
-            for subExpr in symbolSubs
-            for symbolDep in subExpr.free_symbols
+    def _subDictUntilFixed(self, expr, subDict):
+        assert expr is not None, "cannot sub a nonexistant expression"
+        symbolsToIncludeForCondition = expr.free_symbols
+        lastExpr = None
+        iters = 0
+        while lastExpr is not expr:
+            lastExpr = expr
+            expr = expr.subs(subDict)
+            iters += 1
+            assert iters < 9999, "Substitution probably should have stopped by now..."
+        conditions = {
+            symbol - subDict[symbol]
+            for symbol in symbolsToIncludeForCondition
         }
-        return sum(symbolDepNums)
+        return SubSet.Sub(expr, conditions)
 
+    def _getSymbolDepSortKey(self, symbolKey, _symbolsChecked=None):
+        symbolsChecked = _symbolsChecked
+        if symbolsChecked is None:
+            symbolsChecked = set()
+        
+        symbolSubs = self._substitutions.get(symbolKey)
+        if symbolSubs is None:
+            # since there are no substitutions (even if that's just "yet"),
+            # there are therefore no dependencies
+            return 0
+        assert symbolKey not in symbolsChecked, "Circular dependencies were processed (these should not exist...)"
+        symbolsChecked.add(symbolKey)
+        
+        # if A's conditions depend on B, C, and D (throughout the whole SubSet for A),
+        # then we want to evaluate A after B, C and D, and therefore kA (the sort key
+        # for A) > kB and kC and kD; an easy way to guarantee this is just summing them up
+        symbolDeps = {
+            symbolDep
+            for sub in symbolSubs
+            for condRelation in sub.conditions
+            for symbolDep in condRelation.free_symbols
+        }
+        # TODO: highly inefficient; we should cache values in a dictionary as we find them
+        return sum(self._getSymbolDepSortKey(symbolDep, symbolsChecked) for symbolDep in symbolDeps) + 1
 
 class Solver:
     def __init__(self, relations, symbolDefinitions=None):
@@ -661,7 +692,7 @@ if __name__ == "__main__":
             if not mainDictContainsVal:
                 return False
         return True
-    
+
     solutions = Solver({
         a + 2 * b + c  -  0,
         3 * a - b + 2 * c  -  11,
