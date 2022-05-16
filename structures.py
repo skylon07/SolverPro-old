@@ -407,6 +407,7 @@ class SubSet(Model):
     @classmethod
     def join(cls, subSets):
         joinSet = SubSet()
+        # TODO: perhaps theres a way to combine subSets into one iterator?
         for subSet in subSets:
             joinSet.addFrom(subSet)
         return joinSet
@@ -422,10 +423,15 @@ class SubSet(Model):
             self._strippedSet = set()
 
     def __repr__(self):
-        if len(self._set) > 0:
-            return "SubSet{}".format(repr(self._set))
-        else:
-            return "SubSet{}"
+        # using ", ".join() (instead of stringifying a set)
+        # removes the nested quotes (since it'd be a set of strings)
+        return "SubSet{}".format("{" + ", ".join(
+            "{}{}".format(
+                sub.expr,
+                set(sub.conditions) if len(sub.conditions) > 0 else "",
+            )
+            for sub in self._set
+        ) + "}")
 
     def __contains__(self, item):
         if type(item) is self.Sub:
@@ -474,7 +480,7 @@ class SubSet(Model):
         self._set.add(sub)
         self._strippedSet.add(sub.expr)
 
-        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
+        assert self._strippedSet == {sub.expr for sub in self._set} and len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
 
     def addFrom(self, iterable):
         iterable = {self._convertToSub(expr) for expr in iterable}
@@ -482,14 +488,14 @@ class SubSet(Model):
         self._set.update(iterable)
         self._strippedSet.update({sub.expr for sub in iterable})
 
-        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
+        assert self._strippedSet == {sub.expr for sub in self._set} and len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
 
     def remove(self, expr):
         assert self.Sub._checkValidExpr(expr) or type(expr) is self.Sub, "SubSet can't remove non-Substitution item (as it only contains (or should only contain) SubSet Substitutions)"
         self._strippedSet.remove(expr)
         self._set.remove(self.getSub(expr))
 
-        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
+        assert self._strippedSet == {sub.expr for sub in self._set} and len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
 
     def removeFrom(self, iterable):
         iterable = tuple(iterable)
@@ -497,7 +503,7 @@ class SubSet(Model):
         self._strippedSet.difference_update(iterable)
         self._set.difference_update(self.getSubs(iterable))
 
-        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
+        assert self._strippedSet == {sub.expr for sub in self._set} and len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
 
     def getSubs(self, items):
         lookup = {
@@ -544,7 +550,7 @@ class SubSet(Model):
             self._conditions = self._ConditionSet(conditions)
 
         def __repr__(self):
-            return "S({}, {})".format(self._expr, self._conditions)
+            return "Sub({}, {})".format(self._expr, self._conditions)
 
         def __eq__(self, other):
             if type(other) is type(self):
@@ -678,9 +684,10 @@ if __name__ == "__main__":
     s = SubSet({})
     s.add(1)
     s.add(2)
-    s.add(SubSet.Sub(3, {sympy.Symbol('a') - 4}))
-    s.add(SubSet.Sub(3, {sympy.Symbol('a') - 4}))
+    s.add(SubSet.Sub(3, {sympy.Symbol('a') - 4, sympy.Symbol('a') + 4}))
+    s.add(SubSet.Sub(3, {sympy.Symbol('a') - 4, sympy.Symbol('a') + 4}))
     print(s)
+    print({sub for sub in s})
     print("s == s --", s == s)
     print("s == SubSet (but without conditions) --", s == SubSet({1, 2, 3}))
     print(list(s.getSubs({3, SubSet.Sub(2)})))
