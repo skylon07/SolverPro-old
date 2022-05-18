@@ -212,7 +212,8 @@ class Substituter:
 
     def _subDictUntilFixed(self, expr, subDict):
         assert expr is not None, "cannot sub a nonexistant expression"
-        symbolsToIncludeForCondition = expr.free_symbols
+        
+        origExpr = expr
         lastExpr = None
         iters = 0
         while lastExpr is not expr:
@@ -220,11 +221,18 @@ class Substituter:
             expr = expr.subs(subDict)
             iters += 1
             assert iters < 9999, "Substitution probably should have stopped by now..."
+        
+        return self._generateSub(origExpr, expr, subDict)
+
+    def _generateSub(self, exprBeforeSubs, exprAfterSubs, subDict):
+        allSymbols = exprBeforeSubs.free_symbols
+        nonSubbedSymbols = exprAfterSubs.free_symbols
+        subbedSymbols = iterDifference(allSymbols, nonSubbedSymbols)
         conditions = {
             symbol - subDict[symbol]
-            for symbol in symbolsToIncludeForCondition
+            for symbol in subbedSymbols
         }
-        return SubSet.Sub(expr, conditions)
+        return SubSet.Sub(exprAfterSubs, conditions)
 
     def _getSymbolDepSortKey(self, symbolKey, _symbolsChecked=None):
         symbolsChecked = _symbolsChecked
