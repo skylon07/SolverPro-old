@@ -491,7 +491,7 @@ class SubSet(Model):
         self._set.add(sub)
         self._strippedSet.add(sub.expr)
 
-        assert self._strippedSet == {sub.expr for sub in self._set} and len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
+        self._assertSynced()
 
     def addFrom(self, iterable):
         iterable = {self._convertToSub(expr) for expr in iterable}
@@ -499,14 +499,14 @@ class SubSet(Model):
         self._set.update(iterable)
         self._strippedSet.update({sub.expr for sub in iterable})
 
-        assert self._strippedSet == {sub.expr for sub in self._set} and len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
+        self._assertSynced()
 
     def remove(self, expr):
         assert self.Sub._checkValidExpr(expr) or type(expr) is self.Sub, "SubSet can't remove non-Substitution item (as it only contains (or should only contain) SubSet Substitutions)"
         self._strippedSet.remove(expr)
         self._set.remove(self.getSub(expr))
 
-        assert self._strippedSet == {sub.expr for sub in self._set} and len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
+        self._assertSynced()
 
     def removeFrom(self, iterable):
         iterable = tuple(iterable)
@@ -514,7 +514,7 @@ class SubSet(Model):
         self._strippedSet.difference_update(iterable)
         self._set.difference_update(self.getSubs(iterable))
 
-        assert self._strippedSet == {sub.expr for sub in self._set} and len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
+        self._assertSynced()
 
     def getSubs(self, items):
         lookup = {
@@ -543,6 +543,10 @@ class SubSet(Model):
             return item
         else:
             return self.Sub(item)
+
+    def _assertSynced(self):
+        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
+        assert len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
 
     class Sub:
         @classmethod
