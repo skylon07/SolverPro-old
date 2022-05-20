@@ -376,6 +376,7 @@ class Solver:
             return self._Solution(solutionSet)
 
     def _updateNumericSubs(self, exprKey, subSet):
+        assert isinstance(exprKey, sympy.Expr), "_updateNumericSubs() requires a sympy expression"
         assert type(subSet) is SubSet, "_updateNumericSubs() requires a SubSet"
         assert subSet.isNumericSet, "_subsDict can only contain numeric substitutions"
         if exprKey not in self._subsDict:
