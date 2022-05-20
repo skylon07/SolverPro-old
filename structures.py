@@ -412,6 +412,17 @@ class SubSet(Model):
             joinSet.addFrom(subSet)
         return joinSet
 
+    @classmethod
+    def fullRepr(cls, subSet):
+        assert type(subSet) is SubSet, "Cannot get SubSet full repr str from non-SubSet"
+        if len(subSet) > 0:
+            return "SubSet{}".format("{" + ", ".join(
+            repr(sub)
+            for sub in subSet._set
+        ) + "}")
+        else:
+            return "SubSet{}"
+
     def __init__(self, iterable=None):
         if iterable is not None:
             iterable = {self._convertToSub(item) for item in iterable}
@@ -426,9 +437,9 @@ class SubSet(Model):
         # using ", ".join() (instead of stringifying a set)
         # removes the nested quotes (since it'd be a set of strings)
         return "SubSet{}".format("{" + ", ".join(
-            "{}{}".format(
+            "{} {}".format(
                 sub.expr,
-                set(sub.conditions) if len(sub.conditions) > 0 else "",
+                "<{}>".format(", ".join(str(condExpr) for condExpr in sub.conditions)),
             )
             for sub in self._set
         ) + "}")
