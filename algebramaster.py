@@ -317,11 +317,12 @@ class Solver:
                 assert all(len(sub.conditions) == 0 for sub in self._subsDict[exprKey]), "What to do if there are conditions?"
                 symbolSubs = SubSet.join(
                     self._inferSymbolFromRelation(symbol, exprKey - numericSub)
-                    for numericSub in self._subsDict[exprKey]
+                    for sub in self._subsDict[exprKey]
+                    for numericSub in [sub.expr]
                 )
                 inferredAnyVals = len(symbolSubs) > 0
                 if inferredAnyVals:
-                    self._updateSymbolSub(symbol, symbolSubs)
+                    self._updateSymbolSubs(symbol, symbolSubs)
                     DEBUG.append((exprKey, symbol, symbolSubs))
             self._symbolSubs = Substituter(self._symbolSubs).backSubstitute(self._relationsEqZero)
 
