@@ -311,6 +311,7 @@ class Solver:
                 if cantInferFromExprKey:
                     continue
 
+                assert all(len(sub.conditions) == 0 for sub in self._subsDict[exprKey]), "What to do if there are conditions?"
                 symbolSubs = SubSet.join(
                     self._inferSymbolFromRelation(symbol, exprKey - numericSub)
                     for numericSub in self._subsDict[exprKey]
