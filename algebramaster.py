@@ -103,14 +103,14 @@ class Substituter:
             return SubSet({expr})
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         
-        resultSet = self._substituteAllCombos([expr])
+        # TODO: substitute
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
         return resultSet
 
     def substituteByElimination(self, expr, forSymbol):
         assert isinstance(expr, sympy.Expr), "substituteByElimination() requires a sympy Expr"
         assert type(forSymbol) is sympy.Symbol, "substituteByElimination() needs a sympy Symbol for the variable being solved"
-        resultSet = self._substituteAllCombos([expr])
+        # TODO: substitute
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
         assert not any(symbol in resultSub.expr.free_symbols for resultSub in resultSet for exprKey in self._substitutions for symbol in exprKey.free_symbols), "Elimination-substitution requires a dict with expression keys with unidirectional dependencies (can't have {a: b + c, b: a * c}, but CAN have {a: b + c, b: 2 * c})"
         return resultSet
@@ -128,46 +128,14 @@ class Substituter:
                     if isNumeric(sub.expr)
                 )
             else:
-                newSubs = self._substituteAllCombos(symbolSubs, symbolKeys[:numSymbolsProcessed])
+                pass # TODO
             
             self._substitutions[symbolKey] = newSubs
         return self._substitutions
 
-    # below are different kinds of substitution algoritms;
-    # some are used, some might not be, but they're still useful to have around
+    # below are the substitution algorithms currently being used
 
-    def _substituteAllCombos(self, primaryExprs, keysToSub=None):
-        if keysToSub is None:
-            keysToSub = sorted(self._substitutions.keys(), key=self._getSymbolDepSortKey)
-        
-        return SubSet(
-            self._subDictUntilFixed(primaryExpr, subCombo)
-            for subCombo in self._makeSubCombos(keysToSub)
-            for primaryExpr in primaryExprs
-        )
-
-    def _makeSubCombos(self, keys, _comboDict=None):
-        comboDict = _comboDict
-        if comboDict is None:
-            comboDict = dict()
-        
-        if len(keys) == 0:
-            comboDictFinished = comboDict
-            yield comboDictFinished
-        else:
-            currKey = keys.pop(0)
-            subSet = self._substitutions[currKey]
-            for sub in subSet:
-                if not self._matchesConditions(comboDict, sub.conditions):
-                    continue
-
-                comboDict[currKey] = sub.expr
-                for comboDictFinished in self._makeSubCombos(keys, comboDict):
-                    yield comboDictFinished
-            # an empty subSet breaks popping from comboDict below, and it just isn't a good sign...
-            assert len(subSet) > 0, "Cannot have empty numeric set"
-            comboDict.pop(currKey)
-            keys.insert(0, currKey)
+    # TODO: make common subs algorithm
 
     # unused substitution algorithms
 
@@ -202,16 +170,6 @@ class Substituter:
         return primaryExprs
 
     # other utility functions
-
-    def _matchesConditions(self, subDict, conditionRelations):
-        for conRelation in conditionRelations:
-            sub = self._subDictUntilFixed(conRelation, subDict)
-            numeric = sub.expr
-            assert isNumeric(numeric), "Condition checking only works if all symbols were substituted (aka use _getSymbolDepSortKey() to evaluate symbol subs in the right order)"
-            conditionsMatchSub = numeric == 0
-            if not conditionsMatchSub:
-                return False
-        return True
 
     def _subDictUntilFixed(self, expr, subDict):
         assert expr is not None, "cannot sub a nonexistant expression"
@@ -302,7 +260,6 @@ class Solver:
         numSubs = self._getTotalNumSubstitutions()
         substitutionsChanged = True
         iters = 0
-        DEBUG = []
         while substitutionsChanged:
             lastNumSubs = numSubs
             
@@ -323,8 +280,7 @@ class Solver:
                 inferredAnyVals = len(symbolSubs) > 0
                 if inferredAnyVals:
                     self._updateSymbolSubs(symbol, symbolSubs)
-                    DEBUG.append((exprKey, symbol, symbolSubs))
-            self._symbolSubs = Substituter(self._symbolSubs).backSubstitute(self._relationsEqZero)
+            self._symbolSubs = Substituter(self._symbolSubs).backSubstitute()
 
             numSubs = self._getTotalNumSubstitutions()
             substitutionsChanged = numSubs != lastNumSubs
@@ -350,20 +306,7 @@ class Solver:
         return first(iterDifference(expr.free_symbols, self._symbolSubs), None)
 
     def _inferSymbolFromRelation(self, symbol, relation):
-        subRelationSet = Substituter(self._symbolSubs).substituteByElimination(relation)
-        symbolSubs = SubSet.join(
-            newSubSet
-            for subRelation in subRelationSet
-            for newSubSet in [self._extractInferenceSolutionSet(self._solveSet(subRelation, symbol))]
-            if newSubSet is not None
-        )
-        if symbolSubs.hasNumerics:
-            if symbolSubs.isNumericSet:
-                return symbolSubs
-            else:
-                return SubSet(numeric for numeric in symbolSubs if isNumeric(numeric))
-        else:
-            return symbolSubs
+        pass # TODO
 
     def _solveSet(self, expr, atom):
         # solving x ** 2 for 2 gives us errors (but if we substitute a symbol it's fine...?)
@@ -484,34 +427,38 @@ class Solver:
             for expTerm in self._findPowTerms(term):
                 yield expTerm
 
-    def _extractInferenceSolutionSet(self, solution):
-        types = self._Solution.types
-        if solution.type is types.NORMAL:
-            solutionSet = SubSet(solution.set)
-            return solutionSet
-        elif solution.type is types.COMPLEXES:
-            # this means a variable can be any value and still hold true in the relation,
-            # which ultimately means the relation provided no new information for the symbol;
-            # we therefore return saying "hey, this symbol has no new substitutions"
-            return None
-        elif solution.type is types.EMPTY:
-            # similar to the above case, except we ended up with some kind of
-            # 4 = 0 case (say, 1 + 3(b + 1)/(b + 1))
-            return None
-        elif solution.type is types.COMPLEMENT:
-            if solution.set.args[0] is not sympy.Complexes:
-                # this happens when the solver is forced to put a variable in the denominator of a fraction;
-                # this generates a solution with (calculus) "holes", which can be ignored
-                return SubSet(solution.set.args[0])
-            elif solution.set.args[0] is sympy.Complexes:
-                # this happens in cases similar to the above, except sort of reversed;
-                # here, the "holes" are actually the solutions, since graphically any value is
-                # included in the complement set (this happens in cases like (c + 1)/(c + 2))
-                return SubSet(solution.set.args[1])
-            else:
-                raise NotImplementedError("missing an inference solution type case (for COMPLEMENT sets)")
-        else:
-            raise NotImplementedError("missing an inference solution type case (general case)")
+    def _extractInferenceSolutionSet(self, solution, withConditions):
+        pass # TODO
+        # types = self._Solution.types
+        # if solution.type is types.NORMAL:
+        #     solutionSet = SubSet(self._mapToSubsWithConditions(solution.set, withConditions))
+        #     return solutionSet
+        # elif solution.type is types.COMPLEXES:
+        #     # this means a variable can be any value and still hold true in the relation,
+        #     # which ultimately means the relation provided no new information for the symbol;
+        #     # we therefore return saying "hey, this symbol has no new substitutions"
+        #     return None
+        # elif solution.type is types.EMPTY:
+        #     # similar to the above case, except we ended up with some kind of
+        #     # 4 = 0 case (say, 1 + 3(b + 1)/(b + 1))
+        #     return None
+        # elif solution.type is types.COMPLEMENT:
+        #     if solution.set.args[0] is not sympy.Complexes:
+        #         # this happens when the solver is forced to put a variable in the denominator of a fraction;
+        #         # this generates a solution with (calculus) "holes", which can be ignored
+        #         return SubSet(self._mapToSubsWithConditions(solution.set.args[0], withConditions))
+        #     elif solution.set.args[0] is sympy.Complexes:
+        #         # this happens in cases similar to the above, except sort of reversed;
+        #         # here, the "holes" are actually the solutions, since graphically any value is
+        #         # included in the complement set (this happens in cases like (c + 1)/(c + 2))
+        #         return SubSet(self._mapToSubsWithConditions(solution.set.args[1], withConditions))
+        #     else:
+        #         raise NotImplementedError("missing an inference solution type case (for COMPLEMENT sets)")
+        # else:
+        #     raise NotImplementedError("missing an inference solution type case (general case)")
+    
+    # def _mapToSubsWithConditions(self, values, conditionSet):
+    #     return (SubSet.Sub(val, conditionSet) for val in values)
 
     class _Solution:
         @classmethod
