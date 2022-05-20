@@ -284,14 +284,15 @@ class Solver:
 
     def _genSolutionsFromNumericsInRelations(self):
         for relation in self._relationsEqZero:
-            # although technically the numeric given is the negative/opposite
+            # although technically the eqNumeric given is the negative/opposite
             # (ie x + 4 (= 0); x is actually -4; we negate the original 4 to get
-            # the "solution value"), this doesn't work well for exponents. So, we just
-            # let the solver do its thing without negating (which still works, just
-            # returns 4 = -x instead)
+            # the "solution value"), this isn't necessary for the algorithm
+            # (it just returns 4 = -x instead)
             for eqNumeric in (atom for atom in relation.atoms() if isNumeric(atom)):
                 solutionSet = self._extractRelationalSolutionSet(self._solveSet(relation, eqNumeric))
-                for exprKey in solutionSet:
+                for sub in solutionSet:
+                    exprKey = sub.expr
+                    assert len(sub.conditions) == 0, "What should be done if there are conditions?"
                     self._updateNumericSubs(exprKey, SubSet({eqNumeric}))
 
     def _extrapolateNumericSolutionsForSymbols(self):
