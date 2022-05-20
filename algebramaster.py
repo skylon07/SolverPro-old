@@ -384,9 +384,9 @@ class Solver:
             self._subsDict[exprKey].addFrom(subSet)
         assert len(self._subsDict[exprKey]) > 0, "Cannot have empty substitution set for main expression substitutions"
 
-    def _updateSymbolSub(self, symbolKey, subSet):
-        assert type(subSet) is SubSet, "_updateSymbolSub() requires a SubSet"
-        assert type(symbolKey) is sympy.Symbol, "_updateSymbolSub() requires a sympy Symbol key"
+    def _updateSymbolSubs(self, symbolKey, subSet):
+        assert type(symbolKey) is sympy.Symbol, "_updateSymbolSubs() requires a sympy Symbol key"
+        assert type(subSet) is SubSet, "_updateSymbolSubs() requires a SubSet"
         if symbolKey not in self._symbolSubs:
             self._symbolSubs[symbolKey] = subSet
         else:
