@@ -109,7 +109,7 @@ class Substituter:
     def substituteByElimination(self, expr):
         resultSet = self._substituteAllCombos([expr])
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
-        assert not any(symbol in result.free_symbols for result in resultSet for exprKey in self._substitutions for symbol in exprKey.free_symbols), "Elimination-substitution requires a dict with expression keys with unidirectional dependencies (can't have {a: b + c, b: a * c}, but CAN have {a: b + c, b: 2 * c})"
+        assert not any(symbol in resultSub.expr.free_symbols for resultSub in resultSet for exprKey in self._substitutions for symbol in exprKey.free_symbols), "Elimination-substitution requires a dict with expression keys with unidirectional dependencies (can't have {a: b + c, b: a * c}, but CAN have {a: b + c, b: 2 * c})"
         return resultSet
 
     def backSubstitute(self):
