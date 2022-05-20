@@ -685,12 +685,12 @@ if __name__ == "__main__":
             if type(shouldContainVal) is SubSet and shouldContainVal.isNumericSet:
                 try:
                     shouldFloat = SubSet(
-                        float(shouldHaveItem)
-                        for shouldHaveItem in shouldContainVal
+                        float(shouldHaveSub.expr)
+                        for shouldHaveSub in shouldContainVal
                     )
                     mainFloat = SubSet(
-                        float(mainItem)
-                        for mainItem in mainVal
+                        float(mainSub.expr)
+                        for mainSub in mainVal
                     )
                     mainDictContainsVal = shouldFloat == mainFloat
                 except TypeError:
@@ -727,8 +727,8 @@ if __name__ == "__main__":
         a ** 2 + b  -  5,
     }).genNumericSolutions()
     assert dictIncludes(solutions, {
-        a: SubSet({3}),
-        b: SubSet({-4}),
+        a: SubSet({3, -2}),
+        b: SubSet({-4, 1}),
     })
 
     solutions = Solver({
@@ -737,9 +737,9 @@ if __name__ == "__main__":
         a + b + c  -  2,
     }).genNumericSolutions()
     assert dictIncludes(solutions, {
-        a: SubSet({1}),
-        b: SubSet({-2}),
-        c: SubSet({3}),
+        a: SubSet({1, -3}),
+        b: SubSet({-2, 10}),
+        c: SubSet({3, -5}),
     })
     
     solutions = Solver({
@@ -752,6 +752,8 @@ if __name__ == "__main__":
         b: SubSet({-2}),
         c: SubSet({3}),
     })
+
+    # TODO: add more tests using square roots
 
     # a + 2b + c = 0
     # 3a - b + 2c = 11
