@@ -199,31 +199,39 @@ class Substituter:
         }
         return SubSet.Sub(exprAfterSubs, conditions)
 
-    def _getSymbolDepSortKey(self, symbolKey, _symbolsChecked=None):
-        symbolsChecked = _symbolsChecked
-        if symbolsChecked is None:
-            symbolsChecked = set()
+    def _getSortedDepKeys(self, exprKeysToSort=None, _depCounts=None):
+        if exprKeysToSort is None:
+            exprKeysToSort = self._substitutions.keys()
+        depCounts = _depCounts
+        if depCounts is None:
+            depCounts = dict()
         
-        symbolSubs = self._substitutions.get(symbolKey)
-        if symbolSubs is None:
-            # since there are no substitutions (even if that's just "yet"),
-            # there are therefore no dependencies
-            return 0
-        assert symbolKey not in symbolsChecked, "Circular dependencies were processed (these should not exist...)"
-        symbolsChecked.add(symbolKey)
-        
-        # if A's expressions depend on B, C, and D (throughout the whole SubSet for A),
-        # then we want to evaluate A after B, C and D, and therefore kA (the sort key
-        # for A) > kB and kC and kD; an easy way to guarantee this is just summing them up
-        symbolDeps = {
-            symbolDep
-            for sub in symbolSubs
-            for symbolDep in sub.expr.free_symbols
-        }
-        # TODO: highly inefficient; we should cache values in a dictionary as we find them
-        result = sum(self._getSymbolDepSortKey(symbolDep, symbolsChecked) for symbolDep in symbolDeps) + 1
-        symbolsChecked.remove(symbolKey)
-        return result
+        for exprKey in exprKeysToSort:
+            self._getDepSortKey(exprKey, depCounts)
+        return sorted(depCounts.keys(), key=lambda exprKey: depCounts[exprKey])
+
+    def _getDepSortKey(self, exprKey, depCounts):
+        # we consider keys with no substitutions a "base case" (ie it has the
+        # same dependencies as a key that subs to numbers)
+        if exprKey not in self._substitutions.keys():
+            # we DON'T set depCounts here since it should only contain existing keys
+            return 1
+
+        if exprKey not in depCounts:
+            # setting this here doesn't just make it nice for returning on base cases;
+            # it also helps with evaluating circular dependencies
+            depCounts[exprKey] = 1
+            exprSubs = self._substitutions[exprKey]
+            if not exprSubs.hasNumerics:
+                # an easy way to calculate integer keys is to sum up their dependencies;
+                # if A depends on B and C, then add up B and C's keys, and boom -- sort key for A
+                depCountSum = sum(
+                    self._getDepSortKey(symbol, depCounts)
+                    for sub in exprSubs
+                    for symbol in sub.expr.free_symbols
+                )
+                depCounts[exprKey] += depCountSum
+        return depCounts[exprKey]
 
 class Solver:
     def __init__(self, relations, symbolDefinitions=None):
