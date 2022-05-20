@@ -303,7 +303,9 @@ class Solver:
         while substitutionsChanged:
             lastNumSubs = numSubs
             
-            for exprKey in self._exprKeysSortedByIndependence():
+            # moved out for debugging purposes
+            exprKeys = self._exprKeysSortedByIndependence()
+            for exprKey in exprKeys:
                 symbol = self._findSymbolToSolve(exprKey)
                 cantInferFromExprKey = symbol is None
                 if cantInferFromExprKey:
