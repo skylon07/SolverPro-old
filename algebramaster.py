@@ -229,8 +229,12 @@ class Substituter:
         nonSubbedSymbols = exprAfterSubs.free_symbols
         subbedSymbols = iterDifference(allSymbols, nonSubbedSymbols)
         conditions = {
-            symbol - subDict[symbol]
+            symbol - symbolSubExpr
             for symbol in subbedSymbols
+            for symbolSubExpr in [subDict.get(symbol)]
+            # variables get eliminated without being subbed; this checks for that
+            # (ex. (a + b + c).subs(b, 1 - c) --> a + 1)
+            if symbolSubExpr is not None
         }
         return SubSet.Sub(exprAfterSubs, conditions)
 
