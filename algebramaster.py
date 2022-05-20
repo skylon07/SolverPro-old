@@ -251,17 +251,18 @@ class Substituter:
         assert symbolKey not in symbolsChecked, "Circular dependencies were processed (these should not exist...)"
         symbolsChecked.add(symbolKey)
         
-        # if A's conditions depend on B, C, and D (throughout the whole SubSet for A),
+        # if A's expressions depend on B, C, and D (throughout the whole SubSet for A),
         # then we want to evaluate A after B, C and D, and therefore kA (the sort key
         # for A) > kB and kC and kD; an easy way to guarantee this is just summing them up
         symbolDeps = {
             symbolDep
             for sub in symbolSubs
-            for condRelation in sub.conditions
-            for symbolDep in condRelation.free_symbols
+            for symbolDep in sub.expr.free_symbols
         }
         # TODO: highly inefficient; we should cache values in a dictionary as we find them
-        return sum(self._getSymbolDepSortKey(symbolDep, symbolsChecked) for symbolDep in symbolDeps) + 1
+        result = sum(self._getSymbolDepSortKey(symbolDep, symbolsChecked) for symbolDep in symbolDeps) + 1
+        symbolsChecked.remove(symbolKey)
+        return result
 
 class Solver:
     def __init__(self, relations, symbolDefinitions=None):
