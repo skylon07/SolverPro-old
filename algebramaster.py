@@ -96,6 +96,7 @@ class Substituter:
         self._usedKeys = set()
 
     def substituteToNumerics(self, expr):
+        assert isinstance(expr, sympy.Expr), "substituteToNumerics() requires a sympy Expr"
         assert all(subSet.isNumericSet for subSet in self._substitutions.values()), "Substituting to numeric requires dictionary to only contain numeric substitutions"
         
         if isNumeric(expr):
@@ -106,7 +107,9 @@ class Substituter:
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
         return resultSet
 
-    def substituteByElimination(self, expr):
+    def substituteByElimination(self, expr, forSymbol):
+        assert isinstance(expr, sympy.Expr), "substituteByElimination() requires a sympy Expr"
+        assert type(forSymbol) is sympy.Symbol, "substituteByElimination() needs a sympy Symbol for the variable being solved"
         resultSet = self._substituteAllCombos([expr])
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
         assert not any(symbol in resultSub.expr.free_symbols for resultSub in resultSet for exprKey in self._substitutions for symbol in exprKey.free_symbols), "Elimination-substitution requires a dict with expression keys with unidirectional dependencies (can't have {a: b + c, b: a * c}, but CAN have {a: b + c, b: 2 * c})"
