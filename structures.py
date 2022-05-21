@@ -405,14 +405,6 @@ class TemplateCall(Model):
 
 class SubSet(Model):
     @classmethod
-    def join(cls, subSets):
-        joinSet = SubSet()
-        # TODO: perhaps theres a way to combine subSets into one iterator?
-        for subSet in subSets:
-            joinSet.addFrom(subSet)
-        return joinSet
-
-    @classmethod
     def fullRepr(cls, subSet):
         assert type(subSet) is SubSet, "Cannot get SubSet full repr str from non-SubSet"
         if len(subSet) > 0:
