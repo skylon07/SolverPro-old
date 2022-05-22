@@ -133,41 +133,65 @@ class Substituter:
             self._substitutions[symbolKey] = newSubs
         return self._substitutions
 
-    # below are the substitution algorithms currently being used
+    def _makeSubCombos(self, subsDict, forExprKeys, _comboDict=None, _comboConditions=None):
+        assert type(forExprKeys) is list, "_makeSubCombos() algorithm requires a list of exprKeys"
+        comboDict = _comboDict
+        if comboDict is None:
+            comboDict = dict()
+        comboConditions = _comboConditions
+        if comboConditions is None:
+            comboConditions = set()
+        
+        if len(forExprKeys) == 0:
+            finishedComboDict = comboDict
+            yield (finishedComboDict, comboConditions)
+        else:
+            currExprKey = forExprKeys.pop(0)
+            currSubs = subsDict[currExprKey]
+            assert len(currSubs) > 0, "Length of substitutions was zero (this not only breaks the comboDict.pop() statement below, but is also just a bad sign)"
+            for currExprSub in currSubs:
+                comboDict[currExprKey] = currExprSub.expr
+                (failedConditions, conditionsWithMissingVars) = self._checkConditions(comboDict, (*comboConditions, *currExprSub.conditions))
+                if not failedConditions:
+                    for result in self._makeSubCombos(subsDict, forExprKeys, comboDict, conditionsWithMissingVars):
+                        yield result
+            comboDict.pop(currExprKey)
+            forExprKeys.insert(0, currExprKey)
 
-    # TODO: make common subs algorithm
+    def _checkConditions(self, comboDict, comboConditions):
+        valStore = dict()
+        valStore['anyFailed'] = False
 
-    # unused substitution algorithms
+        def getConditionFromResult(result):
+            (condition, failed) = result
+            if failed:
+                # yeah... this is a little weird, but just setting the variable directly
+                # only sets it locally for handleResult's scope
+                valStore['anyFailed'] = True
+            return condition
+        incompleteConditions = {
+            nonZeroCondition
+            for result in self._subAndGetIncompleteConditions(comboConditions, comboDict)
+            for nonZeroCondition in [getConditionFromResult(result)]
+            if nonZeroCondition != 0
+        }
 
-    def _substituteAllPaths(self, primaryExprs):
-        # TODO: should sort unused keys by _getSymbolDepSortKey() for accurate results
-        # TODO: this does not yet respect SubSet conditions (don't implement until this needs to be used)
-        unusedKeys = iterDifference(self._substitutions, self._usedKeys)
-        for exprKey in unusedKeys:
-            if primaryExprs.isNumericSet:
-                return primaryExprs
-            
-            self._usedKeys.add(exprKey)
+        anyFailed = valStore['anyFailed']
+        if anyFailed:
+            return (anyFailed, None)
+        else:
+            return (anyFailed, incompleteConditions)
 
-            primaryExprs = SubSet.join(
-                self._substituteAllPaths(SubSet({primaryExpr.subs(exprKey, exprKeySub)}))
-                for primaryExpr in primaryExprs
-                for exprKeySub in self._substitutions[exprKey]
-            )
-
-            self._usedKeys.remove(exprKey)
-        return primaryExprs
-
-    def _substituteInOrder(self, primaryExprs, keyOrder):
-        # TODO: this does not yet respect SubSet conditions (don't implement until this needs to be used)
-        for exprKey in keyOrder:
-            assert exprKey in self._substitutions, "keyOrder contained exprKey not included in the original subs dict"
-            primaryExprs = SubSet(
-                primaryExpr.subs(exprKey, exprKeySub)
-                for primaryExpr in primaryExprs
-                for exprKeySub in self._substitutions[exprKey]
-            )
-        return primaryExprs
+    def _subAndGetIncompleteConditions(self, conditions, comboDict):
+        for condition in conditions:
+            subCondition = self._subDictUntilFixed(condition, comboDict).expr
+            if len(subCondition.free_symbols) > 0:
+                notFailedYet = False
+                yield (subCondition, notFailedYet)
+            elif subCondition != 0:
+                failed = True
+                yield (None, failed)
+                return
 
     # other utility functions
 
