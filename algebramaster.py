@@ -103,7 +103,14 @@ class Substituter:
             return SubSet({expr})
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         
-        # TODO: substitute
+        resultSet = SubSet(
+            # yielding sub.conditions produces the "condition history" we want when substituting;
+            # yielding conditions (from _makeSubCombos()) adds any (unresolved) conditions that
+            # were present at the start of this function
+            SubSet.Sub(sub.expr, {*sub.conditions, *conditions})
+            for (subCombo, conditions) in self._makeSubCombos(self._substitutions, list(self._substitutions.keys()))
+            for sub in [self._subDictUntilFixed(expr, subCombo)]
+        )
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
         return resultSet
 
