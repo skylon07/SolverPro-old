@@ -107,8 +107,8 @@ class Substituter:
             # yielding sub.conditions produces the "condition history" we want when substituting;
             # yielding conditions (from _makeSubCombos()) adds any (unresolved) conditions that
             # were present at the start of this function
-            SubSet.Sub(sub.expr, {*sub.conditions, *conditions})
-            for (subCombo, conditions) in self._makeSubCombos(self._substitutions, list(self._substitutions.keys()))
+            SubSet.Sub(sub.expr, {*sub.conditions, *comboConditions})
+            for (subCombo, comboConditions) in self._makeSubCombos(self._substitutions, list(self._substitutions.keys()))
             for sub in [self._subDictUntilFixed(expr, subCombo)]
         )
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
@@ -117,7 +117,17 @@ class Substituter:
     def substituteByElimination(self, expr, forSymbol):
         assert isinstance(expr, sympy.Expr), "substituteByElimination() requires a sympy Expr"
         assert type(forSymbol) is sympy.Symbol, "substituteByElimination() needs a sympy Symbol for the variable being solved"
-        # TODO: substitute
+        assert forSymbol in expr.free_symbols, "substituteByElimination() cannot help infer when the new symbol is not in the expression"
+        assert forSymbol not in self._substitutions.keys(), "substituteByElminination() is meant to help find the next symbol not currently in the substitution dictionary"
+        
+        resultSet = SubSet(
+            # yielding sub.conditions produces the "condition history" we want when substituting;
+            # yielding conditions (from _makeSubCombos()) adds any (unresolved) conditions that
+            # were present at the start of this function
+            SubSet.Sub(sub.expr, {*sub.conditions, *comboConditions})
+            for (subCombo, comboConditions) in self._makeSubCombos(self._substitutions, list(self._substitutions.keys()))
+            for sub in [self._subDictUntilFixed(expr, subCombo)]
+        )
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
         assert not any(symbol in resultSub.expr.free_symbols for resultSub in resultSet for exprKey in self._substitutions for symbol in exprKey.free_symbols), "Elimination-substitution requires a dict with expression keys with unidirectional dependencies (can't have {a: b + c, b: a * c}, but CAN have {a: b + c, b: 2 * c})"
         return resultSet
@@ -700,6 +710,24 @@ if __name__ == "__main__":
             if not mainDictContainsVal:
                 return False
         return True
+
+    # a + b + c = 6
+    # 2*a + b - c = 1
+    # a - b + 2*c = 5
+
+    # a * c - b  -  5,
+    # a ** 2 + c  -  4,
+    # a + b + c  -  2,
+    s = Substituter({
+
+    }).substituteByElimination(a + b + c - 6, b)
+    s = Substituter({
+        b: SubSet({-a - c + 6}),
+    }).substituteByElimination(2*a + b - c - 1, a)
+    s = Substituter({
+        b: SubSet({-a - c + 6}),
+        a: SubSet({SubSet.Sub(2*c - 5, {-a - c + 6 - b})})
+    }).substituteByElimination(a - b + 2*c - 5, c)
 
     solutions = Solver({
         a + 2 * b + c  -  0,
