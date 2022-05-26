@@ -104,6 +104,7 @@ class Substituter:
         assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
         
         resultSet = SubSet(
+            # TODO: this is repeated and should be refactored into a separate function
             # yielding sub.conditions produces the "condition history" we want when substituting;
             # yielding conditions (from _makeSubCombos()) adds any (unresolved) conditions that
             # were present at the start of this function
@@ -121,6 +122,7 @@ class Substituter:
         assert forSymbol not in self._substitutions.keys(), "substituteByElminination() is meant to help find the next symbol not currently in the substitution dictionary"
         
         resultSet = SubSet(
+            # TODO: this is repeated and should be refactored into a separate function
             # yielding sub.conditions produces the "condition history" we want when substituting;
             # yielding conditions (from _makeSubCombos()) adds any (unresolved) conditions that
             # were present at the start of this function
@@ -147,6 +149,7 @@ class Substituter:
             else:
                 symbolsUpToCurrent = symbolKeys[:numSymbolsProcessed + 1]
                 newSubs = SubSet(
+                    # TODO: this is repeated and should be refactored into a separate function
                     # yielding sub.conditions produces the "condition history" we want when substituting;
                     # yielding conditions (from _makeSubCombos()) adds any (unresolved) conditions that
                     # were present at the start of this function
