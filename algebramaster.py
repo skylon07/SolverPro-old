@@ -108,7 +108,7 @@ class Substituter:
             # yielding conditions (from _makeSubCombos()) adds any (unresolved) conditions that
             # were present at the start of this function
             SubSet.Sub(sub.expr, {*sub.conditions, *comboConditions})
-            for (subCombo, comboConditions) in self._makeSubCombos(self._substitutions, list(self._substitutions.keys()))
+            for (subCombo, comboConditions) in self._makeSubCombos(self._substitutions)
             for sub in [self._subDictUntilFixed(expr, subCombo)]
         )
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
@@ -125,7 +125,7 @@ class Substituter:
             # yielding conditions (from _makeSubCombos()) adds any (unresolved) conditions that
             # were present at the start of this function
             SubSet.Sub(sub.expr, {*sub.conditions, *comboConditions})
-            for (subCombo, comboConditions) in self._makeSubCombos(self._substitutions, list(self._substitutions.keys()))
+            for (subCombo, comboConditions) in self._makeSubCombos(self._substitutions)
             for sub in [self._subDictUntilFixed(expr, subCombo)]
         )
         assert len(self._usedKeys) == 0, "failed to pop all used keys"
@@ -159,7 +159,9 @@ class Substituter:
             self._substitutions[symbolKey] = newSubs
         return self._substitutions
 
-    def _makeSubCombos(self, subsDict, forExprKeys, _comboDict=None, _comboConditions=None):
+    def _makeSubCombos(self, subsDict, forExprKeys=None, _comboDict=None, _comboConditions=None):
+        if forExprKeys is None:
+            forExprKeys = list(self._substitutions.keys())
         assert type(forExprKeys) is list, "_makeSubCombos() algorithm requires a list of exprKeys"
         comboDict = _comboDict
         if comboDict is None:
