@@ -360,6 +360,9 @@ class Solver:
         # (a -- a..2b..2c)
         # (b -- 2a..b..3c)
         # (c -- 2a..4b -- TRAPPED)
+        # TODO: will this work with multiple relationships?
+        #       ex. a + b = 2; a + b + c = 5;             c + d + e = 12;      d + e = 7
+        #                              ^ evaluated here   ^ can't solve here   ^ ...and therefore here
         return sorted(self._subsDict.keys(), key=lambda expr: len(expr.free_symbols))
 
     def _findSymbolToSolve(self, expr):
