@@ -134,7 +134,7 @@ class Substituter:
 
     def backSubstitute(self):
         assert all(type(symbolKey) is sympy.Symbol for symbolKey in self._substitutions.keys()), "Backwards-substitution only works on symbol substitution dictionaries"
-        symbolKeys = sorted(self._substitutions.keys(), key=self._getSymbolDepSortKey)
+        symbolKeys = self._getSortedDepKeys()
         for (symbolKey, numSymbolsProcessed) in zip(symbolKeys, range(len(symbolKeys))):
             symbolSubs = self._substitutions[symbolKey]
 
@@ -145,7 +145,16 @@ class Substituter:
                     if isNumeric(sub.expr)
                 )
             else:
-                pass # TODO
+                symbolsUpToCurrent = symbolKeys[:numSymbolsProcessed + 1]
+                newSubs = SubSet(
+                    # yielding sub.conditions produces the "condition history" we want when substituting;
+                    # yielding conditions (from _makeSubCombos()) adds any (unresolved) conditions that
+                    # were present at the start of this function
+                    SubSet.Sub(sub.expr, {*sub.conditions, *comboConditions})
+                    for (subCombo, comboConditions) in self._makeSubCombos(self._substitutions, symbolsUpToCurrent)
+                    for symbolSub in symbolSubs
+                    for sub in [self._subDictUntilFixed(symbolSub.expr, subCombo)]
+                )
             
             self._substitutions[symbolKey] = newSubs
         return self._substitutions
@@ -711,23 +720,30 @@ if __name__ == "__main__":
                 return False
         return True
 
-    # a + b + c = 6
-    # 2*a + b - c = 1
-    # a - b + 2*c = 5
+    # a + b + c = 6     a = 1
+    # 2*a + b - c = 1   b = 2
+    # a - b + 2*c = 5   c = 3
 
-    # a * c - b  -  5,
-    # a ** 2 + c  -  4,
-    # a + b + c  -  2,
+    # a * c - b  -  5,  a =  1, -3
+    # a ** 2 + c  -  4, b = -2, 10
+    # a + b + c  -  2,  c =  3, -5
     s = Substituter({
 
-    }).substituteByElimination(a + b + c - 6, b)
+    }).substituteByElimination(a*c - b - 5, b)
     s = Substituter({
-        b: SubSet({-a - c + 6}),
-    }).substituteByElimination(2*a + b - c - 1, a)
+        b: SubSet({a*c - 5}),
+    }).substituteByElimination(a**2 + c - 4, a)
     s = Substituter({
-        b: SubSet({-a - c + 6}),
-        a: SubSet({SubSet.Sub(2*c - 5, {-a - c + 6 - b})})
-    }).substituteByElimination(a - b + 2*c - 5, c)
+        b: SubSet({a*c - 5}),
+        a: SubSet({-sympy.sqrt(4 - c), sympy.sqrt(4 - c)})
+    }).substituteByElimination(a + b + c - 2, c)
+
+    subber = Substituter({
+        b: SubSet({a*c - 5}),
+        a: SubSet({-sympy.sqrt(4 - c), sympy.sqrt(4 - c)}),
+        c: SubSet({SubSet.Sub(3, {-a*c + b + 5, a - sympy.sqrt(4 - c)}), SubSet.Sub(-5, {-a*c + b + 5, a + sympy.sqrt(4 - c)})})
+    })
+    s = subber.backSubstitute()
 
     solutions = Solver({
         a + 2 * b + c  -  0,
