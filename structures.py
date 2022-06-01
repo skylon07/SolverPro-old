@@ -429,23 +429,27 @@ class SubDict(dict):
         return isNumeric(val) or isinstance(val, sympy.Basic)
 
 
-class SubDictSet(set):
+class SubDictList(list):
     def __init__(self, setLike):
         setLike = self._assertValidItems(setLike)
         super().__init__(setLike)
 
-    def add(self, subDict):
-        assert type(subDict) is SubDict, "SubDictSet can only add SubDicts as items"
-        super().add(subDict)
+    def append(self, subDict):
+        assert type(subDict) is SubDict, "SubDictList can only add SubDicts as items"
+        super().append(subDict)
 
-    def update(self, setLike):
+    def extend(self, setLike):
         setLike = self._assertValidItems(setLike)
         super().update(setLike)
+
+    def insert(self, index, subDict):
+        assert type(subDict) is SubDict, "SubDictList can only add SubDicts as items"
+        super().insert(index, subDict)
 
     def _assertValidItems(self, setLike):
         if __debug__:
             setLike = set(setLike)
-            assert all(type(subDict) is SubDict for subDict in setLike), "SubDictSet can only update SubDicts as items"
+            assert all(type(subDict) is SubDict for subDict in setLike), "SubDictList can only update SubDicts as items"
         return setLike
 
 
