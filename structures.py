@@ -403,211 +403,50 @@ class TemplateCall(Model):
         return self._params
 
 
-class SubSet(Model):
-    @classmethod
-    def fullRepr(cls, subSet):
-        assert type(subSet) is SubSet, "Cannot get SubSet full repr str from non-SubSet"
-        if len(subSet) > 0:
-            return "SubSet{}".format("{" + ", ".join(
-            repr(sub)
-            for sub in subSet._set
-        ) + "}")
-        else:
-            return "SubSet{}"
+class SubDict(dict):
+    def __init__(self, dictLike):
+        dictLike = self._assertValidSubDictLike(dictLike)
+        super().__init__(dictLike)
 
-    def __init__(self, iterable=None):
-        if iterable is not None:
-            iterable = {self._convertToSub(item) for item in iterable}
-            assert all(self.Sub._checkValidExpr(item) or type(item) is self.Sub for item in iterable), "SubSet can only be initialized with Substitution objects"
-            self._set = set(iterable)
-            self._strippedSet = {sub.expr for sub in iterable}
-        else:
-            self._set = set()
-            self._strippedSet = set()
+    def __setitem__(self, key, val):
+        assert self._isValidKey(key) and self._isValidVal(val), "SubDict got an invalid key-value pair"
+        return super().__setitem__(key, val)
 
-    def __repr__(self):
-        # using ", ".join() (instead of stringifying a set)
-        # removes the nested quotes (since it'd be a set of strings)
-        return "SubSet{}".format("{" + ", ".join(
-            "{} {}".format(
-                sub.expr,
-                "<{}>".format(", ".join(str(condExpr) for condExpr in sub.conditions)),
-            )
-            for sub in self._set
-        ) + "}")
+    def update(self, dictLike):
+        dictLike = self._assertValidSubDictLike(dictLike)
+        return super().update(dictLike)
 
-    def __contains__(self, item):
-        if type(item) is self.Sub:
-            return item in self._set
-        else:
-            return item in self._strippedSet
+    def _assertValidSubDictLike(self, dictLike):
+        if __debug__:
+            dictLike = dict(dictLike)
+            assert all(self._isValidKey(key) and self._isValidVal(val) for key in dictLike for val in [key]), "SubDict got invalid key-value pairs"
+        return dictLike
 
-    def __iter__(self):
-        return iter(self._set)
+    def _isValidKey(self, key):
+        return isinstance(key, sympy.Expr)
 
-    def __len__(self):
-        return len(self._set)
-
-    def __eq__(self, other):
-        if type(other) is type(self):
-            return self._set == other._set
-        return False
-
-    @property
-    def hasNumerics(self):
-        # TODO: cache value on construction/addition of values
-        for expr in self._strippedSet:
-            if isNumeric(expr):
-                return True
-        return False
-
-    @property
-    def hasExpressions(self):
-        # TODO: cache value on construction/addition of values
-        for expr in self._strippedSet:
-            if not isNumeric(expr):
-                return True
-        return False
-
-    @property
-    def isNumericSet(self):
-        return not self.hasExpressions
-
-    @property
-    def isExpressionSet(self):
-        return not self.hasNumerics
-
-    def add(self, expr):
-        assert self.Sub._checkValidExpr(expr) or type(expr) is self.Sub, "SubSet tried to add an invalid item"
-        sub = self._convertToSub(expr)
-        self._set.add(sub)
-        self._strippedSet.add(sub.expr)
-
-        self._assertSynced()
-
-    def addFrom(self, iterable):
-        iterable = {self._convertToSub(expr) for expr in iterable}
-        assert all(self.Sub._checkValidExpr(expr) or type(expr) is self.Sub for expr in iterable), "SubSet can only add from iterable yielding SubSet Substitutions"
-        self._set.update(iterable)
-        self._strippedSet.update({sub.expr for sub in iterable})
-
-        self._assertSynced()
-
-    def remove(self, expr):
-        assert self.Sub._checkValidExpr(expr) or type(expr) is self.Sub, "SubSet can't remove non-Substitution item (as it only contains (or should only contain) SubSet Substitutions)"
-        self._strippedSet.remove(expr)
-        self._set.remove(self.getSub(expr))
-
-        self._assertSynced()
-
-    def removeFrom(self, iterable):
-        iterable = tuple(iterable)
-        assert all(self.Sub._checkValidExpr(expr) or type(expr) is self.Sub for expr in iterable), "SubSet can only remove from iterable yielding SubSet Substitutions (since that's all a SubSet has anyway)"
-        self._strippedSet.difference_update(iterable)
-        self._set.difference_update(self.getSubs(iterable))
-
-        self._assertSynced()
-
-    def getSubs(self, items):
-        lookup = {
-            sub.expr: sub
-            for sub in self._set
-        }
-        for item in items:
-            if type(item) is self.Sub:
-                if item in self._set:
-                    yield item
-                else:
-                    raise KeyError("SubSet Substitution item is not in the SubSet")
-            else:
-                sub = lookup.get(item)
-                if sub is not None:
-                    yield sub
-                else:
-                    raise KeyError("SubSet non-Substitution item is not in the SubSet")
+    def _isValidVal(self, val):
+        return isNumeric(val) or isinstance(val, sympy.Basic)
 
 
-    def getSub(self, expr):
-        return first(self.getSubs({expr}))
+class SubDictSet(set):
+    def __init__(self, setLike):
+        setLike = self._assertValidItems(setLike)
+        super().__init__(setLike)
 
-    def _convertToSub(self, item):
-        if type(item) is self.Sub:
-            return item
-        else:
-            return self.Sub(item)
+    def add(self, subDict):
+        assert type(subDict) is SubDict, "SubDictSet can only add SubDicts as items"
+        super().add(subDict)
 
-    def _assertSynced(self):
-        assert self._strippedSet == {sub.expr for sub in self._set}, "SubSet internal sets got out of sync"
-        assert len(self._strippedSet) == len(self._set), "SubSet internal sets got out of sync"
+    def update(self, setLike):
+        setLike = self._assertValidItems(setLike)
+        super().update(setLike)
 
-    class Sub:
-        @classmethod
-        def _checkValidExpr(cls, expr):
-            return isinstance(expr, sympy.Expr) or isNumeric(expr)
-        
-        def __init__(self, expr, conditions=None):
-            if conditions is None:
-                conditions = set()
-            
-            assert self._checkValidExpr(expr), "SubSet Substitution can only represent sympy expressions"
-            if __debug__:
-                conditions = tuple(conditions)
-                assert all(isinstance(con, sympy.Expr) for con in conditions), "SubSet Substitution must be given a set of sympy expressions as the condition set"
-            self._expr = expr
-            self._conditions = self._ConditionSet(conditions)
-
-        def __repr__(self):
-            return "Sub({}, {})".format(self._expr, self._conditions)
-
-        def __eq__(self, other):
-            if type(other) is type(self):
-                return self._expr == other._expr and self._conditions == other._conditions
-            return False
-
-        def __hash__(self):
-            return hash((self._expr, self._conditions))
-
-        @property
-        def expr(self):
-            return self._expr
-
-        @property
-        def conditions(self):
-            return self._conditions
-
-        @property
-        def args(self):
-            return (self.expr, self.conditions)
-
-        class _ConditionSet:
-            def __init__(self, conIter):
-                self._set = set(conIter)
-                self._hash = None
-
-            def __repr__(self):
-                if len(self._set) > 0:
-                    return "Con{}".format(repr(self._set))
-                else:
-                    return "Con{}"
-
-            def __contains__(self, item):
-                return item in self._set
-
-            def __iter__(self):
-                return iter(self._set)
-
-            def __len__(self):
-                return len(self._set)
-
-            def __eq__(self, other):
-                if type(other) is type(self):
-                    return self._set == other._set
-                return False
-
-            def __hash__(self):
-                if self._hash is None:
-                    self._hash = hash(tuple(self._set))
-                return self._hash
+    def _assertValidItems(self, setLike):
+        if __debug__:
+            setLike = set(setLike)
+            assert all(type(subDict) is SubDict for subDict in setLike), "SubDictSet can only update SubDicts as items"
+        return setLike
 
 
 def isNumeric(obj):
@@ -687,17 +526,4 @@ if __name__ == "__main__":
     
     e = e.traverse(VariableRepresentation, onFn)
     print(e)
-
-    s = SubSet({})
-    s.add(1)
-    s.add(2)
-    s.add(SubSet.Sub(3, {sympy.Symbol('a') - 4, sympy.Symbol('a') + 4}))
-    s.add(SubSet.Sub(3, {sympy.Symbol('a') - 4, sympy.Symbol('a') + 4}))
-    print(s)
-    print({sub for sub in s})
-    print("s == s --", s == s)
-    print("s == SubSet (but without conditions) --", s == SubSet({1, 2, 3}))
-    print(list(s.getSubs({3, SubSet.Sub(2)})))
-    s.removeFrom({2, 3})
-    print(s)
     
