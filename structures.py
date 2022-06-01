@@ -417,6 +417,12 @@ class SubDict(dict):
         super().__init__(dictLike)
         self.conditions = conditions
 
+    def __str__(self):
+        return "SD{}".format(str(super()))
+
+    def __repr__(self):
+        return "SD{}".format(repr(super()))
+
     @property
     def conditions(self):
         return self._conditions
@@ -451,6 +457,12 @@ class SubDictList(list):
     def __init__(self, listLike):
         listLike = self._assertValidItems(listLike)
         super().__init__(listLike)
+
+    def __str__(self):
+        return "SL{}".format(str(super()))
+
+    def __repr__(self):
+        return "SL{}".format(repr(super()))
 
     def append(self, subDict):
         assert type(subDict) is SubDict, "SubDictList can only add SubDicts as items"
