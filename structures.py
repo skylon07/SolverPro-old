@@ -418,10 +418,16 @@ class SubDict(dict):
         self.conditions = conditions
 
     def __str__(self):
-        return "SD{}<{}>".format(super().__str__(), str(self._conditions)[1:-1])
+        return "SD{}<{}>".format(
+            super().__str__(),
+            str(self._conditions)[1:-1] if len(self._conditions) > 0 else "",
+        )
 
     def __repr__(self):
-        return "SD{}<{}>".format(super().__repr__(), str(self._conditions)[1:-1])
+        return "SD{}<{}>".format(
+            super().__repr__(),
+            str(self._conditions)[1:-1] if len(self._conditions) > 0 else "",
+        )
 
     @property
     def conditions(self):
