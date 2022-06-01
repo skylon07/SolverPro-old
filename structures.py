@@ -448,27 +448,27 @@ class SubDict(dict):
 
 
 class SubDictList(list):
-    def __init__(self, setLike):
-        setLike = self._assertValidItems(setLike)
-        super().__init__(setLike)
+    def __init__(self, listLike):
+        listLike = self._assertValidItems(listLike)
+        super().__init__(listLike)
 
     def append(self, subDict):
         assert type(subDict) is SubDict, "SubDictList can only add SubDicts as items"
         super().append(subDict)
 
-    def extend(self, setLike):
-        setLike = self._assertValidItems(setLike)
-        super().update(setLike)
+    def extend(self, listLike):
+        listLike = self._assertValidItems(listLike)
+        super().update(listLike)
 
     def insert(self, index, subDict):
         assert type(subDict) is SubDict, "SubDictList can only add SubDicts as items"
         super().insert(index, subDict)
 
-    def _assertValidItems(self, setLike):
+    def _assertValidItems(self, listLike):
         if __debug__:
-            setLike = set(setLike)
-            assert all(type(subDict) is SubDict for subDict in setLike), "SubDictList can only update SubDicts as items"
-        return setLike
+            listLike = set(listLike)
+            assert all(type(subDict) is SubDict for subDict in listLike), "SubDictList can only update SubDicts as items"
+        return listLike
 
 
 def isNumeric(obj):
