@@ -53,7 +53,7 @@ class Solver:
                 if solution.type is solution.types.NORMAL:
                     solutionSet = solution.set
                 else:
-                    raise NotImplementedError("_FIRSTTHING() didn't handle the solution type '{}'".format(solution.type))
+                    raise NotImplementedError("extractGivenRelationalNumerics() didn't handle the solution type '{}'".format(solution.type))
 
                 for exprKey in solutionSet:
                     self._baseRelationalSubs[exprKey] = eqNumeric
