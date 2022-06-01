@@ -404,9 +404,27 @@ class TemplateCall(Model):
 
 
 class SubDict(dict):
-    def __init__(self, dictLike):
+    def __init__(self, dictLike=None, conditions=None):
+        if dictLike is None:
+            dictLike = dict()
+        if conditions is None:
+            if type(dictLike) is SubDict:
+                conditions = dictLike._conditions
+            else:    
+                conditions = set()
+        
         dictLike = self._assertValidSubDictLike(dictLike)
         super().__init__(dictLike)
+        self.conditions = conditions
+
+    @property
+    def conditions(self):
+        return self._conditions
+
+    @conditions.setter
+    def conditions(self, newConditions):
+        self._conditions = set(newConditions)
+        assert all(self._isValidKey(condition) for condition in self._conditions), "SubDict got an invalid conditions set"
 
     def __setitem__(self, key, val):
         assert self._isValidKey(key) and self._isValidVal(val), "SubDict got an invalid key-value pair"
