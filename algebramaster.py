@@ -34,6 +34,176 @@ class Substituter:
             assert iters < 9999, "Substitution probably should have stopped by now..."
         return expr
 
+class Solver:
+    def __init__(self):
+        self._baseRelationalSubs = None
+        self._subDictList = None
+
+    # STEP 1 fns: solve numerics already present in the relations
+
+    def extractGivenRelationalNumerics(self, relations):
+        assert self._baseRelationalSubs is None, "Should not invoke extractGivenRelationalNumerics() more than once"
+        self._baseRelationalSubs = SubDict()
+        for relation in relations:
+            # negative because the numeric in x + 4 (= 0) is a +4,
+            # however the actual solution is x = -4 (the opposite of the found atom)
+            for negEqNumeric in self._findSolvableNumerics(relation):
+                eqNumeric = -negEqNumeric
+                solution = self._solveSet(relation, eqNumeric)
+                if solution.type is solution.types.NORMAL:
+                    solutionSet = solution.set
+                else:
+                    raise NotImplementedError("_FIRSTTHING() didn't handle the solution type '{}'".format(solution.type))
+
+                for exprKey in solutionSet:
+                    self._baseRelationalSubs[exprKey] = eqNumeric
+        return self
+
+    def _findSolvableNumerics(self, expr):
+        if isNumeric(expr):
+            yield expr
+        elif expr.is_Atom:
+            pass
+        elif expr.is_Add or expr.is_Mul:
+            for term in expr.args:
+                for numeric in self._findSolvableNumerics(term):
+                    yield numeric
+        elif expr.is_Pow:
+            pass # we ignore solving for numerics in power terms
+        else:
+            raise NotImplementedError("Unconsidered expression case when finding solvable numerics")
+
+    # STEP 2 fns: back substitute relations to find symbol solutions
+
+    # TODO
+
+    # UTILITY FUNCTIONS
+
+    @property
+    def solutions(self):
+        if self._subDictList is not None:
+            return self._subDictList
+        elif self._baseRelationalSubs is not None:
+            return SubDictList([self._baseRelationalSubs])
+        else:
+            return None
+
+    def _solveSet(self, expr, atom, _checkNumeric=True):
+        if isNumeric(atom) and _checkNumeric:
+            # solving for variables in exponents leads to errors with no clean fixes,
+            # so we just ignore them by converting them to symbols first
+            numericSub = sympy.Symbol(":NUMERIC {}:".format(atom))
+            exprWithNumericSubbed = self._subsNumericInBadTerms(atom, numericSub, expr)
+            solution = self._solveSet(exprWithNumericSubbed, atom, _checkNumeric=False)
+            solution.reverseSubstitutionMade({numericSub: atom})
+            return solution
+        else:
+            solutionSet = sympy.solveset(expr, atom)
+            return self._Solution(solutionSet)
+
+    def _subsNumericInBadTerms(self, numeric, numericSub, expr):
+        isBadExpr = expr.is_Pow
+        if isBadExpr:
+            return expr.subs(numeric, numericSub)
+        elif expr.is_Atom:
+            return expr
+        else:
+            return expr.func(*(
+                self._subsNumericInBadTerms(numeric, numericSub, term)
+                for term in expr.args
+            ))
+
+    class _Solution:
+        class _types:
+            @property
+            def NORMAL(self):
+                return "NORMAL"
+
+            @property
+            def EMPTY(self):
+                return "EMPTY"
+
+            @property
+            def COMPLEXES(self):
+                return "COMPLEXES"
+
+            @property
+            def COMPLEMENT(self):
+                return "COMPLEMENT"
+
+            @property
+            def CONDITIONAL(self):
+                return "CONDITIONAL"
+
+        types = _types()
+
+        def __init__(self, solutionSet):
+            self._solutionSet = solutionSet
+            self._type = self._getSetType(solutionSet)
+
+        @property
+        def type(self):
+            return self._type
+
+        @property
+        def set(self):
+            return self._solutionSet
+
+        def _getSetType(self, solutionSet):
+            types = self.types
+            if type(solutionSet) is sympy.FiniteSet:
+                return types.NORMAL
+            elif solutionSet is sympy.EmptySet:
+                return types.EMPTY
+            elif type(solutionSet) is sympy.Complement:
+                return types.COMPLEMENT
+            elif solutionSet is sympy.Complexes:
+                return types.COMPLEXES
+            elif type(solutionSet) is sympy.ConditionSet:
+                return types.CONDITIONAL
+            else:
+                raise NotImplementedError("Solution ran into an unconsidered type scenario")
+
+        def reverseSubstitutionMade(self, subsDict):
+            self._solutionSet = self._reverseSubsForSet(self._solutionSet, subsDict)
+
+        def _reverseSubsForSet(self, sympySet, subsDict):
+            # subsDict is used directly since it is assumed it is already a reverse-dictionary
+            # of the substitutions that already occurred (instead of making the caller construct
+            # a dictionary accurate to history and reversing it here, which would be less efficient)
+            types = self.types
+            setType = self._getSetType(sympySet)
+            if setType is types.NORMAL:
+                # no need to substitute; the symbol being solved for was already extracted
+                returnSet = sympySet
+            elif setType is types.EMPTY:
+                # there is nothing to substitute back
+                returnSet = sympySet
+            elif setType is types.COMPLEXES:
+                # sort of like the above case, except it's everything
+                returnSet = sympySet
+            elif setType is types.COMPLEMENT:
+                (mainSet, complementSet) = sympySet.args
+                mainSetSubbed = self._reverseSubsForSet(mainSet, subsDict)
+                complementSetSubbed = self._reverseSubsForSet(complementSet, subsDict)
+                return sympy.Complement(mainSetSubbed, complementSetSubbed)
+            elif setType is types.CONDITIONAL:
+                (symbol, eqCondition, baseSet) = sympySet.args
+                assert type(eqCondition) is sympy.Eq, "sympy ConditionSet did not have Eq() as expected"
+                (eqLeft, eqRight) = eqCondition.args
+                symbolSubbed = symbol.subs(subsDict)
+                if isNumeric(symbolSubbed):
+                    # ConditionSets really don't like numerics as their first arg... this gets around that
+                    # (of course, this means the extractor will need to convert it bsck later...)
+                    symbolSubbed = NumericSymbol(symbolSubbed)
+                eqConditionSubbed = sympy.Eq(eqLeft.subs(subsDict), eqRight.subs(subsDict))
+                return sympy.ConditionSet(symbolSubbed, eqConditionSubbed, baseSet)
+            else:
+                raise NotImplementedError("Tried to reverse a previous substitution for an unconsidered solution type")
+
+            assert not any(symbolKey in expr.atoms() for expr in returnSet for symbolKey in subsDict)
+            return returnSet
+
 
 class NotANumericException(Exception):
     pass # exists just as a type
