@@ -3,6 +3,38 @@ import sympy
 from structures import *
 
 
+class Substituter:
+    def __init__(self, subDictList):
+        assert type(subDictList) is SubDictList, "Substituter requires a SubDictList"
+        self._subDictList = subDictList
+
+    def substituteToNumerics(self, expr):
+        assert isinstance(expr, sympy.Expr), "substituteToNumerics() requires a sympy Expr"
+        assert all(isNumeric(val) for subDict in self._subDictList for val in subDict.values()), "Substituter sub dicts' values must be numerics when substituting to numerics"
+        if isNumeric(expr):
+            return SubDictList([SubDict({expr: expr})])
+        assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
+        
+        resultList = SubDictList([
+            SubDict({expr: self._subDictUntilFixed(expr, subDict)}, subDict.conditions)
+            for subDict in self._subDictList
+        ])
+        return resultList
+
+    # other utility functions
+
+    def _subDictUntilFixed(self, expr, subDict):
+        assert expr is not None, "cannot sub a nonexistant expression"
+        lastExpr = None
+        iters = 0
+        while lastExpr is not expr:
+            lastExpr = expr
+            expr = expr.subs(subDict)
+            iters += 1
+            assert iters < 9999, "Substitution probably should have stopped by now..."
+        return expr
+
+
 class NotANumericException(Exception):
     pass # exists just as a type
 
@@ -15,7 +47,7 @@ class ContradictionException(Exception):
 
 if __name__ == "__main__":
     S = sympy.Symbol
-    master = AlgebraMaster()
+    # master = AlgebraMaster()
 
     (a, b, c, d) = sympy.symbols("a, b, c, d")
     def dictIncludes(mainDict, shouldContainDict):
