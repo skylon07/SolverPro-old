@@ -418,10 +418,7 @@ class SubDict(dict):
         self.conditions = conditions
 
     def __str__(self):
-        return "SD{}<{}>".format(
-            super().__str__(),
-            str(self._conditions)[1:-1] if len(self._conditions) > 0 else "",
-        )
+        return repr(self)
 
     def __repr__(self):
         return "SD{}<{}>".format(
@@ -465,7 +462,7 @@ class SubDictList(list):
         super().__init__(listLike)
 
     def __str__(self):
-        return "SL{}".format(super().__str__())
+        return repr(self)
 
     def __repr__(self):
         return "SL{}".format(super().__repr__())
@@ -485,7 +482,7 @@ class SubDictList(list):
     def _assertValidItems(self, listLike):
         if __debug__:
             listLike = list(listLike)
-            assert all(type(subDict) is SubDict for subDict in listLike), "SubDictList can only update SubDicts as items"
+            assert all(type(subDict) is SubDict for subDict in listLike), "SubDictList can only extend SubDicts as items"
         return listLike
 
 
