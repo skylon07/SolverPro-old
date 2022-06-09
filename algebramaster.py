@@ -75,7 +75,130 @@ class Solver:
 
     # STEP 2 fns: back substitute relations to find symbol solutions
 
-    # TODO
+    def solveSymbolsByBackSubstitution(self):
+        assert self._baseRelationalSubs is not None, "Solving by back substitution requires relational substitutions to have been made already (use extractGivenRelationsNumerics() first)"
+        assert self._subDictList is None, "Should not invoke solveSymbolsByBackSubstitution() more than once"
+        exprKeyOrder = self._exprKeysSortedByIndependence()
+        if __debug__:
+            origExprKeyOrder = list(exprKeyOrder)
+        self._subDictList = SubDictList(
+            subDict
+            for subDict in self._recursiveSolveThenBackSubstitute(exprKeyOrder)
+            # not an actual filter; this is done just for the side-effect
+            if subDict.update(self._baseRelationalSubs) is None
+        )
+        assert exprKeyOrder == origExprKeyOrder, "back substitution algorithm should end up returning expr order stack to its original state"
+        return self
+
+    def _exprKeysSortedByIndependence(self):
+        # this ensures that variables needing to be solved don't get "trapped"
+        # trying to use an expression they don't exist in
+        # (a -- a..2b..2c)
+        # (b -- 2a..b..3c)
+        # (c -- 2a..4b -- TRAPPED)
+        # TODO: will this work with multiple relationships?
+        #       ex. a + b = 2; a + b + c = 5;             c + d + e = 12;      d + e = 7
+        #                              ^ evaluated here   ^ can't solve here   ^ ...and therefore here
+        # DEBUG:
+        # return sorted(self._baseRelationalSubs.keys(), key=lambda expr: len(expr.free_symbols))
+        return [(2*a + b)/(c + 1), sympy.Mul(-1, (-b + c + 1)/a), a + b*c - b, (a + b*c - 5)/b, a + b + c]
+    
+    def _recursiveSolveThenBackSubstitute(self, exprKeys, symbolSubs=None):
+        if symbolSubs is None:
+            symbolSubs = SubDict()
+
+        relationProvidesNewInformation = False
+        poppedItemsFromExprKeys = []
+        while not relationProvidesNewInformation:
+            if len(exprKeys) == 0:
+                finalSubDict = symbolSubs
+                yield finalSubDict
+                for item in reversed(poppedItemsFromExprKeys):
+                    exprKeys.insert(0, item)
+                return
+            currExprKey = exprKeys.pop(0)
+            poppedItemsFromExprKeys.append(currExprKey)
+
+            currSymbol = self._findSymbolToSolve(currExprKey, symbolSubs)
+            cantInferFromExprKey = currSymbol is None
+            # DEBUG
+            global DEBUG_solveList
+            DEBUG_solveList.append((currSymbol, currExprKey, SubDict(symbolSubs)))
+            if cantInferFromExprKey:
+                # TODO: this code is copy-pasted; perhaps refactoring it could make it nicer?
+                finalSubDict = symbolSubs
+                yield finalSubDict
+                for item in reversed(poppedItemsFromExprKeys):
+                    exprKeys.insert(0, item)
+                return
+            
+            eqNumeric = self._baseRelationalSubs[currExprKey]
+            # TODO: use Substituter.substituteByElimination() (it'll need to be repurposed...)
+            relation = Substituter(SubDictList())._subDictUntilFixed(currExprKey - eqNumeric, symbolSubs)
+            simplifiedRelation = sympy.simplify(relation)
+            relationProvidesNewInformation = simplifiedRelation != 0
+
+        solution = self._solveSet(simplifiedRelation, currSymbol)
+        # DEBUG
+        DEBUG_solveList.append(("solution:", solution))
+        if solution.type is solution.types.NORMAL:
+            symbolSolutions = solution.set
+        elif solution.type is solution.types.COMPLEXES:
+            # this means a variable can be any value and still hold true in the relation,
+            # which ultimately means the relation provided no new information for the symbol
+            symbolSolutions = set()
+        elif solution.type is solution.types.EMPTY:
+            # similar to the above case, except we ended up with some kind of
+            # 4 = 0 case (say, 1 + 3(b + 1)/(b + 1))
+            symbolSolutions = set()
+        elif solution.type is solution.types.COMPLEMENT:
+            if solution.set.args[0] is not sympy.Complexes:
+                # this happens when the solver is forced to put a variable in the denominator of a fraction;
+                # this generates a solution with (calculus) "holes", which can be ignored
+                # (happens in cases like solving a / b - 4 for b)
+                symbolSolutions = solution.set.args[0]
+            elif solution.set.args[0] is sympy.Complexes:
+                # this happens in cases similar to the above, except sort of reversed;
+                # here, the "holes" are actually the solutions, since graphically any value is
+                # included in the complement set (not sure what an example case is though...)
+                symbolSolutions = solution.set.args[1]
+        else:
+            raise NotImplementedError("solveSymbolsByBackSubstitution() didn't handle the solution type '{}'".format(solution.type))
+
+        if len(symbolSolutions) == 0:
+            # because no branching occurs, we can simply reuse the sub dict/conditions set
+            nextSymbolSubs = symbolSubs
+            for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextSymbolSubs):
+                yield finalSubDict
+        elif len(symbolSolutions) == 1:
+            # because no branching occurs, we can simply reuse the sub dict/conditions set
+            nextSymbolSubs = symbolSubs
+            nextSymbolSubs[currSymbol] = first(symbolSolutions)
+            for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextSymbolSubs):
+                # TODO: use Substituter.backSubstitute() (it'll need to be repurposed...)
+                finalSubDict[currSymbol] = finalSubDict[currSymbol].subs(finalSubDict)
+                yield finalSubDict
+        else:
+            for symbolSub in symbolSolutions:
+                # a copy of the dict must be made to track each path
+                nextSymbolSubs = SubDict(symbolSubs)
+                nextSymbolSubs[currSymbol] = symbolSub
+                # conditions only matter when a solution "branches"
+                nextSymbolSubs.conditions.add(currSymbol - symbolSub)
+                for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextSymbolSubs):
+                    # TODO: use Substituter.backSubstitute() (it'll need to be repurposed...)
+                    finalSubDict[currSymbol] = finalSubDict[currSymbol].subs(finalSubDict)
+                    yield finalSubDict
+
+        for item in reversed(poppedItemsFromExprKeys):
+            exprKeys.insert(0, item)
+
+    def _findSymbolToSolve(self, expr, symbolSubDict):
+        # DEBUG
+        val = first(iterDifference(expr.free_symbols, symbolSubDict.keys()), None)
+        val = [b, a, a, c, c, None][self._exprKeysSortedByIndependence().index(expr)]
+        DEBUG_solveList.append(("find symbol:", val))
+        return val
 
     # UTILITY FUNCTIONS
 
