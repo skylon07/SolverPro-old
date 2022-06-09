@@ -404,9 +404,7 @@ class TemplateCall(Model):
 
 
 class SubDict(dict):
-    def __init__(self, dictLike=None, conditions=None):
-        if dictLike is None:
-            dictLike = dict()
+    def __init__(self, dictLike={}, conditions=None):
         if conditions is None:
             if type(dictLike) is SubDict:
                 conditions = dictLike._conditions
@@ -457,7 +455,7 @@ class SubDict(dict):
 
 
 class SubDictList(list):
-    def __init__(self, listLike):
+    def __init__(self, listLike=[]):
         listLike = self._assertValidItems(listLike)
         super().__init__(listLike)
 
