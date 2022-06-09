@@ -100,8 +100,8 @@ class Solver:
         #       ex. a + b = 2; a + b + c = 5;             c + d + e = 12;      d + e = 7
         #                              ^ evaluated here   ^ can't solve here   ^ ...and therefore here
         # DEBUG:
-        # return sorted(self._baseRelationalSubs.keys(), key=lambda expr: len(expr.free_symbols))
-        return [(2*a + b)/(c + 1), sympy.Mul(-1, (-b + c + 1)/a), a + b*c - b, (a + b*c - 5)/b, a + b + c]
+        return sorted(self._baseRelationalSubs.keys(), key=lambda expr: len(expr.free_symbols))
+        # return [(2*a + b)/(c + 1), sympy.Mul(-1, (-b + c + 1)/a), a + b*c - b, (a + b*c - 5)/b, a + b + c]
     
     def _recursiveSolveThenBackSubstitute(self, exprKeys, symbolSubs=None):
         if symbolSubs is None:
@@ -196,7 +196,7 @@ class Solver:
     def _findSymbolToSolve(self, expr, symbolSubDict):
         # DEBUG
         val = first(iterDifference(expr.free_symbols, symbolSubDict.keys()), None)
-        val = [b, a, a, c, c, None][self._exprKeysSortedByIndependence().index(expr)]
+        # val = [b, a, a, c, c, None][self._exprKeysSortedByIndependence().index(expr)]
         DEBUG_solveList.append(("find symbol:", val))
         return val
 
