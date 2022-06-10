@@ -404,11 +404,16 @@ class TemplateCall(Model):
 
 
 class SubDict(dict):
+    conditionsKey = object()
+
     def __init__(self, dictLike={}, conditions=None):
         if conditions is None:
             if type(dictLike) is SubDict:
                 conditions = dictLike._conditions
-            else:    
+            elif self.conditionsKey in dictLike:
+                conditions = dictLike[self.conditionsKey]
+                del dictLike[self.conditionsKey]
+            else:
                 conditions = set()
         
         dictLike = self._assertValidSubDictLike(dictLike)
