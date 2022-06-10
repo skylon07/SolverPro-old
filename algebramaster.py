@@ -159,12 +159,13 @@ class Solver:
                 return
             
             eqNumeric = self._baseRelationalSubs[currExprKey]
-            # TODO: use Substituter.substituteByElimination() (it'll need to be repurposed...)
-            relation = Substituter(SubDictList())._subDictUntilFixed(currExprKey - eqNumeric, symbolSubs)
-            simplifiedRelation = sympy.simplify(relation)
-            relationProvidesNewInformation = simplifiedRelation != 0
+            relation = currExprKey - eqNumeric
+            eliminatedRelationList = Substituter(SubDictList([symbolSubs])).substituteByElimination(relation, currSymbol)
+            eliminatedRelation = eliminatedRelationList[0][relation]
+            simplifiedElimRelation = sympy.simplify(eliminatedRelation)
+            relationProvidesNewInformation = simplifiedElimRelation != 0
 
-        solution = self._solveSet(simplifiedRelation, currSymbol)
+        solution = self._solveSet(simplifiedElimRelation, currSymbol)
         # DEBUG
         DEBUG_solveList.append(("solution:", solution))
         if solution.type is solution.types.NORMAL:
@@ -201,8 +202,10 @@ class Solver:
             nextSymbolSubs = symbolSubs
             nextSymbolSubs[currSymbol] = first(symbolSolutions)
             for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextSymbolSubs):
-                # TODO: use Substituter.backSubstitute() (it'll need to be repurposed...)
-                finalSubDict[currSymbol] = finalSubDict[currSymbol].subs(finalSubDict)
+                # TODO: this code is reused and should be refactored
+                symbolSubDictList = Substituter(SubDictList([finalSubDict])).backSubstitute(currSymbol)
+                backSubbedSymbolSub = symbolSubDictList[0][currSymbol]
+                finalSubDict[currSymbol] = backSubbedSymbolSub
                 yield finalSubDict
         else:
             for symbolSub in symbolSolutions:
@@ -212,8 +215,10 @@ class Solver:
                 # conditions only matter when a solution "branches"
                 nextSymbolSubs.conditions.add(currSymbol - symbolSub)
                 for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextSymbolSubs):
-                    # TODO: use Substituter.backSubstitute() (it'll need to be repurposed...)
-                    finalSubDict[currSymbol] = finalSubDict[currSymbol].subs(finalSubDict)
+                    # TODO: this code is reused and should be refactored
+                    symbolSubDictList = Substituter(SubDictList([finalSubDict])).backSubstitute(currSymbol)
+                    backSubbedSymbolSub = symbolSubDictList[0][currSymbol]
+                    finalSubDict[currSymbol] = backSubbedSymbolSub
                     yield finalSubDict
 
         for item in reversed(poppedItemsFromExprKeys):
