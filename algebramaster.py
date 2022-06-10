@@ -21,6 +21,32 @@ class Substituter:
         ])
         return resultList
 
+    def substituteByElimination(self, expr, forSymbol):
+        assert isinstance(expr, sympy.Expr), "substituteByElimination() requires a sympy Expr"
+        assert type(forSymbol) is sympy.Symbol, "substituteByElimination() needs a sympy Symbol for the variable being solved"
+        assert forSymbol in expr.free_symbols, "substituteByElimination() cannot help infer when the new symbol is not in the expression"
+        assert not any(forSymbol in subDict for subDict in self._subDictList), "substituteByElminination() is meant to help find a symbol not currently in any of the substitution dictionaries"
+        
+        resultList = SubDictList([
+            SubDict({expr: self._subDictUntilFixed(expr, subDict)}, subDict.conditions)
+            for subDict in self._subDictList
+        ])
+        if __debug__:
+            allSymbols = {symbol for subDict in self._subDictList for subDictExprKey in subDict.keys() for symbol in subDictExprKey.free_symbols}
+            resultExprs = (resultExpr for resultDict in resultList for resultExpr in [resultDict[expr]])
+            assert not any(symbol in resultExpr.free_symbols for resultExpr in resultExprs for symbol in allSymbols), "Elimination-substitution requires a dict with expression keys with unidirectional dependencies (can't have {a: b + c, b: a * c}, but CAN have {a: b + c, b: 2 * c})"
+        return resultList
+
+    def backSubstitute(self, forSymbol):
+        assert type(forSymbol) is sympy.Symbol, "backSubstitute() must be given a symbol to substitute for"
+        assert all(forSymbol in subDict for subDict in self._subDictList), "backSubstitute() requires that the symbol has a substitution present in all SubDicts"
+        resultList = SubDictList([
+            SubDict({forSymbol: self._subDictUntilFixed(symbolSubExpr, subDict)}, subDict.conditions)
+            for subDict in self._subDictList
+            for symbolSubExpr in [subDict[forSymbol]]
+        ])
+        return resultList
+
     # other utility functions
 
     def _subDictUntilFixed(self, expr, subDict):
