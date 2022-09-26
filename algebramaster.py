@@ -105,69 +105,95 @@ class Solver:
         assert self._baseRelationalSubs is not None, "Solving by back substitution requires relational substitutions to have been made already (use extractGivenRelationsNumerics() first)"
         assert self._subDictList is None, "Should not invoke solveSymbolsByBackSubstitution() more than once"
         exprKeyOrder = self._exprKeysSortedByIndependence()
-        if __debug__:
-            origExprKeyOrder = list(exprKeyOrder)
         self._subDictList = SubDictList(
             subDict
             for subDict in self._recursiveSolveThenBackSubstitute(exprKeyOrder)
-            # not an actual filter; this is done just for the side-effect
-            if subDict.update(self._baseRelationalSubs) is None
+            for _updatedSubDict in [subDict.update(self._baseRelationalSubs)]
         )
-        assert exprKeyOrder == origExprKeyOrder, "back substitution algorithm should end up returning expr order stack to its original state"
         return self
 
     def _exprKeysSortedByIndependence(self):
         # this ensures that variables needing to be solved don't get "trapped"
-        # trying to use an expression they don't exist in
-        # (a -- a..2b..2c)
-        # (b -- 2a..b..3c)
-        # (c -- 2a..4b -- TRAPPED)
+        # trying to use an expression they don't exist in; for example:
+        #   solve for a -- a..2b..2c
+        #   solve for b -- 2a..b..3c
+        #   solve for c -- 2a..4b -- TRAPPED
+        # another example:
+        #   solve for a -- a..c
+        #   solve for b -- b..c
+        #   solve for c -- a..b -- TRAPPED
         # TODO: will this work with multiple relationships?
         #       ex. a + b = 2; a + b + c = 5;             c + d + e = 12;      d + e = 7
         #                              ^ evaluated here   ^ can't solve here   ^ ...and therefore here
-        # DEBUG:
-        return sorted(self._baseRelationalSubs.keys(), key=lambda expr: len(expr.free_symbols))
-        # return [(2*a + b)/(c + 1), sympy.Mul(-1, (-b + c + 1)/a), a + b*c - b, (a + b*c - 5)/b, a + b + c]
-    
-    def _recursiveSolveThenBackSubstitute(self, exprKeys, symbolSubs=None):
+        return tuple(sorted(self._baseRelationalSubs.keys(), key=lambda expr: len(expr.free_symbols)))
+
+    def _recursiveSolveThenBackSubstitute(self, exprKeys, nextUnusedExprKeyIdx=0, symbolSubs=None):
         if symbolSubs is None:
             symbolSubs = SubDict()
 
-        relationProvidesNewInformation = False
-        poppedItemsFromExprKeys = []
-        while not relationProvidesNewInformation:
-            if len(exprKeys) == 0:
-                finalSubDict = symbolSubs
+        (nextUsefulRelation, symbolToSolveFor, updatedExprKeyIdx) = self._findNextUsefulRelation(exprKeys, nextUnusedExprKeyIdx, symbolSubs)
+        relationFound = nextUsefulRelation is not None
+        if not relationFound:
+            finalSubDict = symbolSubs
+            yield finalSubDict
+        else:
+            solutionsForSymbol = self._interpretSolution(self._solveSet(nextUsefulRelation, symbolToSolveFor))
+            for finalSubDict in self._recursiveBranchForMultiSolutions(solutionsForSymbol, symbolToSolveFor, exprKeys, updatedExprKeyIdx, symbolSubs):
                 yield finalSubDict
-                for item in reversed(poppedItemsFromExprKeys):
-                    exprKeys.insert(0, item)
-                return
-            currExprKey = exprKeys.pop(0)
-            poppedItemsFromExprKeys.append(currExprKey)
 
-            currSymbol = self._findSymbolToSolve(currExprKey, symbolSubs)
-            cantInferFromExprKey = currSymbol is None
-            # DEBUG
-            global DEBUG_solveList
-            DEBUG_solveList.append((currSymbol, currExprKey, SubDict(symbolSubs)))
+    def _findNextUsefulRelation(self, exprKeys, nextUnusedExprKeyIdx, symbolSubs):
+        relationProvidesNewInformation = False
+        while not relationProvidesNewInformation:
+            if nextUnusedExprKeyIdx == len(exprKeys):
+                return (None, None, nextUnusedExprKeyIdx)
+
+            currExprKey = exprKeys[nextUnusedExprKeyIdx]
+            nextUnusedExprKeyIdx += 1
+            symbolToSolveFor = self._findSymbolToSolve(currExprKey, symbolSubs)
+            cantInferFromExprKey = symbolToSolveFor is None
             if cantInferFromExprKey:
-                # TODO: this code is copy-pasted; perhaps refactoring it could make it nicer?
-                finalSubDict = symbolSubs
-                yield finalSubDict
-                for item in reversed(poppedItemsFromExprKeys):
-                    exprKeys.insert(0, item)
-                return
+                return (None, None, nextUnusedExprKeyIdx)
             
             eqNumeric = self._baseRelationalSubs[currExprKey]
             relation = currExprKey - eqNumeric
-            eliminatedRelationList = Substituter(SubDictList([symbolSubs])).substituteByElimination(relation, currSymbol)
+            eliminatedRelationList = Substituter(SubDictList([symbolSubs])).substituteByElimination(relation, symbolToSolveFor)
             eliminatedRelation = eliminatedRelationList[0][relation]
             simplifiedElimRelation = sympy.simplify(eliminatedRelation)
             relationProvidesNewInformation = simplifiedElimRelation != 0
+        return (simplifiedElimRelation, symbolToSolveFor, nextUnusedExprKeyIdx)
 
-        solution = self._solveSet(simplifiedElimRelation, currSymbol)
-        # DEBUG
-        DEBUG_solveList.append(("solution:", solution))
+    def _findSymbolToSolve(self, expr, symbolSubDict):
+        return first(iterDifference(expr.free_symbols, symbolSubDict.keys()), None)
+
+    def _recursiveBranchForMultiSolutions(self, solutionsForSymbol, symbolToSolveFor, exprKeys, nextUnusedExprKeyIdx, symbolSubs):
+        if len(solutionsForSymbol) == 0:
+            assert "this" == "never has to happen"
+            nextSymbolSubs = symbolSubs
+            for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextUnusedExprKeyIdx, nextSymbolSubs):
+                yield finalSubDict
+        elif len(solutionsForSymbol) == 1:
+            # because no branching occurs, we can simply reuse the sub dict/conditions set
+            nextSymbolSubs = symbolSubs
+            nextSymbolSubs[symbolToSolveFor] = first(solutionsForSymbol)
+            for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextUnusedExprKeyIdx, nextSymbolSubs):
+                yield self._backSubstituteAfterRecursiveSolve(finalSubDict, symbolToSolveFor)
+        else:
+            for symbolSub in solutionsForSymbol:
+                # a copy of the dict must be made to track each path
+                nextSymbolSubs = SubDict(symbolSubs)
+                nextSymbolSubs[symbolToSolveFor] = symbolSub
+                # add the condition for this branch
+                nextSymbolSubs.conditions.add(symbolToSolveFor - symbolSub)
+                for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextUnusedExprKeyIdx, nextSymbolSubs):
+                    yield self._backSubstituteAfterRecursiveSolve(finalSubDict, symbolToSolveFor)
+
+    def _backSubstituteAfterRecursiveSolve(self, finalSubDict, symbolToSolveFor):
+        symbolSubDictList = Substituter(SubDictList([finalSubDict])).backSubstitute(symbolToSolveFor)
+        backSubbedSymbolSub = symbolSubDictList[0][symbolToSolveFor]
+        finalSubDict[symbolToSolveFor] = backSubbedSymbolSub
+        return finalSubDict
+
+    def _interpretSolution(self, solution):
         if solution.type is solution.types.NORMAL:
             symbolSolutions = solution.set
         elif solution.type is solution.types.COMPLEXES:
@@ -191,45 +217,7 @@ class Solver:
                 symbolSolutions = solution.set.args[1]
         else:
             raise NotImplementedError("solveSymbolsByBackSubstitution() didn't handle the solution type '{}'".format(solution.type))
-
-        if len(symbolSolutions) == 0:
-            # because no branching occurs, we can simply reuse the sub dict/conditions set
-            nextSymbolSubs = symbolSubs
-            for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextSymbolSubs):
-                yield finalSubDict
-        elif len(symbolSolutions) == 1:
-            # because no branching occurs, we can simply reuse the sub dict/conditions set
-            nextSymbolSubs = symbolSubs
-            nextSymbolSubs[currSymbol] = first(symbolSolutions)
-            for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextSymbolSubs):
-                # TODO: this code is reused and should be refactored
-                symbolSubDictList = Substituter(SubDictList([finalSubDict])).backSubstitute(currSymbol)
-                backSubbedSymbolSub = symbolSubDictList[0][currSymbol]
-                finalSubDict[currSymbol] = backSubbedSymbolSub
-                yield finalSubDict
-        else:
-            for symbolSub in symbolSolutions:
-                # a copy of the dict must be made to track each path
-                nextSymbolSubs = SubDict(symbolSubs)
-                nextSymbolSubs[currSymbol] = symbolSub
-                # conditions only matter when a solution "branches"
-                nextSymbolSubs.conditions.add(currSymbol - symbolSub)
-                for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextSymbolSubs):
-                    # TODO: this code is reused and should be refactored
-                    symbolSubDictList = Substituter(SubDictList([finalSubDict])).backSubstitute(currSymbol)
-                    backSubbedSymbolSub = symbolSubDictList[0][currSymbol]
-                    finalSubDict[currSymbol] = backSubbedSymbolSub
-                    yield finalSubDict
-
-        for item in reversed(poppedItemsFromExprKeys):
-            exprKeys.insert(0, item)
-
-    def _findSymbolToSolve(self, expr, symbolSubDict):
-        # DEBUG
-        val = first(iterDifference(expr.free_symbols, symbolSubDict.keys()), None)
-        # val = [b, a, a, c, c, None][self._exprKeysSortedByIndependence().index(expr)]
-        DEBUG_solveList.append(("find symbol:", val))
-        return val
+        return symbolSolutions
 
     # UTILITY FUNCTIONS
 
@@ -370,7 +358,6 @@ class ContradictionException(Exception):
 
 
 if __name__ == "__main__":
-    DEBUG_solveList = []
     S = sympy.Symbol
     # master = AlgebraMaster()
 
@@ -394,7 +381,6 @@ if __name__ == "__main__":
     #     .solutions
 
     solver = Solver()
-    DEBUG_solveList = [solver]
     solutions = solver \
         .extractGivenRelationalNumerics({
             a + b + c  -  6,
