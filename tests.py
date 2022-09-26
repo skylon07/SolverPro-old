@@ -1,4 +1,7 @@
+from email.policy import strict
 from main import *
+from algebramaster import Solver
+from structures import *
 
 ISP = ' ' * len(USER_INPUT)
 
@@ -1349,6 +1352,150 @@ class TestSuites:
         Tester.stopIfFailed()
 
     @classmethod
+    def Solver(cls):
+        def dictIncludes(someDict, includesKeysAndValues):
+            for (includeKey, includeVal) in includesKeysAndValues.items():
+                if includeKey not in someDict or someDict[includeKey] != includeVal:
+                    return False
+            return True
+
+        def conditionsMatch(subDict1, subDict2):
+            if type(subDict1) is not SubDict:
+                subDict1 = SubDict(subDict1)
+            if type(subDict2) is not SubDict:
+                subDict2 = SubDict(subDict2)
+
+            return subDict1.conditions == subDict2.conditions
+
+        def testSolver(relations, expectedSolutions, testName, *args, strictLen=None):
+            if strictLen is None:
+                # strictLen must be provided; True signals that all solutions are provided,
+                # and False signals only some solutions are provided (and False cases
+                # should be converted to True ones wherever possible)
+                raise TypeError("testSolver() requires the 'strictLen' boolean keyword argument")
+            
+            if isinstance(expectedSolutions, dict):
+                expectedSolutions = SubDictList([SubDict(expectedSolutions)])
+            elif type(expectedSolutions) in (tuple, list, set):
+                expectedSolutions = SubDictList(SubDict(dictLike) for dictLike in expectedSolutions)
+
+            # TODO: all combinations need to be done here
+            # (except how do I manupulate aht vars get evaluated first?)
+            solver = Solver()
+            solver.extractGivenRelationalNumerics(relations)
+            solver.solveSymbolsByBackSubstitution()
+            solutions = solver.solutions
+
+            for expectedContainsDict in expectedSolutions:
+                solutionsContainsMatch = any(
+                    dictIncludes(subDict, expectedContainsDict)
+                        and conditionsMatch(subDict, expectedContainsDict)
+                    for subDict in solutions
+                )
+                if not solutionsContainsMatch:
+                    # should always fail; just provides a useful error message
+                    Tester.assertIn(expectedContainsDict, solutions, testName)
+            if strictLen:
+                Tester.assertEqual(len(expectedSolutions), len(solutions), testName)
+            elif len(expectedSolutions) != len(solutions):
+                print("WARNING! Solver() len-tests did not match (but strict mode was not enabled...)")
+                print("    solutions keys: {}".format([tuple(solution.keys()) for solution in solutions]))
+                print("    exp sols keys:  {}".format([tuple(expDict.keys()) for expDict in expectedSolutions]))
+            Tester.stopIfFailed()
+
+        # a + b = 4
+        # a - b = 2
+        # a = 3
+        # b = 1
+        (a, b) = sympy.symbols("a, b")
+        testSolver(
+            [
+                a + b  -  4,
+                a - b  -  2,
+            ],
+            [{
+                a: 3,
+                b: 1,
+            }],
+            "basic two-relation two-variable one-universe system",
+            strictLen=True,
+        )
+        Tester.stopIfFailed()
+
+        # a + 2b + c = 20
+        # 2a + c = 14
+        # b - a = 1
+        # a = 4
+        # b = 5
+        # c = 6
+        (a, b, c) = sympy.symbols("a, b, c")
+        testSolver(
+            [
+                a + 2*b + c  -  20,
+                2*a + c  -  14,
+                b - a  -  1,
+            ],
+            [{
+                a: 4,
+                b: 5,
+                c: 6,
+            }],
+            "basic three-relation three-variable one-universe system",
+            strictLen=True
+        )
+
+        # a + b = 6
+        # b - c = 7
+        # c = d - 8
+        # d + e = -7
+        # e + a = -10
+        # a = 2
+        # b = 4
+        # c = -3
+        # d = 5
+        # e = -12
+        (a, b, c, d, e) = sympy.symbols("a, b, c, d, e")
+        testSolver(
+            [
+                a + b  -  6,
+                b - c  -  7,
+                c  -  (d - 8),
+                d + e  -  -7,
+                e + a  -  -10,
+            ],
+            [{
+                a: 2,
+                b: 4,
+                c: -3,
+                d: 5,
+                e: -12,
+            }],
+            "five-variable chained relations system",
+            strictLen=True,
+        )
+
+        # ab = 8
+        # b = 2a
+        # a = -2, 2
+        # b = -4, 4
+        (a, b) = sympy.symbols("a, b")
+        testSolver(
+            [
+                a*b  -  8,
+                b  -  2*a
+            ],
+            [{
+                a: 2,
+                b: 4,
+            }, {
+                a: -2,
+                b: -4,
+            }],
+            "two-variable two-universe multiplication system",
+            strictLen=True
+        )
+    
+    @classmethod
     def Interpreter(cls):
         state = dict()
         def fakePrint(*args, **kwargs):
@@ -2476,9 +2623,10 @@ class TestSuites:
 
 class Tester:
     allTests = [
-        "Lexer",
-        "Parser",
-        "Interpreter",
+        'Lexer',
+        'Parser',
+        'Solver',
+        'Interpreter',
     ]
     currentTest = None
     hasFailed = False
