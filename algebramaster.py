@@ -8,12 +8,20 @@ class Substituter:
         assert type(subDictList) is SubDictList, "Substituter requires a SubDictList"
         self._subDictList = subDictList
 
+    def substituteAllKnowns(self, expr):
+        if isNumeric(expr):
+            return SubDictList([SubDict({expr: expr})])
+        assert isinstance(expr, sympy.Expr), "substituteAllKnowns() requires a sympy Expr"
+        return SubDictList([
+            SubDict({expr: expr.subs(subDict)})
+            for subDict in self._subDictList
+        ])
+
     def substituteToNumerics(self, expr):
-        assert isinstance(expr, sympy.Expr), "substituteToNumerics() requires a sympy Expr"
         assert all(isNumeric(val) for subDict in self._subDictList for val in subDict.values()), "Substituter sub dicts' values must be numerics when substituting to numerics"
         if isNumeric(expr):
             return SubDictList([SubDict({expr: expr})])
-        assert isinstance(expr, sympy.Expr), "Can only substitute for Sympy expressions"
+        assert isinstance(expr, sympy.Expr), "substituteToNumerics() requires a sympy Expr"
         
         resultList = SubDictList([
             SubDict({expr: self._subDictUntilFixed(expr, subDict)}, subDict.conditions)
@@ -104,7 +112,7 @@ class Solver:
     def solveSymbolsByBackSubstitution(self):
         assert self._baseRelationalSubs is not None, "Solving by back substitution requires relational substitutions to have been made already (use extractGivenRelationsNumerics() first)"
         assert self._subDictList is None, "Should not invoke solveSymbolsByBackSubstitution() more than once"
-        exprKeyOrder = self._exprKeysSortedByIndependence()
+        exprKeyOrder = tuple(self._exprKeysSortedByIndependence())
         self._subDictList = SubDictList(
             subDict
             for subDict in self._recursiveSolveThenBackSubstitute(exprKeyOrder)
@@ -122,51 +130,73 @@ class Solver:
         #   solve for a -- a..c
         #   solve for b -- b..c
         #   solve for c -- a..b -- TRAPPED
-        # TODO: will this work with multiple relationships?
-        #       ex. a + b = 2; a + b + c = 5;             c + d + e = 12;      d + e = 7
-        #                              ^ evaluated here   ^ can't solve here   ^ ...and therefore here
-        return tuple(sorted(self._baseRelationalSubs.keys(), key=lambda expr: len(expr.free_symbols)))
+        return sorted(self._baseRelationalSubs.keys(), key=lambda expr: len(expr.free_symbols))
 
-    def _recursiveSolveThenBackSubstitute(self, exprKeys, nextUnusedExprKeyIdx=0, symbolSubs=None):
+    def _recursiveSolveThenBackSubstitute(self, exprKeys, unusedExprKeyIdx=0, symbolSubs=None):
         if symbolSubs is None:
             symbolSubs = SubDict()
 
-        (nextUsefulRelation, symbolToSolveFor, updatedExprKeyIdx) = self._findNextUsefulRelation(exprKeys, nextUnusedExprKeyIdx, symbolSubs)
-        relationFound = nextUsefulRelation is not None
-        if not relationFound:
+        (nextUsefulRelation, symbolToSolveFor, nextUnusedExprKeyIdx) = self._findNextUsefulRelation(exprKeys, unusedExprKeyIdx, symbolSubs)
+        usedAllExprKeys = nextUsefulRelation is None
+        if usedAllExprKeys:
             finalSubDict = symbolSubs
             yield finalSubDict
         else:
             solutionsForSymbol = self._interpretSolution(self._solveSet(nextUsefulRelation, symbolToSolveFor))
-            for finalSubDict in self._recursiveBranchForMultiSolutions(solutionsForSymbol, symbolToSolveFor, exprKeys, updatedExprKeyIdx, symbolSubs):
+            argsForNextRecursiveCall = (exprKeys, nextUnusedExprKeyIdx, symbolSubs)
+            for finalSubDict in self._recursiveBranchForMultiSolutions(solutionsForSymbol, symbolToSolveFor, argsForNextRecursiveCall):
                 yield finalSubDict
 
-    def _findNextUsefulRelation(self, exprKeys, nextUnusedExprKeyIdx, symbolSubs):
+    def _findNextUsefulRelation(self, exprKeys, unusedExprKeyIdx, symbolSubs):
         relationProvidesNewInformation = False
         while not relationProvidesNewInformation:
-            if nextUnusedExprKeyIdx == len(exprKeys):
-                return (None, None, nextUnusedExprKeyIdx)
+            ranOutOfExprs = unusedExprKeyIdx == len(exprKeys)
+            if ranOutOfExprs:
+                return (None, None, unusedExprKeyIdx)
 
-            currExprKey = exprKeys[nextUnusedExprKeyIdx]
-            nextUnusedExprKeyIdx += 1
-            symbolToSolveFor = self._findSymbolToSolve(currExprKey, symbolSubs)
-            cantInferFromExprKey = symbolToSolveFor is None
-            if cantInferFromExprKey:
-                return (None, None, nextUnusedExprKeyIdx)
-            
+            currExprKey = exprKeys[unusedExprKeyIdx]
             eqNumeric = self._baseRelationalSubs[currExprKey]
             relation = currExprKey - eqNumeric
-            eliminatedRelationList = Substituter(SubDictList([symbolSubs])).substituteByElimination(relation, symbolToSolveFor)
-            eliminatedRelation = eliminatedRelationList[0][relation]
-            simplifiedElimRelation = sympy.simplify(eliminatedRelation)
-            relationProvidesNewInformation = simplifiedElimRelation != 0
-        return (simplifiedElimRelation, symbolToSolveFor, nextUnusedExprKeyIdx)
+            subbedRelation = Substituter(SubDictList([symbolSubs])).substituteAllKnowns(relation)[0][relation]
+            
+            relationProvidesNewInformation = subbedRelation != 0
+            if relationProvidesNewInformation:
+                symbolToSolveFor = self._findSymbolToSolve(subbedRelation, exprKeys[unusedExprKeyIdx + 1:], symbolSubs)
+                cantInferFromExprKey = symbolToSolveFor is None
+                
+                if cantInferFromExprKey:
+                    assert first(iterDifference(currExprKey.free_symbols, symbolSubs.keys()), None) is None, "Can't infer expression key for some bad reason (the only good reason is if the expression doesn't contain any new/unsolved symbols)"
+                    relationProvidesNewInformation = False
+                else:
+                    eliminatedRelationList = Substituter(SubDictList([symbolSubs])).substituteByElimination(subbedRelation, symbolToSolveFor)
+                    eliminatedRelation = eliminatedRelationList[0][subbedRelation]
+                    simplifiedElimRelation = sympy.simplify(eliminatedRelation)
+                    # TODO: is this check needed?
+                    relationProvidesNewInformation = simplifiedElimRelation != 0
+            
+            unusedExprKeyIdx += 1
+                
+        return (simplifiedElimRelation, symbolToSolveFor, unusedExprKeyIdx)
 
-    def _findSymbolToSolve(self, expr, symbolSubDict):
-        return first(iterDifference(expr.free_symbols, symbolSubDict.keys()), None)
+    def _findSymbolToSolve(self, subbedRelation, restOfExprKeys, symbolSubs):
+        usedSymbols = set(symbolSubs.keys())
 
-    def _recursiveBranchForMultiSolutions(self, solutionsForSymbol, symbolToSolveFor, exprKeys, nextUnusedExprKeyIdx, symbolSubs):
+        possibleSymbols = iterDifference(subbedRelation.free_symbols, usedSymbols)
+        nonBlockingSymbol = None
+        for symbol in possibleSymbols:
+            usingSymbolCausesBlocks = any(
+                first(iterDifference(expr.free_symbols, usedSymbols), None) is None
+                for expr in restOfExprKeys
+            )
+            if not usingSymbolCausesBlocks:
+                nonBlockingSymbol = symbol
+                break
+        return nonBlockingSymbol
+
+    def _recursiveBranchForMultiSolutions(self, solutionsForSymbol, symbolToSolveFor, argsForNextRecursiveCall):
+        (exprKeys, nextUnusedExprKeyIdx, symbolSubs) = argsForNextRecursiveCall
         if len(solutionsForSymbol) == 0:
+            # TODO: remove this if it actually never happens (and make an assert for it)
             assert "this" == "never has to happen"
             nextSymbolSubs = symbolSubs
             for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextUnusedExprKeyIdx, nextSymbolSubs):
