@@ -1389,7 +1389,6 @@ class TestSuites:
             for expectedContainsDict in expectedSolutions:
                 solutionsContainsMatch = any(
                     dictIncludes(subDict, expectedContainsDict)
-                        and conditionsMatch(subDict, expectedContainsDict)
                     for subDict in solutions
                 )
                 if not solutionsContainsMatch:
