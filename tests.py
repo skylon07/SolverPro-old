@@ -1584,7 +1584,7 @@ class TestSuites:
 
         # a + c = b
         # d - b = c
-        # 2*c = d - a
+        # a*d = 4*(b + c)
         # a * 10 = d * 4
         # (a = 4)
         # (b = 7)
@@ -1595,7 +1595,7 @@ class TestSuites:
             [
                 a + c  -  b,
                 d - b  -  c,
-                2*c  -  (d - a),
+                a*d  -  4*(b + c),
                 a*10  -  d*4,
             ],
             [{
