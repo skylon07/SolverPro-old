@@ -1367,12 +1367,9 @@ class TestSuites:
 
             return subDict1.conditions == subDict2.conditions
 
-        def testSolver(relations, expectedSolutions, testName, *args, strictLen=None):
-            if strictLen is None:
-                # strictLen must be provided; True signals that all solutions are provided,
-                # and False signals only some solutions are provided (and False cases
-                # should be converted to True ones wherever possible)
-                raise TypeError("testSolver() requires the 'strictLen' boolean keyword argument")
+        def testSolver(relations, expectedSolutions, testName, *args, allSolutionsProvided=None):
+            if allSolutionsProvided is None:
+                raise TypeError("testSolver() requires the 'allSolutionsProvided' boolean keyword argument")
             
             if isinstance(expectedSolutions, dict):
                 expectedSolutions = SubDictList([SubDict(expectedSolutions)])
@@ -1394,7 +1391,7 @@ class TestSuites:
                 if not solutionsContainsMatch:
                     # should always fail; just provides a useful error message
                     Tester.assertIn(expectedContainsDict, solutions, testName)
-            if strictLen:
+            if allSolutionsProvided:
                 Tester.assertEqual(len(expectedSolutions), len(solutions), testName)
             elif len(expectedSolutions) != len(solutions):
                 print("WARNING! Solver() len-tests did not match (but strict mode was not enabled...)")
@@ -1404,8 +1401,8 @@ class TestSuites:
 
         # a + b = 4
         # a - b = 2
-        # a = 3
-        # b = 1
+        # (a = 3)
+        # (b = 1)
         (a, b) = sympy.symbols("a, b")
         testSolver(
             [
@@ -1417,16 +1414,16 @@ class TestSuites:
                 b: 1,
             }],
             "basic two-relation two-variable one-universe system",
-            strictLen=True,
+            allSolutionsProvided=True,
         )
         Tester.stopIfFailed()
 
         # a + 2b + c = 20
         # 2a + c = 14
         # b - a = 1
-        # a = 4
-        # b = 5
-        # c = 6
+        # (a = 4)
+        # (b = 5)
+        # (c = 6)
         (a, b, c) = sympy.symbols("a, b, c")
         testSolver(
             [
@@ -1440,7 +1437,7 @@ class TestSuites:
                 c: 6,
             }],
             "basic three-relation three-variable one-universe system",
-            strictLen=True
+            allSolutionsProvided=True
         )
 
         # a + b = 6
@@ -1448,11 +1445,11 @@ class TestSuites:
         # c = d - 8
         # d + e = -7
         # e + a = -10
-        # a = 2
-        # b = 4
-        # c = -3
-        # d = 5
-        # e = -12
+        # (a = 2)
+        # (b = 4)
+        # (c = -3)
+        # (d = 5)
+        # (e = -12)
         (a, b, c, d, e) = sympy.symbols("a, b, c, d, e")
         testSolver(
             [
@@ -1470,13 +1467,13 @@ class TestSuites:
                 e: -12,
             }],
             "five-variable chained relations system",
-            strictLen=True,
+            allSolutionsProvided=True,
         )
 
         # ab = 8
         # b = 2a
-        # a = -2, 2
-        # b = -4, 4
+        # (a = -2, 2)
+        # (b = -4, 4)
         (a, b) = sympy.symbols("a, b")
         testSolver(
             [
@@ -1491,8 +1488,9 @@ class TestSuites:
                 b: -4,
             }],
             "two-variable two-universe multiplication system",
-            strictLen=True
+            allSolutionsProvided=True
         )
+
     
     @classmethod
     def Interpreter(cls):
