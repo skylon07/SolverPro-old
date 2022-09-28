@@ -12,10 +12,12 @@ class Substituter:
         if isNumeric(expr):
             return SubDictList([SubDict({expr: expr})])
         assert isinstance(expr, sympy.Expr), "substituteAllKnowns() requires a sympy Expr"
-        return SubDictList([
-            SubDict({expr: expr.subs(subDict)})
+
+        resultList = SubDictList([
+            SubDict({expr: self._subDictUntilFixed(expr, subDict)}, subDict.conditions)
             for subDict in self._subDictList
         ])
+        return resultList
 
     def substituteToNumerics(self, expr):
         assert all(isNumeric(val) for subDict in self._subDictList for val in subDict.values()), "Substituter sub dicts' values must be numerics when substituting to numerics"
