@@ -180,18 +180,24 @@ class Solver:
 
     def _findSymbolToSolve(self, subbedRelation, restOfExprKeys, symbolSubs):
         usedSymbols = set(symbolSubs.keys())
+        restOfExprKeys = tuple(
+            Substituter(SubDictList([symbolSubs])).substituteAllKnowns(restExpr)[0][restExpr]
+            for restExpr in restOfExprKeys
+        )
 
-        possibleSymbols = iterDifference(subbedRelation.free_symbols, usedSymbols)
-        nonBlockingSymbol = None
-        for symbol in possibleSymbols:
-            usingSymbolCausesBlocks = any(
-                first(iterDifference(expr.free_symbols, usedSymbols), None) is None
-                for expr in restOfExprKeys
-            )
-            if not usingSymbolCausesBlocks:
-                nonBlockingSymbol = symbol
-                break
-        return nonBlockingSymbol
+        possibleSymbols = list(iterDifference(subbedRelation.free_symbols, usedSymbols))
+        symbolCount = {symbol: 0 for symbol in possibleSymbols}
+        if len(symbolCount) == 0:
+            return None
+        
+        for restSymbol in possibleSymbols:
+            symbolCount[restSymbol] += 1
+        for restExpr in restOfExprKeys:
+            for restSymbol in restExpr.free_symbols:
+                if restSymbol in symbolCount:
+                    symbolCount[restSymbol] += 1
+        return min(symbolCount, key=lambda symbol: symbolCount[symbol])
+        
 
     def _recursiveBranchForMultiSolutions(self, solutionsForSymbol, symbolToSolveFor, argsForNextRecursiveCall):
         (exprKeys, nextUnusedExprKeyIdx, symbolSubs) = argsForNextRecursiveCall
