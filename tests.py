@@ -1355,7 +1355,11 @@ class TestSuites:
     def Solver(cls):
         def dictIncludes(someDict, includesKeysAndValues):
             for (includeKey, includeVal) in includesKeysAndValues.items():
-                if includeKey not in someDict or someDict[includeKey] != includeVal:
+                if includeKey not in someDict:
+                    return False
+                someVal = someDict[includeKey]
+                roundedValIfNumeric = round(someVal, 100) if isNumeric(someVal) else someVal
+                if roundedValIfNumeric != includeVal:
                     return False
             return True
 
@@ -1478,7 +1482,7 @@ class TestSuites:
         testSolver(
             [
                 a*b  -  8,
-                b  -  2*a
+                b  -  2*a,
             ],
             [{
                 a: 2,
@@ -1491,6 +1495,136 @@ class TestSuites:
             allSolutionsProvided=True
         )
 
+        # f = m * a
+        # f = 80
+        # m = 20
+        # (a = 4)
+        (f, m, a) = sympy.symbols("f, m, a")
+        testSolver(
+            [
+                f  -  m*a,
+                f - 80,
+                m - 20,
+            ],
+            [{
+                f: 80,
+                m: 20,
+                a: 4,
+            }],
+            "system with one variable-only relation",
+            allSolutionsProvided=True,
+        )
+
+        # k1i = 1/2 * m1 * v1i^2
+        # k2i = 1/2 * m2 * v2i^2
+        # k1f = 1/2 * m1 * v1f^2
+        # k2f = 1/2 * m2 * v2f^2
+        # kt = k1i + k2i
+        # kt = k1f + k2f
+        # m1 = 10
+        # m2 = 16
+        # v1i = 15
+        # v2i = 10
+        # v1f = 5
+        # (v2f = 15)
+        # (k1i = 1125)
+        # (k2i = 800)
+        # (kt = 1925)
+        # (k1f = 125)
+        # (k2f = 1800)
+
+        (m1, m2, v1i, v2i, v1f, v2f, k1i, k2i, k1f, k2f, kt) = sympy.symbols("m1, m2, v1i, v2i, v1f, v2f, k1i, k2i, k1f, k2f, kt")
+        testSolver(
+            [
+                k1i  -  1/2 * m1 * v1i**2,
+                k2i  -  1/2 * m2 * v2i**2,
+                k1f  -  1/2 * m1 * v1f**2,
+                k2f  -  1/2 * m2 * v2f**2,
+                kt  -  (k1i + k2i),
+                kt  -  (k1f + k2f),
+                m1 - 10,
+                m2 - 16,
+                v1i - 15,
+                v2i - 10,
+                v1f - 5,
+            ],
+            [{
+                m1: 10,
+                m2: 16,
+                v1i: 15,
+                v2i: 10,
+                v1f: 5,
+                v2f: 15,
+                k1i: 1125,
+                k2i: 800,
+                k1f: 125,
+                k2f: 1800,
+                kt: 1925,
+            }, {
+                m1: 10,
+                m2: 16,
+                v1i: 15,
+                v2i: 10,
+                v1f: 5,
+                v2f: -15, # the only thing different (because ±√(2*k2f/m2))
+                k1i: 1125,
+                k2i: 800,
+                k1f: 125,
+                k2f: 1800,
+                kt: 1925,
+            }],
+            "system with multiple variable-only relations",
+            allSolutionsProvided=True
+        )
+
+        # a + c = b
+        # d - b = c
+        # 2*c = d - a
+        # a * 10 = d * 4
+        # (a = 4)
+        # (b = 7)
+        # (c = 3)
+        # (d = 10)
+        (a, b, c, d) = sympy.symbols("a, b, c, d")
+        testSolver(
+            [
+                a + c  -  b,
+                d - b  -  c,
+                2*c  -  (d - a),
+                a*10  -  d*4,
+            ],
+            [{
+                a: 4,
+                b: 7,
+                c: 3,
+                d: 10,
+            }],
+            "system with relations missing numerics",
+            allSolutionsProvided=False
+        )
+
+        # a + b = -c
+        # b * b + c = a
+        # b + b - a = -c
+        # (a = 1)
+        # (b = 2)
+        # (c = -3)
+        (a, b, c) = sympy.symbols("a, b, c")
+        testSolver(
+            [
+                a + b  +  c,
+                b * b + c  -  a,
+                b + b - a  +  c,
+            ],
+            [{
+                a: 1,
+                b: 2,
+                c: -3,
+            }],
+            "system with all relations missing numerics (and one positive-only)",
+            allSolutionsProvided=False
+        )
+        a + b
     
     @classmethod
     def Interpreter(cls):
