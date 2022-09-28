@@ -1443,6 +1443,7 @@ class TestSuites:
             "basic three-relation three-variable one-universe system",
             allSolutionsProvided=True
         )
+        Tester.stopIfFailed()
 
         # a + b = 6
         # b - c = 7
@@ -1473,6 +1474,7 @@ class TestSuites:
             "five-variable chained relations system",
             allSolutionsProvided=True,
         )
+        Tester.stopIfFailed()
 
         # ab = 8
         # b = 2a
@@ -1494,6 +1496,7 @@ class TestSuites:
             "two-variable two-universe multiplication system",
             allSolutionsProvided=True
         )
+        Tester.stopIfFailed()
 
         # f = m * a
         # f = 80
@@ -1514,6 +1517,7 @@ class TestSuites:
             "system with one variable-only relation",
             allSolutionsProvided=True,
         )
+        Tester.stopIfFailed()
 
         # k1i = 1/2 * m1 * v1i^2
         # k2i = 1/2 * m2 * v2i^2
@@ -1576,6 +1580,7 @@ class TestSuites:
             "system with multiple variable-only relations",
             allSolutionsProvided=True
         )
+        Tester.stopIfFailed()
 
         # a + c = b
         # d - b = c
@@ -1602,6 +1607,7 @@ class TestSuites:
             "system with relations missing numerics",
             allSolutionsProvided=False
         )
+        Tester.stopIfFailed()
 
         # a + b = -c
         # b * b + c = a
@@ -1624,7 +1630,7 @@ class TestSuites:
             "system with all relations missing numerics (and one positive-only)",
             allSolutionsProvided=False
         )
-        a + b
+        Tester.stopIfFailed()
     
     @classmethod
     def Interpreter(cls):
@@ -2781,6 +2787,7 @@ class Tester:
         print()
         for testName in cls.allTests:
             cls.runTest(testName)
+            print("Tests for {} passed!".format(testName))
         print("Done!")
 
     @classmethod
