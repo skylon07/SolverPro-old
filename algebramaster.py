@@ -3,6 +3,91 @@ import sympy
 from structures import *
 
 
+class AlgebraMaster:
+    def __init__(self):
+        self._definedSubstitutions = dict()
+        self._inferredSubstitutions = dict()
+        self._relationsEqZero = set()
+        self._relationSymbols = set()
+
+    def define(self, symbols, vals):
+        assert type(symbols) in (tuple, list), "define() requires list or tuple of symbols"
+        assert all(type(symbol) in (sympy.Symbol, Identifier) for symbol in symbols), "symbols must be list/tuple of sympy Symbols or Identifiers"
+        assert type(vals) is SubSet, "define() requires vals to be a SubSet"
+        
+        symbols = self._identifiersToSymbols(symbols)
+        subVals = SubSet.join(self.substitute(val) for val in vals)
+        if not subVals.isNumericSet:
+            raise NotANumericException()
+        self._definedSubstitutions.update({symbol: subVals for symbol in symbols})
+        self._updateInferredSubstitutions()
+
+    def getDefinition(self, symbol):
+        assert type(symbol) in (sympy.Symbol, Identifier), "getDefinition() can only work for sympy Symbols and Identifiers"
+        symbol = self._identifiersToSymbols([symbol])[0]
+        return self._definedSubstitutions.get(symbol)
+
+    def isDefined(self, symbol):
+        assert type(symbol) in (sympy.Symbol, Identifier), "isDefined() can only work for sympy Symbols and Identifiers"
+        symbol = self._identifiersToSymbols([symbol])[0]
+        return symbol in self._definedSubstitutions
+
+    def relate(self, leftExpr, rightExpr):
+        assert isinstance(leftExpr, sympy.Expr), "Cannot relate left side; not a sympy Expr"
+        assert isinstance(rightExpr, sympy.Expr), "Cannot relate right side; not a sympy Expr"
+        exprEqZero = leftExpr - rightExpr
+
+        self._relationsEqZero.add(exprEqZero)
+        self._relationSymbols.update(exprEqZero.free_symbols)
+        self._updateInferredSubstitutions()
+
+    def getInference(self, expr):
+        assert isinstance(expr, sympy.Expr) or type(expr) is Identifier, "getInference() can only work for sympy Exprs and Identifiers"
+        expr = self._identifiersToSymbols([expr])[0]
+        return self._inferredSubstitutions.get(expr)
+
+    def isInferred(self, expr):
+        assert isinstance(expr, sympy.Expr) or type(expr) is Identifier, "getInference() can only work for sympy Exprs and Identifiers"
+        expr = self._identifiersToSymbols([expr])[0]
+        return expr in self._inferredSubstitutions
+
+    def getKnown(self, expr):
+        if type(expr) in (sympy.Symbol, Identifier):
+            return self.getDefinition(expr) or self.getInference(expr)
+        else:
+            return self.getInference(expr)
+
+    def isKnown(self, expr):
+        if type(expr) in (sympy.Symbol, Identifier):
+            return self.isDefined(expr) or self.isInferred(expr)
+        else:
+            return self.isInferred(expr)
+
+    def exists(self, symbol):
+        return symbol in self._relationSymbols
+
+    def substitute(self, expr):
+        subsDict = dict(self._definedSubstitutions)
+        subsDict.update(self._inferredSubstitutions)
+        return Substituter(subsDict).substituteToNumerics(expr)
+
+    def _identifiersToSymbols(self, identifiersOrSymbols):
+        # function exists purely for syntactical purposes
+        def raiseInvalidType():
+            raise NotImplementedError("List must contain Identifiers and sympy Symbols/Exprs; nothing else")
+        
+        return [
+            identifierToSymbol(symbol) if type(symbol) is Identifier
+            else symbol if isinstance(symbol, sympy.Expr)
+            else raiseInvalidType()
+            for symbol in identifiersOrSymbols
+        ]
+
+    # relational/solving functions
+    def _updateInferredSubstitutions(self):
+        self._inferredSubstitutions = Solver(self._relationsEqZero, self._definedSubstitutions).genNumericSolutions()
+
+
 class Substituter:
     def __init__(self, subDictList):
         assert type(subDictList) is SubDictList, "Substituter requires a SubDictList"
@@ -205,7 +290,7 @@ class Solver:
         (exprKeys, nextUnusedExprKeyIdx, symbolSubs) = argsForNextRecursiveCall
         if len(solutionsForSymbol) == 0:
             # TODO: remove this if it actually never happens (and make an assert for it)
-            assert "this" == "never has to happen"
+            # assert "this" == "never has to happen"
             nextSymbolSubs = symbolSubs
             for finalSubDict in self._recursiveSolveThenBackSubstitute(exprKeys, nextUnusedExprKeyIdx, nextSymbolSubs):
                 yield finalSubDict
